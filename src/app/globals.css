@@ -1,8 +1,31 @@
 @import "tailwindcss";
 
 :root {
+  /* Colores base */
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Paleta principal - Azul Francia */
+  --color-primary: #0055A4;
+  --color-primary-light: #3385ff;
+  --color-primary-dark: #003366;
+  
+  /* Paleta secundaria - Grises */
+  --color-secondary: #6c757d;
+  --color-secondary-light: #f8f9fa;
+  --color-secondary-dark: #343a40;
+  
+  /* Colores de acento */
+  --color-success: #28a745;
+  --color-warning: #ffc107;
+  --color-error: #dc3545;
+  --color-info: #17a2b8;
+  
+  /* Sombras */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-primary: 0 4px 15px -3px rgba(0, 85, 164, 0.2);
 }
 
 @theme inline {
@@ -10,17 +33,157 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Colores personalizados para Tailwind v4 */
+  --color-primary-50: #e6f0ff;
+  --color-primary-100: #cce0ff;
+  --color-primary-200: #99c2ff;
+  --color-primary-300: #66a3ff;
+  --color-primary-400: #3385ff;
+  --color-primary-500: #0055A4;
+  --color-primary-600: #004489;
+  --color-primary-700: #003366;
+  --color-primary-800: #002244;
+  --color-primary-900: #001122;
+  
+  --color-secondary-50: #ffffff;
+  --color-secondary-100: #f8f9fa;
+  --color-secondary-200: #e9ecef;
+  --color-secondary-300: #dee2e6;
+  --color-secondary-400: #ced4da;
+  --color-secondary-500: #adb5bd;
+  --color-secondary-600: #6c757d;
+  --color-secondary-700: #495057;
+  --color-secondary-800: #343a40;
+  --color-secondary-900: #212529;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --color-secondary-light: #212529;
+    --color-secondary-dark: #f8f9fa;
   }
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(to bottom, #99c2ff 0%, #ffffff 20%, #ffffff 80%, #1a1a1a 100%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
 }
+
+/* Utilidades globales */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .container-custom {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  
+  .section-padding {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
+
+  /* Animaciones de scroll reveal */
+  .animate-on-scroll {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+
+  .animate-on-scroll.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .animate-slide-in-left {
+    opacity: 0;
+    transform: translateX(-50px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .animate-slide-in-left.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .animate-slide-in-right {
+    opacity: 0;
+    transform: translateX(50px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .animate-slide-in-right.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .animate-scale-in {
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+
+  .animate-scale-in.is-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Efecto de brillo en hover */
+  .shine-effect {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shine-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: left 0.5s;
+  }
+
+  .shine-effect:hover::before {
+    left: 100%;
+  }
+
+  /* Smooth scroll */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Mejora de performance para animaciones */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
