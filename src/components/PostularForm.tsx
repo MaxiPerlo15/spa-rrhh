@@ -123,7 +123,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 required
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900"
                 placeholder="Juan Pérez"
               />
             </div>
@@ -140,7 +140,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 required
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900"
                 placeholder="juan@ejemplo.com"
               />
             </div>
@@ -156,7 +156,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900"
                 placeholder="+54 11 1234-5678"
               />
             </div>
@@ -173,7 +173,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 required
                 accept=".pdf,.doc,.docx"
                 onChange={handleFileChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
               />
               {resumeFile && (
                 <p className="text-sm text-gray-600 mt-2">Archivo seleccionado: {resumeFile.name}</p>
@@ -191,7 +191,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 value={formData.coverLetter}
                 onChange={handleInputChange}
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none text-gray-900"
                 placeholder="Cuéntanos por qué eres el candidato ideal para esta posición..."
               />
             </div>

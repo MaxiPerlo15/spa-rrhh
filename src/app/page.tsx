@@ -14,8 +14,11 @@ interface Vacancy {
   title: string
   description: string
   location: string
-  type: 'full-time' | 'part-time' | 'freelance'
+  workday: 'FULL_TIME' | 'PART_TIME' | 'PROJECT_BASED' | 'INTERNSHIP'
+  modality: 'ON_SITE' | 'REMOTE' | 'HYBRID'
   salary?: string
+  requirements?: string
+  benefits?: string
 }
 
 export default function Home() {
@@ -133,8 +136,11 @@ export default function Home() {
                     title={vacancy.title}
                     description={vacancy.description}
                     location={vacancy.location}
-                    type={vacancy.type}
+                    workday={vacancy.workday}
+                    modality={vacancy.modality}
                     salary={vacancy.salary}
+                    requirements={vacancy.requirements}
+                    benefits={vacancy.benefits}
                     onApply={handleApply}
                   />
                 ))

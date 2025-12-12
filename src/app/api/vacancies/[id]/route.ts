@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
 interface RouteParams {
   params: Promise<{
@@ -52,17 +53,26 @@ export async function PUT(
   { params }: RouteParams
 ) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
 
-    // Convertir type si viene del frontend
-    if (body.type) {
-      const typeMap: Record<string, string> = {
-        'full-time': 'FULL_TIME',
-        'part-time': 'PART_TIME',
-        'freelance': 'FREELANCE'
+    // Convertir status si viene del frontend
+    if (body.status) {
+      const statusMap: Record<string, string> = {
+        'active': 'ACTIVE',
+        'closed': 'CLOSED',
+        'draft': 'DRAFT'
       }
-      body.type = typeMap[body.type] || body.type
+      body.status = statusMap[body.status] || body.status.toUpperCase()
     }
 
     const vacancy = await prisma.vacancy.update({
@@ -86,6 +96,15 @@ export async function DELETE(
   { params }: RouteParams
 ) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     
     await prisma.vacancy.delete({

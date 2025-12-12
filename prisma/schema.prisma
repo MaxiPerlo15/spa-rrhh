@@ -9,13 +9,32 @@ datasource db {
   provider = "postgresql"
 }
 
+// Modelo de Usuarios (Admin)
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
 // Modelo de Vacantes/Ofertas Laborales
 model Vacancy {
   id          String   @id @default(cuid())
   title       String
   description String   @db.Text
   location    String
-  type        VacancyType
+  workday     VacancyWorkday @default(FULL_TIME)
+  modality    VacancyModality @default(ON_SITE)
   salary      String?
   requirements String? @db.Text
   benefits    String?  @db.Text
@@ -29,10 +48,17 @@ model Vacancy {
   @@index([status, createdAt])
 }
 
-enum VacancyType {
-  FULL_TIME
-  PART_TIME
-  FREELANCE
+enum VacancyWorkday {
+  FULL_TIME      // Jornada Completa
+  PART_TIME      // Media Jornada
+  PROJECT_BASED  // Por Proyecto
+  INTERNSHIP     // Pasantía
+}
+
+enum VacancyModality {
+  ON_SITE  // Presencial
+  REMOTE   // Remoto
+  HYBRID   // Híbrido
 }
 
 enum VacancyStatus {
