@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 // Helper para hacer login antes de tests que requieren autenticación
-async function loginAsAdmin(page: unknown) {
+async function loginAsAdmin(page: Page) {
   await page.goto('/admin/signin');
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@sparrhh.com';
   const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe123!';

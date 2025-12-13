@@ -49,7 +49,7 @@ test.describe('Autenticación Admin', () => {
     await expect(page.locator('text=Panel de Administración')).toBeVisible();
   });
 
-  test('debe redirigir a /admin si ya está autenticado', async ({ page, context }) => {
+  test('debe redirigir a /admin si ya está autenticado', async ({ page }) => {
     // Primero hacer login
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@sparrhh.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe123!';

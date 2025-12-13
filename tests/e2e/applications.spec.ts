@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
 
 test.describe('Flujo de Postulación a Vacantes', () => {
   test('debe navegar a la página de ofertas laborales', async ({ page }) => {
@@ -109,10 +108,7 @@ test.describe('Flujo de Postulación a Vacantes', () => {
     // Subir CV (crear un archivo temporal)
     const fileInput = page.locator('input[type="file"]');
     if (await fileInput.isVisible()) {
-      // Crear un archivo de prueba
-      const testFilePath = path.join(__dirname, '../fixtures/test-cv.pdf');
-      
-      // Si no existe el archivo, usar un buffer
+      // Crear un archivo de prueba usando buffer
       await fileInput.setInputFiles({
         name: 'test-cv.pdf',
         mimeType: 'application/pdf',
