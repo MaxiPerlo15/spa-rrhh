@@ -11,7 +11,8 @@
     "test:unit": "echo \"No unit tests yet\" && exit 0",
     "test:e2e": "echo \"No e2e tests yet\" && exit 0",
     "db:seed": "dotenv -e .env -- tsx prisma/seed.ts",
-    "db:reset": "dotenv -e .env -- npx prisma migrate reset --force"
+    "db:reset": "dotenv -e .env -- npx prisma migrate reset --force",
+    "db:verify": "dotenv -e .env -- tsx scripts/verify-admin.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env -- tsx prisma/seed.ts"

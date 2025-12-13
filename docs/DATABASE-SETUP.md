@@ -17,6 +17,9 @@ El proyecto incluye un script de seed que inicializa la base de datos con datos 
 # Ejecutar seed (requiere DATABASE_URL en .env)
 npm run db:seed
 
+# Verificar que el admin fue creado
+npm run db:verify
+
 # Reset completo de DB + seed
 npm run db:reset
 ```
