@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ContactStatus } from '@prisma/client'
+import { auth } from '@/lib/auth'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const statusParam = searchParams.get('status')
 

@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 
 export default function NavBar() {
@@ -15,18 +16,33 @@ export default function NavBar() {
   }, [])
 
   const navLinks = [
-    { href: '#inicio', label: 'Inicio' },
-    { href: '#nosotros', label: 'Nosotros' },
-    { href: '#empresas', label: 'Empresas' },
-    { href: '#contacto', label: 'Contacto' },
+    { href: '/#inicio', label: 'Inicio' },
+    { href: '/#nosotros', label: 'Nosotros' },
+    { href: '/#servicios', label: 'Servicios' },
+    { href: '/#empresas', label: 'Empresas' },
+    { href: '/#contacto', label: 'Contacto' },
   ]
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault()
-    const target = document.querySelector(href)
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Si es un enlace externo (como /ofertas-laborales), no prevenir default
+    if (href.startsWith('/ofertas-laborales')) {
       setMobileMenuOpen(false)
+      return
+    }
+    
+    e.preventDefault()
+    // Si el href incluye "/" significa que estamos en otra página
+    const sectionId = href.includes('/') ? href.split('#')[1] : href.substring(1)
+    
+    if (href.includes('/')) {
+      // Si estamos en otra página, navegar a home primero
+      window.location.assign(href)
+    } else {
+      const target = document.querySelector(`#${sectionId}`)
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setMobileMenuOpen(false)
+      }
     }
   }
   
@@ -37,12 +53,12 @@ export default function NavBar() {
       <div className="container-custom">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-primary-500 font-bold text-xl">RH</span>
-            </div>
-            <span className="text-xl font-semibold text-white hidden sm:block">
-              Meinardi&Perlo RRHH
+          <Link href="/" className="flex items-center">
+            <span className="text-2xl font-bold text-white tracking-tight">
+              Meinardi&Perlo{' '}
+              <span className="text-yellow-400 animate-pulse-subtle inline-block">
+                RRHH
+              </span>
             </span>
           </Link>
 
@@ -60,8 +76,7 @@ export default function NavBar() {
             ))}
             {/* Botón CTA Ver Ofertas */}
             <a
-              href="#vacantes"
-              onClick={(e) => handleScrollToSection(e, '#vacantes')}
+              href="/ofertas-laborales"
               className="px-6 py-2.5 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
             >
               Ver Ofertas Laborales
@@ -110,8 +125,7 @@ export default function NavBar() {
               ))}
               {/* Botón CTA en mobile */}
               <a
-                href="#vacantes"
-                onClick={(e) => handleScrollToSection(e, '#vacantes')}
+                href="/ofertas-laborales"
                 className="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-all duration-300 text-center"
               >
                 Ver Ofertas Laborales

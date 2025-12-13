@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
-// GET /api/vacancies - Listar vacantes activas
+// Función helper para normalizar ubicaciones
+function normalizeLocation(location: string): string {
+  return location
+    .trim() // Eliminar espacios al inicio y final
+    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
+    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
+}
+
+// GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const status = searchParams.get('status') || 'ACTIVE'
+    const all = searchParams.get('all') // Para el admin dashboard
+    
+    let whereClause = {}
+    
+    // Si no es petición de admin, solo mostrar activas
+    if (!all) {
+      whereClause = { status: 'ACTIVE' }
+    }
 
     const vacancies = await prisma.vacancy.findMany({
-      where: {
-        status: status as 'ACTIVE' | 'CLOSED' | 'DRAFT'
-      },
+      where: whereClause,
       orderBy: {
         createdAt: 'desc'
       }
@@ -22,10 +36,13 @@ export async function GET(request: NextRequest) {
       title: v.title,
       description: v.description,
       location: v.location,
-      type: v.type.toLowerCase().replace('_', '-') as 'full-time' | 'part-time' | 'freelance',
+      workday: v.workday,
+      modality: v.modality,
       salary: v.salary || undefined,
       requirements: v.requirements || undefined,
-      benefits: v.benefits || undefined
+      benefits: v.benefits || undefined,
+      status: v.status.toLowerCase(),
+      createdAt: v.createdAt.toISOString()
     }))
 
     return NextResponse.json(formattedVacancies)
@@ -41,30 +58,33 @@ export async function GET(request: NextRequest) {
 // POST /api/vacancies - Crear nueva vacante (admin)
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
-    const { title, description, location, type, salary, requirements, benefits } = body
+    const { title, description, location, workday, modality, salary, requirements, benefits } = body
 
     // Validaciones básicas
-    if (!title || !description || !location || !type) {
+    if (!title || !description || !location || !workday || !modality) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
         { status: 400 }
       )
     }
 
-    // Convertir type del frontend al formato de la BD
-    const typeMap: Record<string, string> = {
-      'full-time': 'FULL_TIME',
-      'part-time': 'PART_TIME',
-      'freelance': 'FREELANCE'
-    }
-
     const vacancy = await prisma.vacancy.create({
       data: {
-        title,
+        title: title.trim(),
         description,
-        location,
-        type: typeMap[type] as 'FULL_TIME' | 'PART_TIME' | 'FREELANCE',
+        location: normalizeLocation(location),
+        workday,
+        modality,
         salary,
         requirements,
         benefits,

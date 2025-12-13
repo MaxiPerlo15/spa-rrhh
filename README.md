@@ -1,41 +1,71 @@
 # SPA RRHH - Consultora de Recursos Humanos
 
-Single Page Application para una consultora de RRHH con sistema de postulaciones y gestión de vacantes.
+Sistema web completo para consultora de recursos humanos Meinardi&Perlo RRHH de Las Varillas, Córdoba.
 
-## 📋 Descripción
+## 🚀 Versiones
 
-Plataforma web moderna para consultora de recursos humanos que permite:
-- **Para candidatos**: Explorar vacantes disponibles y postularse de forma anónima
-- **Para empresas**: Sección informativa sobre servicios para empresas
-- **Para administradores**: Backend con API REST para gestión completa de vacantes, postulaciones y consultas
+### v0.1.0 - Landing Page y Backend Inicial ✅
+- Landing page completa con secciones:
+  - Hero con presentación de la consultora
+  - Nosotros (perfiles de fundadoras)
+  - Vacantes disponibles
+  - Empresas asociadas
+  - Formulario de contacto
+- Backend con API REST
+- Base de datos PostgreSQL
+- Modelos: Vacancy, Application, Contact
+- Seed con datos de ejemplo
 
-## ✨ Características v0.1.0
+### v0.2.0 - Panel de Administración y Gestión de Vacantes 🚧 (En desarrollo)
 
-### Frontend (Landing Page)
-- ✅ Página principal con diseño moderno y responsivo
-- ✅ Sección Hero con imagen de fondo y parallax
-- ✅ Sección "Nosotros" con información de la consultora
-- ✅ Sección "Para Empresas" con servicios ofrecidos
-- ✅ Listado de vacantes con filtros por tipo (Tiempo Completo, Medio Tiempo, Freelance)
-- ✅ Sistema de postulación con formulario modal (nombre, email, teléfono, CV en PDF/Word)
-- ✅ Formulario de contacto
-- ✅ Animaciones y efectos hover profesionales
-- ✅ Diseño responsive con Tailwind CSS
+#### ✅ Completado:
+- **Sistema de Autenticación:**
+  - NextAuth.js con CredentialsProvider
+  - Modelo User con roles (ADMIN/USER)
+  - Protección de rutas con middleware
+  - Hash de contraseñas con bcrypt
+  - Sesiones JWT
 
-### Backend (API REST)
-- ✅ API REST completa con Next.js App Router
-- ✅ Integración con PostgreSQL vía Prisma ORM
-- ✅ CRUD completo de vacantes
-- ✅ Sistema de postulaciones con validación de vacante activa
-- ✅ Sistema de consultas/contactos
-- ✅ Datos de prueba (seed) con 5 vacantes
+- **Panel de Administración:**
+  - Dashboard con estadísticas:
+    - Total de vacantes
+    - Vacantes activas
+    - Total de postulaciones
+    - Consultas pendientes
+  - CRUD completo de vacantes con modal form
+  - Cambio de estado (Activa/Cerrada)
+  - Tabla con filtros y acciones
 
-### Base de Datos
-- ✅ PostgreSQL 16 configurado localmente
-- ✅ Prisma ORM con migraciones aplicadas
-- ✅ 3 modelos: Vacancy, Application, Contact
-- ✅ Enums para estados y tipos
-- ✅ Relaciones entre modelos (CASCADE)
+- **Sistema de Vacantes Mejorado:**
+  - Nuevos campos: `workday` (jornada) y `modality` (modalidad)
+  - Tipos de jornada:
+    - Jornada Completa
+    - Media Jornada
+    - Por Proyecto
+    - Pasantía
+  - Tipos de modalidad:
+    - Presencial
+    - Remoto
+    - Híbrido
+  - Cards expandibles con detalles (+/-)
+  - Visualización de requisitos y beneficios
+  - Badges con colores diferenciados
+
+- **Mejoras de UX:**
+  - Formulario de postulación con inputs legibles (text-gray-900)
+  - Tooltips en botones de acción
+  - Animaciones y transiciones
+  - Navbar del admin con fondo azul
+  - Botones de cerrar/activar con emojis y colores
+
+#### 🔜 Pendiente:
+- Vista de gestión de postulaciones
+- Vista de gestión de consultas
+- Sistema de notificaciones por email
+- Gestión de usuarios admin adicionales
+- Filtros avanzados y búsqueda
+- Paginación para grandes conjuntos de datos
+- Exportación de datos (CVs, reportes)
 
 ## 🛠️ Stack Tecnológico
 
@@ -44,6 +74,7 @@ Plataforma web moderna para consultora de recursos humanos que permite:
 - **Backend**: Next.js API Routes, TypeScript
 - **Base de Datos**: PostgreSQL 16
 - **ORM**: Prisma 7.1.0 con @prisma/adapter-pg
+- **Autenticación**: NextAuth.js con bcrypt
 - **Tipografías**: Geist Sans & Geist Mono (Vercel)
 - **Runtime**: Node.js 24.x
 
@@ -56,7 +87,7 @@ Plataforma web moderna para consultora de recursos humanos que permite:
 
 ### 1. Clonar el repositorio
 ```bash
-git clone <repository-url>
+git clone https://github.com/MaxiPerlo15/spa-rrhh.git
 cd spa-rrhh
 ```
 
@@ -70,9 +101,12 @@ npm install
 cp .env.example .env
 ```
 
-Editar `.env` con tus credenciales de PostgreSQL:
+Editar `.env` con tus credenciales:
 ```env
 DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/spa_rrhh_db?schema=public"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="tu-secret-key-aqui"
+ADMIN_PASSWORD="admin123"
 ```
 
 ### 4. Configurar base de datos
@@ -94,6 +128,12 @@ npm run dev
 
 Abrir [http://localhost:3000](http://localhost:3000) en el navegador.
 
+## 🔐 Acceso al Panel de Administración
+
+- **URL:** http://localhost:3000/admin
+- **Email:** admin@sparrhh.com
+- **Contraseña:** admin123 (configurable en ADMIN_PASSWORD)
+
 ## 📁 Estructura del Proyecto
 
 ```
@@ -108,7 +148,9 @@ spa-rrhh/
 │   └── empresas-bg.jpg    # Imagen de fondo Empresas
 ├── src/
 │   ├── app/
+│   │   ├── admin/         # Panel de administración
 │   │   ├── api/           # API Routes
+│   │   │   ├── auth/      # NextAuth endpoints
 │   │   │   ├── vacancies/
 │   │   │   ├── applications/
 │   │   │   └── contacts/
@@ -117,6 +159,8 @@ spa-rrhh/
 │   │   └── globals.css    # Estilos globales + animaciones
 │   ├── components/
 │   │   ├── NavBar.tsx
+│   │   ├── AuthProvider.tsx
+│   │   └── VacancyCard.tsx
 │   │   ├── Hero.tsx
 │   │   ├── Nosotros.tsx
 │   │   ├── Empresas.tsx
@@ -136,24 +180,62 @@ spa-rrhh/
 
 ## 🗄️ Modelos de Base de Datos
 
+### User (Usuarios Admin)
+```prisma
+- id: String (CUID)
+- email: String (unique)
+- name: String?
+- passwordHash: String
+- role: Role (ADMIN, USER)
+- createdAt: DateTime
+- updatedAt: DateTime
+```
+
 ### Vacancy (Vacantes)
 ```prisma
-- id: String (UUID)
+- id: String (CUID)
 - title: String
-- company: String
-- location: String
-- type: VacancyType (FULL_TIME, PART_TIME, FREELANCE)
 - description: String
-- requirements: String
-- status: VacancyStatus (ACTIVE, INACTIVE, CLOSED)
+- location: String
+- workday: VacancyWorkday (FULL_TIME, PART_TIME, PROJECT_BASED, INTERNSHIP)
+- modality: VacancyModality (ON_SITE, REMOTE, HYBRID)
+- salary: String?
+- requirements: String?
+- benefits: String?
+- status: VacancyStatus (ACTIVE, CLOSED, DRAFT)
 - createdAt: DateTime
+- updatedAt: DateTime
 - applications: Application[]
 ```
 
 ### Application (Postulaciones)
 ```prisma
-- id: String (UUID)
+- id: String (CUID)
+- vacancyId: String
+- candidateName: String
+- email: String
+- phone: String
+- resumeData: String? (Base64)
+- resumeFileName: String?
+- coverLetter: String?
+- status: ApplicationStatus (PENDING, REVIEWING, INTERVIEWED, ACCEPTED, REJECTED)
+- submittedAt: DateTime
+- updatedAt: DateTime
+- vacancy: Vacancy
+```
+
+### Contact (Consultas)
+```prisma
+- id: String (CUID)
 - name: String
+- email: String
+- phone: String
+- subject: String
+- message: String
+- status: ContactStatus (PENDING, ANSWERED)
+- createdAt: DateTime
+- updatedAt: DateTime
+```
 - email: String
 - phone: String
 - cvData: String (Base64)

@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Script from 'next/script'
 import NavBar from '@/components/NavBar'
 import Hero from '@/components/Hero'
 import FounderCard from '@/components/FounderCard'
+import Servicios from '@/components/Servicios'
 import VacancyCard from '@/components/VacancyCard'
 import PostularForm from '@/components/PostularForm'
 import ContactForm from '@/components/ContactForm'
@@ -14,8 +16,11 @@ interface Vacancy {
   title: string
   description: string
   location: string
-  type: 'full-time' | 'part-time' | 'freelance'
+  workday: 'FULL_TIME' | 'PART_TIME' | 'PROJECT_BASED' | 'INTERNSHIP'
+  modality: 'ON_SITE' | 'REMOTE' | 'HYBRID'
   salary?: string
+  requirements?: string
+  benefits?: string
 }
 
 export default function Home() {
@@ -52,6 +57,52 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-primary-200 via-white to-gray-900">
+      {/* Schema.org para SEO */}
+      <Script
+        id="schema-org"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ProfessionalService",
+            "name": "Meinardi&Perlo RRHH",
+            "description": "Consultora de Recursos Humanos especializada en reclutamiento y selección de personal",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Las Varillas",
+              "addressRegion": "Córdoba",
+              "addressCountry": "AR"
+            },
+            "areaServed": {
+              "@type": "Place",
+              "name": "Argentina"
+            },
+            "url": "https://www.meinardiperlo.com",
+            "priceRange": "$$",
+            "hasOfferCatalog": {
+              "@type": "OfferCatalog",
+              "name": "Servicios de Recursos Humanos",
+              "itemListElement": [
+                {
+                  "@type": "Offer",
+                  "itemOffered": {
+                    "@type": "Service",
+                    "name": "Reclutamiento y Selección de Personal"
+                  }
+                },
+                {
+                  "@type": "Offer",
+                  "itemOffered": {
+                    "@type": "Service",
+                    "name": "Búsqueda de Empleos"
+                  }
+                }
+              ]
+            }
+          })
+        }}
+      />
+      
       <NavBar />
       
       {/* Contenido principal */}
@@ -92,7 +143,7 @@ export default function Home() {
                 name="María Soledad Perlo"
                 role="Fundadora"
                 description="Licenciada en Recursos Humanos graduada de la universidad IUA con más de 20 años de experiencia, especializada en reclutamiento y selección de personal. Apasionada por ayudar a las empresas a encontrar el talento adecuado para impulsar su crecimiento."
-                imageUrl="/images/founder-1.jpg"
+                imageUrl=""
               />
               <FounderCard
                 name="Ayelen Meinardi"
@@ -104,6 +155,9 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Sección Servicios */}
+        <Servicios />
+
         {/* Sección Vacantes */}
         <section id="vacantes" className="section-padding bg-secondary-100">
           <div className="container-custom">
@@ -112,13 +166,22 @@ export default function Home() {
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
                 Ofertas laborales <span className="text-primary-500">Disponibles</span>
               </h2>
-              <p className="text-lg text-gray-600">
+              <p className="text-lg text-gray-600 mb-6">
                 Descubre oportunidades profesionales que se ajustan a tu perfil. 
                 Todas nuestras vacantes son verificadas y provienen de empresas de primer nivel.
               </p>
+              <a
+                href="/ofertas-laborales"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
+              >
+                Ver todas las ofertas laborales
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
             </div>
 
-            {/* Lista de vacantes */}
+            {/* Lista de vacantes (mostrar solo las primeras 3) */}
             <div className="flex flex-col gap-4 max-w-5xl mx-auto">
               {loading ? (
                 <div className="text-center py-12">
@@ -126,18 +189,36 @@ export default function Home() {
                   <p className="text-gray-600 mt-4">Cargando vacantes...</p>
                 </div>
               ) : vacancies.length > 0 ? (
-                vacancies.map((vacancy) => (
-                  <VacancyCard
-                    key={vacancy.id}
-                    id={vacancy.id}
-                    title={vacancy.title}
-                    description={vacancy.description}
-                    location={vacancy.location}
-                    type={vacancy.type}
-                    salary={vacancy.salary}
-                    onApply={handleApply}
-                  />
-                ))
+                <>
+                  {vacancies.slice(0, 3).map((vacancy) => (
+                    <VacancyCard
+                      key={vacancy.id}
+                      id={vacancy.id}
+                      title={vacancy.title}
+                      description={vacancy.description}
+                      location={vacancy.location}
+                      workday={vacancy.workday}
+                      modality={vacancy.modality}
+                      salary={vacancy.salary}
+                      requirements={vacancy.requirements}
+                      benefits={vacancy.benefits}
+                      onApply={handleApply}
+                    />
+                  ))}
+                  {vacancies.length > 3 && (
+                    <div className="text-center mt-8">
+                      <a
+                        href="/ofertas-laborales"
+                        className="inline-flex items-center gap-2 px-8 py-4 bg-white text-primary-500 font-bold text-lg rounded-lg hover:bg-primary-50 transition-all border-2 border-primary-500 shadow-md hover:shadow-lg"
+                      >
+                        Ver todas las ofertas disponibles
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <p className="text-gray-600 text-lg">
