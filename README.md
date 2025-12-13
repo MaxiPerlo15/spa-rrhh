@@ -266,13 +266,20 @@ npm run dev          # Servidor de desarrollo
 npm run build        # Build de producción
 npm run start        # Ejecutar build de producción
 npm run lint         # Ejecutar ESLint
-npm run test         # Ejecutar tests (placeholder)
+
+# Testing
+npm run test         # Ejecutar todos los tests E2E
 npm run test:unit    # Tests unitarios (placeholder)
-npm run test:e2e     # Tests E2E (placeholder)
+npm run test:e2e     # Tests E2E con Playwright
+npm run test:e2e:ui  # Tests E2E en modo UI interactivo
+npm run test:e2e:headed  # Tests E2E con navegador visible
+npm run test:e2e:debug   # Tests E2E en modo debug
+npm run test:report  # Ver reporte de tests E2E
 
 # Base de datos
 npm run db:seed      # Cargar datos iniciales (admin + vacantes)
 npm run db:reset     # Reset completo de DB + seed
+npm run db:verify    # Verificar que admin existe
 npx prisma studio    # Explorador visual de BD
 npx prisma migrate dev  # Crear/aplicar migración
 npx prisma generate  # Generar cliente de Prisma

@@ -122,12 +122,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+      
       - name: Run E2E tests
         run: npm run test:e2e
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL || 'admin@sparrhh.com' }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'ChangeMe123!' }}
       
       - name: Upload E2E test results
         uses: actions/upload-artifact@v4
