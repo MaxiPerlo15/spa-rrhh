@@ -119,9 +119,24 @@ createdb spa_rrhh_db
 # Ejecutar migraciones
 npx prisma migrate dev
 
-# (Opcional) Cargar datos de prueba
-npx prisma db seed
+# Generar cliente de Prisma
+npx prisma generate
+
+# Cargar datos iniciales (usuario admin + vacantes de ejemplo)
+npm run db:seed
 ```
+
+**Credenciales por defecto** (solo desarrollo):
+- **Email**: `admin@sparrhh.com`
+- **Password**: `ChangeMe123!`
+
+Para personalizar las credenciales del admin, agrega en `.env`:
+```bash
+ADMIN_EMAIL="tu-email@empresa.com"
+ADMIN_PASSWORD="TuPasswordSegura123!"
+```
+
+Ver más detalles en [docs/DATABASE-SETUP.md](docs/DATABASE-SETUP.md)
 
 ### 5. Ejecutar el servidor de desarrollo
 ```bash
@@ -251,9 +266,16 @@ npm run dev          # Servidor de desarrollo
 npm run build        # Build de producción
 npm run start        # Ejecutar build de producción
 npm run lint         # Ejecutar ESLint
+npm run test         # Ejecutar tests (placeholder)
+npm run test:unit    # Tests unitarios (placeholder)
+npm run test:e2e     # Tests E2E (placeholder)
+
+# Base de datos
+npm run db:seed      # Cargar datos iniciales (admin + vacantes)
+npm run db:reset     # Reset completo de DB + seed
 npx prisma studio    # Explorador visual de BD
-npx prisma migrate dev  # Crear migración
-npx prisma db seed   # Cargar datos de prueba
+npx prisma migrate dev  # Crear/aplicar migración
+npx prisma generate  # Generar cliente de Prisma
 ```
 
 ## 🗺️ Roadmap

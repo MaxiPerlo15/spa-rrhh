@@ -3,7 +3,11 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import bcrypt from 'bcrypt'
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://maxiperlo@localhost:5432/spa_rrhh_db?schema=public'
+const connectionString = process.env.DATABASE_URL
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required')
+}
+
 const pool = new pg.Pool({ connectionString })
 const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
@@ -12,21 +16,36 @@ async function main() {
   console.log('🌱 Iniciando seed de la base de datos...')
 
   // Crear usuario admin
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
-  const passwordHash = await bcrypt.hash(adminPassword, 10)
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@sparrhh.com'
+  const adminPassword = process.env.ADMIN_PASSWORD
   
-  await prisma.user.upsert({
-    where: { email: 'admin@sparrhh.com' },
-    update: {},
+  if (!adminPassword) {
+    console.warn('⚠️  ADMIN_PASSWORD no está definida, usando contraseña por defecto (NO usar en producción)')
+  }
+  
+  const passwordToUse = adminPassword || 'ChangeMe123!'
+  const passwordHash = await bcrypt.hash(passwordToUse, 10)
+  
+  const admin = await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {
+      passwordHash,
+      role: 'ADMIN'
+    },
     create: {
-      email: 'admin@sparrhh.com',
+      email: adminEmail,
       name: 'Administrador',
       passwordHash,
       role: 'ADMIN'
     }
   })
 
-  console.log('✅ Usuario admin creado: admin@sparrhh.com')
+  console.log(`✅ Usuario admin creado/actualizado: ${admin.email}`)
+  if (!adminPassword) {
+    console.log('   📧 Email: admin@sparrhh.com')
+    console.log('   🔑 Password: ChangeMe123!')
+    console.log('   ⚠️  IMPORTANTE: Cambia esta contraseña en producción')
+  }
 
   // Crear vacantes de ejemplo
   const vacancies = await prisma.vacancy.createMany({

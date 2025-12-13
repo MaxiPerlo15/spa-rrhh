@@ -9,7 +9,12 @@
     "lint": "eslint",
     "test": "echo \"No tests yet\" && exit 0",
     "test:unit": "echo \"No unit tests yet\" && exit 0",
-    "test:e2e": "echo \"No e2e tests yet\" && exit 0"
+    "test:e2e": "echo \"No e2e tests yet\" && exit 0",
+    "db:seed": "dotenv -e .env -- tsx prisma/seed.ts",
+    "db:reset": "dotenv -e .env -- npx prisma migrate reset --force"
+  },
+  "prisma": {
+    "seed": "dotenv -e .env -- tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
@@ -30,6 +35,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "tailwindcss": "^4",
