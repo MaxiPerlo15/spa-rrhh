@@ -1,5 +1,7 @@
 # SPA RRHH - Consultora de Recursos Humanos
 
+[![CI](https://github.com/MaxiPerlo15/spa-rrhh/actions/workflows/ci.yml/badge.svg)](https://github.com/MaxiPerlo15/spa-rrhh/actions/workflows/ci.yml)
+
 Sistema web completo para la consultora de Recursos Humanos **Meinardi&Perlo RRHH** de Las Varillas, Córdoba.
 
 ## 🎯 Objetivo
