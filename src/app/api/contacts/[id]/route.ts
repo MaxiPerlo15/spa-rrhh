@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 
+interface RouteParams {
+  params: Promise<{
+    id: string
+  }>
+}
+
 // GET /api/contacts/[id] - Obtener un contacto
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -17,7 +24,7 @@ export async function GET(
     }
 
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!contact) {
@@ -40,9 +47,10 @@ export async function GET(
 // PATCH /api/contacts/[id] - Actualizar estado del contacto
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -64,7 +72,7 @@ export async function PATCH(
     }
 
     const contact = await prisma.contact.update({
-      where: { id: params.id },
+      where: { id },
       data: { status }
     })
 
@@ -81,9 +89,10 @@ export async function PATCH(
 // DELETE /api/contacts/[id] - Eliminar contacto
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -93,7 +102,7 @@ export async function DELETE(
     }
 
     await prisma.contact.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Contacto eliminado' })
