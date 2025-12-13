@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       include: {
         vacancy: {
           select: {
+            id: true,
             title: true,
             location: true
           }

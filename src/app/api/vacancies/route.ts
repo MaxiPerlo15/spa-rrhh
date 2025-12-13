@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 
+// Función helper para normalizar ubicaciones
+function normalizeLocation(location: string): string {
+  return location
+    .trim() // Eliminar espacios al inicio y final
+    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
+    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
+}
+
 // GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
   try {
@@ -72,9 +80,9 @@ export async function POST(request: NextRequest) {
 
     const vacancy = await prisma.vacancy.create({
       data: {
-        title,
+        title: title.trim(),
         description,
-        location,
+        location: normalizeLocation(location),
         workday,
         modality,
         salary,

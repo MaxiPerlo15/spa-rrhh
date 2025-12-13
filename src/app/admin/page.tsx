@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import Pagination from '@/components/Pagination'
 
 interface Vacancy {
   id: string
@@ -16,6 +17,33 @@ interface Vacancy {
   description?: string
 }
 
+interface Application {
+  id: string
+  candidateName: string
+  email: string
+  phone: string
+  resumeData?: string
+  resumeFileName?: string
+  coverLetter?: string
+  status: 'PENDING' | 'REVIEWING' | 'INTERVIEWED' | 'ACCEPTED' | 'REJECTED'
+  submittedAt: string
+  vacancy: {
+    id: string
+    title: string
+  }
+}
+
+interface Contact {
+  id: string
+  name: string
+  email: string
+  phone: string
+  subject: string
+  message: string
+  status: 'PENDING' | 'RESPONDED' | 'ARCHIVED'
+  createdAt: string
+}
+
 interface Stats {
   totalVacancies: number
   activeVacancies: number
@@ -26,7 +54,20 @@ interface Stats {
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'vacancies' | 'applications' | 'contacts'>('vacancies')
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
+  const [filteredApplications, setFilteredApplications] = useState<Application[]>([])
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([])
+  const [filterContactStatus, setFilterContactStatus] = useState<string>('all')
+  const [searchApplications, setSearchApplications] = useState<string>('')
+  const [searchContacts, setSearchContacts] = useState<string>('')
+  const [currentVacancyPage, setCurrentVacancyPage] = useState(1)
+  const [currentApplicationPage, setCurrentApplicationPage] = useState(1)
+  const [currentContactPage, setCurrentContactPage] = useState(1)
+  const itemsPerPage = 10
   const [stats, setStats] = useState<Stats>({
     totalVacancies: 0,
     activeVacancies: 0,
@@ -36,6 +77,10 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
+  const [showApplicationDetail, setShowApplicationDetail] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [showContactDetail, setShowContactDetail] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -60,6 +105,57 @@ export default function AdminDashboard() {
     }
   }, [status])
 
+  useEffect(() => {
+    let filtered = applications
+
+    // Filtro por estado
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(app => app.status === filterStatus)
+    }
+
+    // Filtro por búsqueda
+    if (searchApplications.trim()) {
+      const search = searchApplications.toLowerCase()
+      filtered = filtered.filter(app =>
+        app.candidateName.toLowerCase().includes(search) ||
+        app.email.toLowerCase().includes(search) ||
+        app.vacancy.title.toLowerCase().includes(search)
+      )
+    }
+
+    setFilteredApplications(filtered)
+  }, [filterStatus, searchApplications, applications])
+
+  useEffect(() => {
+    let filtered = contacts
+
+    // Filtro por estado
+    if (filterContactStatus !== 'all') {
+      filtered = filtered.filter(contact => contact.status === filterContactStatus)
+    }
+
+    // Filtro por búsqueda
+    if (searchContacts.trim()) {
+      const search = searchContacts.toLowerCase()
+      filtered = filtered.filter(contact =>
+        contact.name.toLowerCase().includes(search) ||
+        contact.email.toLowerCase().includes(search) ||
+        contact.subject.toLowerCase().includes(search)
+      )
+    }
+
+    setFilteredContacts(filtered)
+  }, [filterContactStatus, searchContacts, contacts])
+
+  // Resetear páginas cuando cambian los filtros
+  useEffect(() => {
+    setCurrentApplicationPage(1)
+  }, [filterStatus, searchApplications])
+
+  useEffect(() => {
+    setCurrentContactPage(1)
+  }, [filterContactStatus, searchContacts])
+
   const fetchDashboardData = async () => {
     try {
       const [vacanciesRes, applicationsRes, contactsRes] = await Promise.all([
@@ -73,6 +169,10 @@ export default function AdminDashboard() {
       const contactsData = await contactsRes.json()
 
       setVacancies(vacanciesData)
+      setApplications(applicationsData)
+      setFilteredApplications(applicationsData)
+      setContacts(contactsData)
+      setFilteredContacts(contactsData)
       setStats({
         totalVacancies: vacanciesData.length,
         activeVacancies: vacanciesData.filter((v: Vacancy) => v.status === 'active').length,
@@ -86,8 +186,13 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleDeleteVacancy = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta vacante?')) return
+  const handleDeleteVacancy = async (id: string, title: string) => {
+    const confirmed = confirm(
+      `⚠️ ¿Estás seguro de eliminar la vacante "${title}"?\n\n` +
+      `Esta acción también eliminará todas las postulaciones asociadas y no se puede deshacer.`
+    )
+    
+    if (!confirmed) return
 
     try {
       const res = await fetch(`/api/vacancies/${id}`, {
@@ -96,9 +201,13 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         fetchDashboardData()
+        alert('✅ Vacante eliminada exitosamente')
+      } else {
+        alert('❌ Error al eliminar la vacante')
       }
     } catch (error) {
       console.error('Error deleting vacancy:', error)
+      alert('❌ Error al eliminar la vacante')
     }
   }
 
@@ -197,6 +306,117 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      if (res.ok) {
+        await fetchDashboardData()
+      }
+    } catch (error) {
+      console.error('Error updating application status:', error)
+    }
+  }
+
+  const handleDownloadCV = (application: Application) => {
+    if (!application.resumeData) {
+      alert('No hay CV disponible para esta postulación')
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = application.resumeData
+    link.download = application.resumeFileName || `CV-${application.candidateName}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleViewApplicationDetails = (application: Application) => {
+    setSelectedApplication(application)
+    setShowApplicationDetail(true)
+  }
+
+  const handleContactStatusChange = async (contactId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      if (res.ok) {
+        setContacts(contacts.map(c => 
+          c.id === contactId ? { ...c, status: newStatus as Contact['status'] } : c
+        ))
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado del contacto:', error)
+    }
+  }
+
+  const handleViewContactDetails = (contact: Contact) => {
+    setSelectedContact(contact)
+    setShowContactDetail(true)
+  }
+
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    const confirmed = confirm(
+      `⚠️ ¿Estás seguro de eliminar el contacto de "${contactName}"?\n\n` +
+      `Esta acción no se puede deshacer.`
+    )
+    
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        setContacts(contacts.filter(c => c.id !== contactId))
+        alert('✅ Contacto eliminado exitosamente')
+      } else {
+        alert('❌ Error al eliminar el contacto')
+      }
+    } catch (error) {
+      console.error('Error al eliminar contacto:', error)
+      alert('❌ Error al eliminar el contacto')
+    }
+  }
+
+  const contactStatusLabels = {
+    'PENDING': 'Pendiente',
+    'RESPONDED': 'Respondido',
+    'ARCHIVED': 'Archivado'
+  }
+
+  const contactStatusColors = {
+    'PENDING': 'bg-yellow-100 text-yellow-800',
+    'RESPONDED': 'bg-green-100 text-green-800',
+    'ARCHIVED': 'bg-gray-100 text-gray-800'
+  }
+
+  const statusLabels = {
+    'PENDING': 'Pendiente',
+    'REVIEWING': 'En Revisión',
+    'INTERVIEWED': 'Entrevistado',
+    'ACCEPTED': 'Aceptado',
+    'REJECTED': 'Rechazado'
+  }
+
+  const statusColors = {
+    'PENDING': 'bg-yellow-100 text-yellow-800',
+    'REVIEWING': 'bg-blue-100 text-blue-800',
+    'INTERVIEWED': 'bg-purple-100 text-purple-800',
+    'ACCEPTED': 'bg-green-100 text-green-800',
+    'REJECTED': 'bg-red-100 text-red-800'
+  }
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -248,7 +468,46 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Vacancies Section */}
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('vacancies')}
+                className={`${
+                  activeTab === 'vacancies'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                📋 Vacantes ({stats.totalVacancies})
+              </button>
+              <button
+                onClick={() => setActiveTab('applications')}
+                className={`${
+                  activeTab === 'applications'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                📄 Postulaciones ({stats.totalApplications})
+              </button>
+              <button
+                onClick={() => setActiveTab('contacts')}
+                className={`${
+                  activeTab === 'contacts'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                💬 Contactos ({contacts.length})
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Vacancies Tab */}
+        {activeTab === 'vacancies' && (
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Gestión de Vacantes</h2>
@@ -274,7 +533,9 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {vacancies.map((vacancy) => {
+                {vacancies
+                  .slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage)
+                  .map((vacancy) => {
                   const workdayLabels = {
                     'FULL_TIME': 'Jornada Completa',
                     'PART_TIME': 'Media Jornada',
@@ -327,7 +588,7 @@ export default function AdminDashboard() {
                         ✏️ Editar
                       </button>
                       <button
-                        onClick={() => handleDeleteVacancy(vacancy.id)}
+                        onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
                         className="text-red-600 hover:text-red-800 font-medium"
                       >
                         🗑️ Eliminar
@@ -339,8 +600,576 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          
+          {/* Paginación */}
+          <Pagination
+            currentPage={currentVacancyPage}
+            totalItems={vacancies.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentVacancyPage}
+          />
         </div>
+        )}
+
+        {/* Applications Tab */}
+        {activeTab === 'applications' && (
+          <>
+            {/* Stats pequeñas para applications */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
+                <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
+                <div className="text-2xl font-bold text-yellow-800">
+                  {applications.filter(a => a.status === 'PENDING').length}
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-lg shadow-sm p-4 border border-blue-200">
+                <div className="text-xs font-medium text-blue-700 mb-1">En Revisión</div>
+                <div className="text-2xl font-bold text-blue-800">
+                  {applications.filter(a => a.status === 'REVIEWING').length}
+                </div>
+              </div>
+              <div className="bg-purple-50 rounded-lg shadow-sm p-4 border border-purple-200">
+                <div className="text-xs font-medium text-purple-700 mb-1">Entrevistados</div>
+                <div className="text-2xl font-bold text-purple-800">
+                  {applications.filter(a => a.status === 'INTERVIEWED').length}
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
+                <div className="text-xs font-medium text-green-700 mb-1">Aceptados</div>
+                <div className="text-2xl font-bold text-green-800">
+                  {applications.filter(a => a.status === 'ACCEPTED').length}
+                </div>
+              </div>
+              <div className="bg-red-50 rounded-lg shadow-sm p-4 border border-red-200">
+                <div className="text-xs font-medium text-red-700 mb-1">Rechazados</div>
+                <div className="text-2xl font-bold text-red-800">
+                  {applications.filter(a => a.status === 'REJECTED').length}
+                </div>
+              </div>
+            </div>
+
+            {/* Filtros */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex flex-col gap-4">
+                {/* Búsqueda */}
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, email o vacante..."
+                    value={searchApplications}
+                    onChange={(e) => setSearchApplications(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                {/* Filtros */}
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="PENDING">Pendientes</option>
+                    <option value="REVIEWING">En Revisión</option>
+                    <option value="INTERVIEWED">Entrevistados</option>
+                    <option value="ACCEPTED">Aceptados</option>
+                    <option value="REJECTED">Rechazados</option>
+                  </select>
+                  <span className="text-sm text-gray-600">
+                    {filteredApplications.length} postulaciones
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de postulaciones */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Candidato</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacante</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredApplications.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'disponibles'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredApplications
+                        .slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage)
+                        .map((application) => (
+                        <tr key={application.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            {application.candidateName}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{application.email}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <select
+                              value={application.status}
+                              onChange={(e) => handleStatusChange(application.id, e.target.value)}
+                              className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${statusColors[application.status]}`}
+                            >
+                              <option value="PENDING">Pendiente</option>
+                              <option value="REVIEWING">En Revisión</option>
+                              <option value="INTERVIEWED">Entrevistado</option>
+                              <option value="ACCEPTED">Aceptado</option>
+                              <option value="REJECTED">Rechazado</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {new Date(application.submittedAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right space-x-2">
+                            <button
+                              onClick={() => handleViewApplicationDetails(application)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              👁️ Ver
+                            </button>
+                            {application.resumeData && (
+                              <button
+                                onClick={() => handleDownloadCV(application)}
+                                className="text-green-600 hover:text-green-800 font-medium"
+                              >
+                                📄 CV
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Paginación */}
+              <Pagination
+                currentPage={currentApplicationPage}
+                totalItems={filteredApplications.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentApplicationPage}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Contacts Tab */}
+        {activeTab === 'contacts' && (
+          <>
+            {/* Stats pequeñas para contactos */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
+                <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
+                <div className="text-2xl font-bold text-yellow-800">
+                  {contacts.filter(c => c.status === 'PENDING').length}
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
+                <div className="text-xs font-medium text-green-700 mb-1">Respondidos</div>
+                <div className="text-2xl font-bold text-green-800">
+                  {contacts.filter(c => c.status === 'RESPONDED').length}
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-lg shadow-sm p-4 border border-gray-200">
+                <div className="text-xs font-medium text-gray-700 mb-1">Archivados</div>
+                <div className="text-2xl font-bold text-gray-800">
+                  {contacts.filter(c => c.status === 'ARCHIVED').length}
+                </div>
+              </div>
+            </div>
+
+            {/* Filtros */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex flex-col gap-4">
+                {/* Búsqueda */}
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, email o asunto..."
+                    value={searchContacts}
+                    onChange={(e) => setSearchContacts(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                {/* Filtros */}
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
+                  <select
+                    value={filterContactStatus}
+                    onChange={(e) => setFilterContactStatus(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="PENDING">Pendientes</option>
+                    <option value="RESPONDED">Respondidos</option>
+                    <option value="ARCHIVED">Archivados</option>
+                  </select>
+                  <span className="text-sm text-gray-600">
+                    {filteredContacts.length} contactos
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de contactos */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asunto</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredContacts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'disponibles'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredContacts
+                        .slice((currentContactPage - 1) * itemsPerPage, currentContactPage * itemsPerPage)
+                        .map((contact) => (
+                        <tr key={contact.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            {contact.name}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{contact.email}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                            {contact.subject}
+                          </td>
+                          <td className="px-6 py-4 text-sm">
+                            <select
+                              value={contact.status}
+                              onChange={(e) => handleContactStatusChange(contact.id, e.target.value)}
+                              className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${contactStatusColors[contact.status]}`}
+                            >
+                              <option value="PENDING">Pendiente</option>
+                              <option value="RESPONDED">Respondido</option>
+                              <option value="ARCHIVED">Archivado</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {new Date(contact.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right space-x-2">
+                            <button
+                              onClick={() => handleViewContactDetails(contact)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              👁️ Ver
+                            </button>
+                            <button
+                              onClick={() => handleDeleteContact(contact.id, contact.name)}
+                              className="text-red-600 hover:text-red-800 font-medium"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Paginación */}
+              <Pagination
+                currentPage={currentContactPage}
+                totalItems={filteredContacts.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentContactPage}
+              />
+            </div>
+          </>
+        )}
       </main>
+
+      {/* Contact Detail Modal */}
+      {showContactDetail && selectedContact && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                    {selectedContact.name}
+                  </h3>
+                  <p className="text-gray-600">{selectedContact.email}</p>
+                </div>
+                <button
+                  onClick={() => setShowContactDetail(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Información de contacto */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                  <p className="text-gray-900">{selectedContact.phone}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Asunto</label>
+                  <p className="text-gray-900">{selectedContact.subject}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${contactStatusColors[selectedContact.status]}`}>
+                    {contactStatusLabels[selectedContact.status]}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha</label>
+                  <p className="text-gray-900">
+                    {new Date(selectedContact.createdAt).toLocaleString('es-AR', {
+                      dateStyle: 'long',
+                      timeStyle: 'short'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mensaje */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Mensaje</label>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <p className="text-gray-900 whitespace-pre-line">{selectedContact.message}</p>
+                </div>
+              </div>
+
+              {/* Botón para contactar */}
+              <div className="mb-6">
+                <a
+                  href={`mailto:${selectedContact.email}?subject=Re: ${selectedContact.subject}`}
+                  className="w-full px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                >
+                  📧 Responder por Email
+                </a>
+              </div>
+
+              {/* Cambiar estado */}
+              <div className="border-t pt-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      handleContactStatusChange(selectedContact.id, 'PENDING')
+                      setShowContactDetail(false)
+                    }}
+                    className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
+                  >
+                    Pendiente
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleContactStatusChange(selectedContact.id, 'RESPONDED')
+                      setShowContactDetail(false)
+                    }}
+                    className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                  >
+                    ✅ Respondido
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleContactStatusChange(selectedContact.id, 'ARCHIVED')
+                      setShowContactDetail(false)
+                    }}
+                    className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  >
+                    📦 Archivar
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowContactDetail(false)}
+                  className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Application Detail Modal */}
+      {showApplicationDetail && selectedApplication && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                    {selectedApplication.candidateName}
+                  </h3>
+                  <p className="text-gray-600">
+                    Postulación para: <span className="font-semibold text-primary-500">{selectedApplication.vacancy.title}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowApplicationDetail(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Información de contacto */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                  <p className="text-gray-900">{selectedApplication.email}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                  <p className="text-gray-900">{selectedApplication.phone || 'No proporcionado'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[selectedApplication.status]}`}>
+                    {statusLabels[selectedApplication.status]}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Postulación</label>
+                  <p className="text-gray-900">
+                    {new Date(selectedApplication.submittedAt).toLocaleString('es-AR', {
+                      dateStyle: 'long',
+                      timeStyle: 'short'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Carta de presentación */}
+              {selectedApplication.coverLetter && (
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Carta de Presentación</label>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-gray-900 whitespace-pre-line">{selectedApplication.coverLetter}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* CV */}
+              {selectedApplication.resumeData && (
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Curriculum Vitae</label>
+                  <button
+                    onClick={() => handleDownloadCV(selectedApplication)}
+                    className="w-full px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    📄 Descargar {selectedApplication.resumeFileName || 'CV'}
+                  </button>
+                </div>
+              )}
+
+              {/* Cambiar estado */}
+              <div className="border-t pt-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedApplication.id, 'PENDING')
+                      setShowApplicationDetail(false)
+                    }}
+                    className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
+                  >
+                    Pendiente
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedApplication.id, 'REVIEWING')
+                      setShowApplicationDetail(false)
+                    }}
+                    className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors font-medium"
+                  >
+                    En Revisión
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedApplication.id, 'INTERVIEWED')
+                      setShowApplicationDetail(false)
+                    }}
+                    className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors font-medium"
+                  >
+                    Entrevistado
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedApplication.id, 'ACCEPTED')
+                      setShowApplicationDetail(false)
+                    }}
+                    className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                  >
+                    ✅ Aceptar
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedApplication.id, 'REJECTED')
+                      setShowApplicationDetail(false)
+                    }}
+                    className="px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 transition-colors font-medium"
+                  >
+                    ❌ Rechazar
+                  </button>
+                  <button
+                    onClick={() => setShowApplicationDetail(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       {showCreateModal && (

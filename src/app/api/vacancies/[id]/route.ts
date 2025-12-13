@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 
+// Función helper para normalizar ubicaciones
+function normalizeLocation(location: string): string {
+  return location
+    .trim() // Eliminar espacios al inicio y final
+    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
+    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
+}
+
 interface RouteParams {
   params: Promise<{
     id: string
@@ -73,6 +81,16 @@ export async function PUT(
         'draft': 'DRAFT'
       }
       body.status = statusMap[body.status] || body.status.toUpperCase()
+    }
+
+    // Normalizar ubicación si viene en el body
+    if (body.location) {
+      body.location = normalizeLocation(body.location)
+    }
+
+    // Normalizar título si viene en el body
+    if (body.title) {
+      body.title = body.title.trim()
     }
 
     const vacancy = await prisma.vacancy.update({

@@ -1,16 +1,18 @@
 'use client'
 
+import Image from 'next/image'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 
 interface Company {
   id: number
   name: string
-  logo: string
+  logo?: string
+  logoImage?: string
 }
 
 // Empresas placeholder - podrás reemplazar con logos reales
 const companies: Company[] = [
-  { id: 1, name: 'TechCorp', logo: '🏢' },
+  { id: 1, name: 'TBEH', logoImage: '/logo-tbeh.png' },
   { id: 2, name: 'InnovaSoft', logo: '💼' },
   { id: 3, name: 'DataSolutions', logo: '📊' },
   { id: 4, name: 'CloudServe', logo: '☁️' },
@@ -62,10 +64,21 @@ export default function Empresas() {
                     animationDelay: `${index * 50}ms`
                   }}
                 >
-                  {/* Logo placeholder - reemplazar con <Image /> cuando tengas logos reales */}
-                  <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                    {company.logo}
-                  </div>
+                  {/* Logo - Imagen real o emoji */}
+                  {company.logoImage ? (
+                    <div className="relative w-32 h-32 mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <Image
+                        src={company.logoImage}
+                        alt={`${company.name} logo`}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                      {company.logo}
+                    </div>
+                  )}
                   <p className="text-gray-200 font-semibold text-center group-hover:text-yellow-400 transition-colors duration-300">
                     {company.name}
                   </p>
