@@ -5,61 +5,42 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import Pagination from '@/components/Pagination'
+import { useToast } from '@/contexts/ToastContext'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import AdminHeader from '@/components/admin/AdminHeader'
+import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs'
+import DashboardStats from '@/components/admin/DashboardStats'
+import { useAdminDashboard } from '@/hooks/useAdminDashboard'
+import type { Vacancy } from '@/lib/api/vacancies'
+import type { Application } from '@/lib/api/applications'
+import type { Contact } from '@/lib/api/contacts'
+import * as Sentry from '@sentry/nextjs'
 
-interface Vacancy {
-  id: string
-  title: string
-  location: string
-  workday: string
-  modality: string
-  status: string
-  createdAt: string
-  description?: string
-}
-
-interface Application {
-  id: string
-  candidateName: string
-  email: string
-  phone: string
-  resumeData?: string
-  resumeFileName?: string
-  coverLetter?: string
-  status: 'PENDING' | 'REVIEWING' | 'INTERVIEWED' | 'ACCEPTED' | 'REJECTED'
-  submittedAt: string
-  vacancy: {
-    id: string
-    title: string
-  }
-}
-
-interface Contact {
-  id: string
-  name: string
-  email: string
-  phone: string
-  subject: string
-  message: string
-  status: 'PENDING' | 'RESPONDED' | 'ARCHIVED'
-  createdAt: string
-}
-
-interface Stats {
-  totalVacancies: number
-  activeVacancies: number
-  totalApplications: number
-  pendingContacts: number
-}
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'vacancies' | 'applications' | 'contacts'>('vacancies')
-  const [vacancies, setVacancies] = useState<Vacancy[]>([])
-  const [applications, setApplications] = useState<Application[]>([])
+  const { showSuccess, showError } = useToast()
+  
+  // Usar el hook customizado para manejar datos y operaciones
+  const {
+    vacancies,
+    applications,
+    contacts,
+    stats,
+    isLoading,
+    createVacancy: createVacancyApi,
+    updateVacancy: updateVacancyApi,
+    deleteVacancy: deleteVacancyApi,
+    toggleVacancyStatus,
+    updateApplicationStatus,
+    updateContactStatus,
+    deleteContact: deleteContactApi
+  } = useAdminDashboard()
+  
+  const [activeTab, setActiveTab] = useState<AdminTab>('vacancies')
   const [filteredApplications, setFilteredApplications] = useState<Application[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [contacts, setContacts] = useState<Contact[]>([])
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([])
   const [filterContactStatus, setFilterContactStatus] = useState<string>('all')
   const [searchApplications, setSearchApplications] = useState<string>('')
@@ -68,19 +49,24 @@ export default function AdminDashboard() {
   const [currentApplicationPage, setCurrentApplicationPage] = useState(1)
   const [currentContactPage, setCurrentContactPage] = useState(1)
   const itemsPerPage = 10
-  const [stats, setStats] = useState<Stats>({
-    totalVacancies: 0,
-    activeVacancies: 0,
-    totalApplications: 0,
-    pendingContacts: 0
-  })
-  const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
   const [showApplicationDetail, setShowApplicationDetail] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [showContactDetail, setShowContactDetail] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    type?: 'danger' | 'warning' | 'info'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  })
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -98,12 +84,6 @@ export default function AdminDashboard() {
       router.push('/admin/signin')
     }
   }, [status, router])
-
-  useEffect(() => {
-    if (status === 'authenticated') {
-      fetchDashboardData()
-    }
-  }, [status])
 
   useEffect(() => {
     let filtered = applications
@@ -156,76 +136,33 @@ export default function AdminDashboard() {
     setCurrentContactPage(1)
   }, [filterContactStatus, searchContacts])
 
-  const fetchDashboardData = async () => {
-    try {
-      const [vacanciesRes, applicationsRes, contactsRes] = await Promise.all([
-        fetch('/api/vacancies?all=true'),
-        fetch('/api/applications'),
-        fetch('/api/contacts')
-      ])
-
-      const vacanciesData = await vacanciesRes.json()
-      const applicationsData = await applicationsRes.json()
-      const contactsData = await contactsRes.json()
-
-      setVacancies(vacanciesData)
-      setApplications(applicationsData)
-      setFilteredApplications(applicationsData)
-      setContacts(contactsData)
-      setFilteredContacts(contactsData)
-      setStats({
-        totalVacancies: vacanciesData.length,
-        activeVacancies: vacanciesData.filter((v: Vacancy) => v.status === 'active').length,
-        totalApplications: applicationsData.length,
-        pendingContacts: contactsData.filter((c: { status: string }) => c.status === 'PENDING').length
-      })
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleDeleteVacancy = async (id: string, title: string) => {
-    const confirmed = confirm(
-      `⚠️ ¿Estás seguro de eliminar la vacante "${title}"?\n\n` +
-      `Esta acción también eliminará todas las postulaciones asociadas y no se puede deshacer.`
-    )
-    
-    if (!confirmed) return
-
-    try {
-      const res = await fetch(`/api/vacancies/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (res.ok) {
-        fetchDashboardData()
-        alert('✅ Vacante eliminada exitosamente')
-      } else {
-        alert('❌ Error al eliminar la vacante')
+    setConfirmDialog({
+      isOpen: true,
+      title: '⚠️ Eliminar Vacante',
+      message: `¿Estás seguro de eliminar la vacante "${title}"?\n\nEsta acción también eliminará todas las postulaciones asociadas y no se puede deshacer.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteVacancyApi(id)
+          showSuccess('Vacante eliminada exitosamente')
+        } catch (error) {
+          console.error('Error deleting vacancy:', error)
+          showError('Error al eliminar la vacante')
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error deleting vacancy:', error)
-      alert('❌ Error al eliminar la vacante')
-    }
+    })
   }
 
   const handleStatusToggle = async (vacancy: Vacancy) => {
-    const newStatus = vacancy.status === 'active' ? 'closed' : 'active'
-    
     try {
-      const res = await fetch(`/api/vacancies/${vacancy.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...vacancy, status: newStatus })
-      })
-
-      if (res.ok) {
-        fetchDashboardData()
-      }
+      await toggleVacancyStatus(vacancy)
+      showSuccess(`Vacante ${vacancy.status === 'active' ? 'cerrada' : 'activada'} exitosamente`)
     } catch (error) {
-      console.error('Error updating vacancy:', error)
+      console.error('Error toggling status:', error)
+      showError('Error al cambiar el estado de la vacante')
     }
   }
 
@@ -279,57 +216,40 @@ export default function AdminDashboard() {
     setIsSaving(true)
 
     try {
-      const url = editingVacancy 
-        ? `/api/vacancies/${editingVacancy.id}` 
-        : '/api/vacancies'
-      
-      const method = editingVacancy ? 'PUT' : 'POST'
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      if (res.ok) {
-        await fetchDashboardData()
-        handleCloseModal()
+      if (editingVacancy) {
+        await updateVacancyApi(editingVacancy.id, formData)
+        showSuccess('Vacante actualizada exitosamente')
       } else {
-        const error = await res.json()
-        alert(`Error: ${error.error || 'No se pudo guardar la vacante'}`)
+        await createVacancyApi(formData)
+        showSuccess('Vacante creada exitosamente')
       }
+      handleCloseModal()
     } catch (error) {
       console.error('Error saving vacancy:', error)
-      alert('Error al guardar la vacante')
+      showError(error instanceof Error ? error.message : 'Error al guardar la vacante')
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+  const handleStatusChange = async (applicationId: string, newStatus: Application['status']) => {
     try {
-      const res = await fetch(`/api/applications/${applicationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      })
-
-      if (res.ok) {
-        await fetchDashboardData()
-      }
+      await updateApplicationStatus(applicationId, newStatus)
+      showSuccess('Estado actualizado exitosamente')
     } catch (error) {
       console.error('Error updating application status:', error)
+      showError('Error al actualizar el estado')
     }
   }
 
   const handleDownloadCV = (application: Application) => {
-    if (!application.resumeData) {
-      alert('No hay CV disponible para esta postulación')
+    if (!application.resumeUrl) {
+      showError('No hay CV disponible para esta postulación')
       return
     }
 
     const link = document.createElement('a')
-    link.href = application.resumeData
+    link.href = application.resumeUrl
     link.download = application.resumeFileName || `CV-${application.candidateName}.pdf`
     document.body.appendChild(link)
     link.click()
@@ -341,21 +261,13 @@ export default function AdminDashboard() {
     setShowApplicationDetail(true)
   }
 
-  const handleContactStatusChange = async (contactId: string, newStatus: string) => {
+  const handleContactStatusChange = async (contactId: string, newStatus: Contact['status']) => {
     try {
-      const res = await fetch(`/api/contacts/${contactId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      })
-
-      if (res.ok) {
-        setContacts(contacts.map(c => 
-          c.id === contactId ? { ...c, status: newStatus as Contact['status'] } : c
-        ))
-      }
+      await updateContactStatus(contactId, newStatus)
+      showSuccess('Estado del contacto actualizado')
     } catch (error) {
       console.error('Error al actualizar estado del contacto:', error)
+      showError('Error al actualizar el estado del contacto')
     }
   }
 
@@ -365,28 +277,23 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteContact = async (contactId: string, contactName: string) => {
-    const confirmed = confirm(
-      `⚠️ ¿Estás seguro de eliminar el contacto de "${contactName}"?\n\n` +
-      `Esta acción no se puede deshacer.`
-    )
-    
-    if (!confirmed) return
-
-    try {
-      const res = await fetch(`/api/contacts/${contactId}`, {
-        method: 'DELETE'
-      })
-
-      if (res.ok) {
-        setContacts(contacts.filter(c => c.id !== contactId))
-        alert('✅ Contacto eliminado exitosamente')
-      } else {
-        alert('❌ Error al eliminar el contacto')
+    setConfirmDialog({
+      isOpen: true,
+      title: '⚠️ Eliminar Contacto',
+      message: `¿Estás seguro de eliminar el contacto de "${contactName}"?\n\nEsta acción no se puede deshacer.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteContactApi(contactId)
+          showSuccess('Contacto eliminado exitosamente')
+        } catch (error) {
+          console.error('Error al eliminar contacto:', error)
+          showError('Error al eliminar el contacto')
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error al eliminar contacto:', error)
-      alert('❌ Error al eliminar el contacto')
-    }
+    })
   }
 
   const contactStatusLabels = {
@@ -400,6 +307,28 @@ export default function AdminDashboard() {
     'RESPONDED': 'bg-green-100 text-green-800',
     'ARCHIVED': 'bg-gray-100 text-gray-800'
   }
+
+const handleTestSentry = () => {
+  try {
+    throw new Error('Test Error - Sentry está funcionando correctamente')
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        test: 'true',
+        component: 'AdminDashboard',
+        user_role: 'admin'
+      },
+      extra: {
+        timestamp: new Date().toISOString(),
+        userEmail: session?.user?.email,
+        totalVacancies: stats.totalVacancies,
+        totalApplications: stats.totalApplications
+      },
+      level: 'info'
+    })
+    showSuccess('Error de prueba enviado a Sentry. Revisa tu dashboard en Sentry.io')
+  }
+}
 
   const statusLabels = {
     'PENDING': 'Pendiente',
@@ -429,82 +358,51 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-primary-500 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Panel de Administración</h1>
-              <p className="text-sm text-white/80">Bienvenido, {session.user?.name}</p>
-            </div>
-            <button
-              onClick={() => signOut({ callbackUrl: '/' })}
-              className="px-4 py-2 text-sm font-medium text-white hover:text-yellow-400 transition-colors"
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader 
+        userEmail={session.user?.email ?? undefined}
+        onSignOut={() => signOut({ callbackUrl: '/' })}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-1">Total Vacantes</div>
-            <div className="text-3xl font-bold text-gray-900">{stats.totalVacancies}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-1">Vacantes Activas</div>
-            <div className="text-3xl font-bold text-primary-500">{stats.activeVacancies}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-1">Postulaciones</div>
-            <div className="text-3xl font-bold text-gray-900">{stats.totalApplications}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-1">Consultas Pendientes</div>
-            <div className="text-3xl font-bold text-orange-600">{stats.pendingContacts}</div>
-          </div>
-        </div>
+        <DashboardStats
+          totalVacancies={stats.totalVacancies}
+          activeVacancies={stats.activeVacancies}
+          totalApplications={stats.totalApplications}
+          pendingContacts={stats.pendingContacts}
+        />
 
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+        {/* Botón de Test de Sentry - Solo en desarrollo */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-900">Test de Monitoreo</h3>
+                  <p className="text-xs text-blue-700">Verifica que Sentry esté capturando errores correctamente</p>
+                </div>
+              </div>
               <button
-                onClick={() => setActiveTab('vacancies')}
-                className={`${
-                  activeTab === 'vacancies'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+                onClick={handleTestSentry}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
-                📋 Vacantes ({stats.totalVacancies})
+                🧪 Probar Sentry
               </button>
-              <button
-                onClick={() => setActiveTab('applications')}
-                className={`${
-                  activeTab === 'applications'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-              >
-                📄 Postulaciones ({stats.totalApplications})
-              </button>
-              <button
-                onClick={() => setActiveTab('contacts')}
-                className={`${
-                  activeTab === 'contacts'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-              >
-                💬 Contactos ({contacts.length})
-              </button>
-            </nav>
+            </div>
           </div>
-        </div>
+        )}
+
+        <AdminTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          stats={{
+            activeVacancies: stats.activeVacancies,
+            pendingApplications: applications.filter(a => a.status === 'PENDING').length,
+            pendingContacts: stats.pendingContacts
+          }}
+        />
 
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
@@ -726,7 +624,7 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 text-sm">
                             <select
                               value={application.status}
-                              onChange={(e) => handleStatusChange(application.id, e.target.value)}
+                              onChange={(e) => handleStatusChange(application.id, e.target.value as Application['status'])}
                               className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${statusColors[application.status]}`}
                             >
                               <option value="PENDING">Pendiente</option>
@@ -746,7 +644,7 @@ export default function AdminDashboard() {
                             >
                               👁️ Ver
                             </button>
-                            {application.resumeData && (
+                            {application.resumeUrl && (
                               <button
                                 onClick={() => handleDownloadCV(application)}
                                 className="text-green-600 hover:text-green-800 font-medium"
@@ -876,7 +774,7 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 text-sm">
                             <select
                               value={contact.status}
-                              onChange={(e) => handleContactStatusChange(contact.id, e.target.value)}
+                              onChange={(e) => handleContactStatusChange(contact.id, e.target.value as Contact['status'])}
                               className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${contactStatusColors[contact.status]}`}
                             >
                               <option value="PENDING">Pendiente</option>
@@ -1097,7 +995,7 @@ export default function AdminDashboard() {
               )}
 
               {/* CV */}
-              {selectedApplication.resumeData && (
+              {selectedApplication.resumeUrl && (
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Curriculum Vitae</label>
                   <button
@@ -1342,6 +1240,16 @@ export default function AdminDashboard() {
             </form>
           </div>
         </div>
+      )}
+      
+      {confirmDialog.isOpen && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        />
       )}
     </div>
   )
