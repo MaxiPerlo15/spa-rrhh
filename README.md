@@ -37,6 +37,47 @@ Plataforma digital que conecta talento con oportunidades laborales, facilitando:
 
 ## 🚀 Versiones
 
+### v0.2.1 - Sistema de Monitoreo y Mejoras de Calidad ✅
+
+**Funcionalidades implementadas:**
+- ✅ Seed de usuario admin configurable vía variables de entorno
+- ✅ E2E Testing con Playwright (auth, vacancies, applications)
+- ✅ Mejoras UX: Toast notifications, ConfirmDialog, animaciones scroll
+- ✅ Refactorización arquitectura: API service layer, custom hooks, componentes modulares
+- ✅ Notificaciones por email con Resend (postulaciones y contactos)
+- ✅ Almacenamiento seguro de CVs con UploadThing (presigned URLs)
+- ✅ Monitoreo y error tracking con Sentry
+- ✅ Logger centralizado para captura de errores
+
+**Pendientes para v0.2.2:**
+- 🔄 Tests unitarios con Vitest (utilidades y helpers)
+- 🔄 Políticas de gestión de secrets en CI/CD
+- 🔄 Mejorar navegación del footer en página de ofertas laborales
+
+**Características de Monitoreo (Sentry):**
+- Error tracking en cliente y servidor
+- Performance monitoring (10% sample rate)
+- Release tracking con Vercel Git SHA
+- User context para errores de admins
+- Logger centralizado en API routes, componentes y servicios
+- Protección de PII (datos de candidatos)
+- Botón de test en panel admin (solo desarrollo)
+
+**Características de Email:**
+- Templates HTML profesionales con diseño responsive
+- Notificación automática al admin por nueva postulación
+- Notificación automática al admin por nuevo contacto
+- Modo desarrollo sin API key (simula en consola)
+- Integración con Resend API
+
+**Características de Almacenamiento de CVs:**
+- Subida segura con UploadThing (SDK v7)
+- Soporte para archivos PDF (máx. 4MB)
+- URLs públicas accesibles con CDN
+- Descarga directa desde panel admin
+- Componente de upload con preview y validación
+- Almacenamiento: resumeUrl, resumeFileName, resumeKey en BD
+
 ### v0.2.0 - Gestión Admin, UI/UX y Optimizaciones ✅
 
 **Funcionalidades implementadas:**
@@ -110,6 +151,34 @@ cp .env.example .env
 ```
 
 Editar `.env` con tus credenciales de PostgreSQL y secretos de NextAuth.
+
+**Variables requeridas:**
+- `DATABASE_URL`: Conexión a PostgreSQL
+- `NEXTAUTH_URL`: URL de tu aplicación (http://localhost:3000 en dev)
+- `NEXTAUTH_SECRET`: Secreto para NextAuth (generar con `openssl rand -base64 32`)
+- `ADMIN_EMAIL`: Email del admin (opcional, default: admin@sparrhh.com)
+- `ADMIN_PASSWORD`: Password del admin (opcional, default: ChangeMe123!)
+
+**Variables opcionales (Emails):**
+- `RESEND_API_KEY`: API key de Resend para envío de emails
+- `FROM_EMAIL`: Email remitente (ej: onboarding@resend.dev)
+
+**Variables opcionales (Almacenamiento de CVs):**
+- `UPLOADTHING_TOKEN`: Token de UploadThing para subida de archivos
+  - Obtén tu token en https://uploadthing.com/dashboard
+  - Plan gratuito: 2GB almacenamiento + 2GB/mes upload
+  - Sin token, la subida de CVs no funcionará
+
+**Variables opcionales (Monitoreo con Sentry):**
+- `NEXT_PUBLIC_SENTRY_DSN`: DSN de Sentry para error tracking
+  - Obtén tu DSN en https://sentry.io/settings/projects/
+  - Plan gratuito: 5,000 errores/mes + 10,000 performance events
+  - Sin DSN, el monitoreo no funcionará
+- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`: Porcentaje de transacciones a monitorear (default: 0.1)
+  - Valores: 0.0 (0%) a 1.0 (100%)
+  - Recomendado desarrollo: 1.0, producción: 0.1
+
+> **Nota**: Sin `RESEND_API_KEY` configurada, las notificaciones se simularán en consola.
 
 ### 4. Configurar base de datos
 ```bash
