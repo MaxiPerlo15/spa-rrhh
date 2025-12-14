@@ -200,8 +200,15 @@ export default function VacantesPage() {
             )}
 
             {/* Contador de resultados */}
-            <div className="ml-auto text-sm text-gray-600">
-              {filteredVacancies.length} {filteredVacancies.length === 1 ? 'vacante' : 'vacantes'}
+            <div className="ml-auto text-sm font-medium">
+              <span className="text-gray-600">
+                {filteredVacancies.length} {filteredVacancies.length === 1 ? 'vacante' : 'vacantes'}
+              </span>
+              {filteredVacancies.length > 0 && (
+                <span className="text-green-600 ml-2">
+                  disponible{filteredVacancies.length > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </div>
         </div>

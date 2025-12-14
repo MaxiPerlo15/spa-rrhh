@@ -1,10 +1,29 @@
+'use client'
+
+import { usePathname, useRouter } from 'next/navigation'
+
 export default function Footer() {
   const currentYear = new Date().getFullYear()
+  const pathname = usePathname()
+  const router = useRouter()
+  const isHomePage = pathname === '/'
 
   const scrollToSection = (sectionId: string) => {
+    // Si no estamos en home, navegar a home primero
+    if (!isHomePage) {
+      router.push(`/${sectionId}`)
+      return
+    }
+    
     const element = document.querySelector(sectionId)
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY
+      const offsetPosition = elementPosition - 64
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
     }
   }
 
@@ -55,10 +74,10 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#vacantes')}
+                  onClick={() => scrollToSection('#servicios')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
-                  Oportunidades Laborales
+                  Servicios
                 </button>
               </li>
               <li>

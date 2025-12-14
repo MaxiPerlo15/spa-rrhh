@@ -39,7 +39,13 @@ export default function NavBar() {
     } else {
       const target = document.querySelector(`#${sectionId}`)
       if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const elementPosition = target.getBoundingClientRect().top + window.scrollY
+        const offsetPosition = elementPosition - 64
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        })
         setMobileMenuOpen(false)
       }
     }

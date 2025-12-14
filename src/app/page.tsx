@@ -10,6 +10,7 @@ import PostularForm from '@/components/PostularForm'
 import ContactForm from '@/components/ContactForm'
 import Empresas from '@/components/Empresas'
 import Footer from '@/components/Footer'
+import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 
 interface Vacancy {
   id: string
@@ -27,10 +28,35 @@ export default function Home() {
   const [selectedVacancy, setSelectedVacancy] = useState<{ id: string; title: string } | null>(null)
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Refs para animaciones de scroll
+  const { ref: nosotrosRef, isVisible: nosotrosVisible } = useScrollAnimation<HTMLElement>()
+  const { ref: vacantesRef, isVisible: vacantesVisible } = useScrollAnimation<HTMLElement>()
+  const { ref: contactoRef, isVisible: contactoVisible } = useScrollAnimation<HTMLElement>()
 
   // Cargar vacantes desde la API
   useEffect(() => {
     fetchVacancies()
+  }, [])
+
+  // Manejar scroll a sección cuando se carga la página con hash
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash) {
+      // Usar requestAnimationFrame para scroll más suave
+      requestAnimationFrame(() => {
+        const element = document.querySelector(hash)
+        if (element) {
+          const elementPosition = element.getBoundingClientRect().top + window.scrollY
+          const offsetPosition = elementPosition - 64
+          
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'auto' // Cambiar a 'auto' para scroll instantáneo sin sacudidas
+          })
+        }
+      })
+    }
   }, [])
 
   const fetchVacancies = async () => {
@@ -111,7 +137,7 @@ export default function Home() {
         <Hero />
 
         {/* Sección Nosotros */}
-        <section id="nosotros" className="section-padding bg-gray-900 relative overflow-hidden">
+        <section ref={nosotrosRef} id="nosotros" className={`section-padding bg-gray-900 relative overflow-hidden animate-on-scroll ${nosotrosVisible ? 'is-visible' : ''}`}>
           {/* Imagen de fondo con blur */}
           <div 
             className="absolute inset-0 bg-cover bg-center"
@@ -159,12 +185,12 @@ export default function Home() {
         <Servicios />
 
         {/* Sección Vacantes */}
-        <section id="vacantes" className="section-padding bg-secondary-100">
+        <section ref={vacantesRef} id="vacantes" className={`section-padding bg-secondary-100 animate-on-scroll ${vacantesVisible ? 'is-visible' : ''}`}>
           <div className="container-custom">
             {/* Título */}
             <div className="text-center max-w-3xl mx-auto mb-12">
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                Ofertas laborales <span className="text-primary-500">Disponibles</span>
+                Ofertas laborales <span className="text-primary-500 inline-block hover:scale-110 transition-transform duration-300">Disponibles</span>
               </h2>
               <p className="text-lg text-gray-600 mb-6">
                 Descubre oportunidades profesionales que se ajustan a tu perfil. 
@@ -245,7 +271,7 @@ export default function Home() {
         <Empresas />
 
         {/* Sección Contacto */}
-        <section id="contacto" className="section-padding bg-white">
+        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
           <div className="container-custom">
             {/* Título y descripción */}
             <div className="text-center max-w-3xl mx-auto mb-12">
