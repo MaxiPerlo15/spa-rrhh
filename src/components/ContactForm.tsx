@@ -1,7 +1,12 @@
 'use client'
 import { useState, FormEvent } from 'react'
+import { useToast } from '@/contexts/ToastContext'
+import { createContact } from '@/lib/api/contacts'
+import * as Sentry from '@sentry/nextjs'
+
 
 export default function ContactForm() {
+  const { showSuccess, showError } = useToast()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,27 +27,17 @@ export default function ContactForm() {
     setLoading(true)
 
     try {
-      // Enviar a la API
-      const response = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          subject: formData.subject,
-          message: formData.message
-        })
+      await createContact({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: formData.subject,
+        message: formData.message
       })
-
-      if (!response.ok) {
-        throw new Error('Error al enviar el mensaje')
-      }
 
       // Mostrar éxito y resetear
       setSubmitted(true)
+      showSuccess('¡Mensaje enviado exitosamente! Te contactaremos pronto.')
       setFormData({
         name: '',
         email: '',
@@ -56,8 +51,17 @@ export default function ContactForm() {
         setSubmitted(false)
       }, 5000)
     } catch (error) {
-      console.error('Error al enviar mensaje:', error)
-      alert('Hubo un error al enviar tu mensaje. Por favor intenta nuevamente.')
+      showError('Error al enviar el mensaje. Por favor, intenta nuevamente.')
+      
+      Sentry.captureException(error, {
+        tags: {
+          component: 'ContactForm'
+        },
+        extra: {
+          contactEmail: formData.email,
+          subject: formData.subject
+        }
+      })
     } finally {
       setLoading(false)
     }
