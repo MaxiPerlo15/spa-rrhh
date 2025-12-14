@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// Modelo de Usuarios (Admin)
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -22,43 +18,72 @@ model User {
   @@index([email])
 }
 
-enum Role {
-  ADMIN
-  USER
-}
-
-// Modelo de Vacantes/Ofertas Laborales
 model Vacancy {
-  id          String   @id @default(cuid())
-  title       String
-  description String   @db.Text
-  location    String
-  workday     VacancyWorkday @default(FULL_TIME)
-  modality    VacancyModality @default(ON_SITE)
-  salary      String?
-  requirements String? @db.Text
-  benefits    String?  @db.Text
-  status      VacancyStatus @default(ACTIVE)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relación con postulaciones
+  id           String          @id @default(cuid())
+  title        String
+  description  String
+  location     String
+  salary       String?
+  requirements String?
+  benefits     String?
+  status       VacancyStatus   @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  modality     VacancyModality @default(ON_SITE)
+  workday      VacancyWorkday  @default(FULL_TIME)
   applications Application[]
 
   @@index([status, createdAt])
 }
 
+model Application {
+  id             String            @id @default(cuid())
+  vacancyId      String
+  candidateName  String
+  email          String
+  phone          String
+  resumeFileName String?
+  coverLetter    String?
+  status         ApplicationStatus @default(PENDING)
+  submittedAt    DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  resumeKey      String?
+  resumeUrl      String?
+  vacancy        Vacancy           @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  @@index([vacancyId, status])
+  @@index([email])
+}
+
+model Contact {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  subject   String
+  message   String
+  status    ContactStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+
+  @@index([status, createdAt])
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
 enum VacancyWorkday {
-  FULL_TIME      // Jornada Completa
-  PART_TIME      // Media Jornada
-  PROJECT_BASED  // Por Proyecto
-  INTERNSHIP     // Pasantía
+  FULL_TIME
+  PART_TIME
+  PROJECT_BASED
+  INTERNSHIP
 }
 
 enum VacancyModality {
-  ON_SITE  // Presencial
-  REMOTE   // Remoto
-  HYBRID   // Híbrido
+  ON_SITE
+  REMOTE
+  HYBRID
 }
 
 enum VacancyStatus {
@@ -67,47 +92,12 @@ enum VacancyStatus {
   DRAFT
 }
 
-// Modelo de Postulaciones
-model Application {
-  id              String   @id @default(cuid())
-  vacancyId       String
-  candidateName   String
-  email           String
-  phone           String
-  resumeData      String?  @db.Text  // Base64 del CV
-  resumeFileName  String?
-  coverLetter     String?  @db.Text
-  status          ApplicationStatus @default(PENDING)
-  submittedAt     DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  // Relación con vacante
-  vacancy         Vacancy  @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
-
-  @@index([vacancyId, status])
-  @@index([email])
-}
-
 enum ApplicationStatus {
   PENDING
   REVIEWING
   INTERVIEWED
   ACCEPTED
   REJECTED
-}
-
-// Modelo de Contactos
-model Contact {
-  id          String   @id @default(cuid())
-  name        String
-  email       String
-  phone       String
-  subject     String
-  message     String   @db.Text
-  status      ContactStatus @default(PENDING)
-  createdAt   DateTime @default(now())
-  
-  @@index([status, createdAt])
 }
 
 enum ContactStatus {
