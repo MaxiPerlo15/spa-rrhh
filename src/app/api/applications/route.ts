@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ApplicationStatus } from '@prisma/client'
 import { auth } from '@/lib/auth'
+import { sendNewApplicationEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
+
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
 export async function GET(request: NextRequest) {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(applications)
   } catch (error) {
-    console.error('Error al obtener aplicaciones:', error)
+    logger.error('Error al obtener aplicaciones', error)
     return NextResponse.json(
       { error: 'Error al obtener aplicaciones' },
       { status: 500 }
@@ -58,13 +61,14 @@ export async function POST(request: NextRequest) {
       candidateName, 
       email, 
       phone, 
-      resumeData, 
+      resumeUrl, 
       resumeFileName, 
+      resumeKey,
       coverLetter 
     } = body
 
     // Validaciones
-    if (!vacancyId || !candidateName || !email || !phone) {
+    if (!vacancyId || !candidateName || !email || !phone || !resumeUrl) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
         { status: 400 }
@@ -97,15 +101,28 @@ export async function POST(request: NextRequest) {
         candidateName,
         email,
         phone,
-        resumeData,
+        resumeUrl,
         resumeFileName,
-        coverLetter,
+        resumeKey,
+        coverLetter: body.coverLetter,
         status: 'PENDING'
       }
     })
 
-    // TODO: Enviar email de confirmación al candidato
-    // TODO: Enviar notificación al admin
+    // Enviar notificación al admin (no bloqueante)
+    sendNewApplicationEmail({
+      vacancyTitle: vacancy.title,
+      applicantName: candidateName,
+      applicantEmail: email,
+      applicantPhone: phone,
+      applicantLinkedin: body.linkedin,
+      message: coverLetter
+    }).catch(error => {
+      logger.error('Error al enviar email de notificación', error, {
+        vacancyTitle: vacancy.title,
+        applicationEmail: email
+      })
+    })
 
     return NextResponse.json(
       { 
@@ -115,7 +132,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error al crear aplicación:', error)
+    logger.error('Error al crear aplicación', error)
     return NextResponse.json(
       { error: 'Error al enviar postulación' },
       { status: 500 }

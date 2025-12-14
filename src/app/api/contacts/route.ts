@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ContactStatus } from '@prisma/client'
 import { auth } from '@/lib/auth'
+import { sendNewContactEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(contacts)
   } catch (error) {
-    console.error('Error al obtener contactos:', error)
+    logger.error('Error al obtener contactos', error)
     return NextResponse.json(
       { error: 'Error al obtener contactos' },
       { status: 500 }
@@ -73,8 +75,17 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // TODO: Enviar email de confirmación
-    // TODO: Notificar al admin
+    // Enviar notificación al admin (no bloqueante)
+    sendNewContactEmail({
+      name,
+      email,
+      phone,
+      company: subject,
+      message
+    }).catch(error => {
+      logger.error('Error al enviar email de notificación', error)
+      // No fallar la request si el email falla
+    })
 
     return NextResponse.json(
       { 
@@ -84,7 +95,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error al crear contacto:', error)
+    logger.error('Error al crear contacto', error)
     return NextResponse.json(
       { error: 'Error al enviar mensaje' },
       { status: 500 }

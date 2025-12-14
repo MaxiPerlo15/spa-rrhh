@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 interface RouteParams {
   params: Promise<{
@@ -38,7 +39,7 @@ export async function GET(
 
     return NextResponse.json(application)
   } catch (error) {
-    console.error('Error al obtener postulación:', error)
+    logger.error('Error al obtener postulación', error)
     return NextResponse.json(
       { error: 'Error al obtener postulación' },
       { status: 500 }
@@ -81,7 +82,7 @@ export async function PATCH(
 
     return NextResponse.json(application)
   } catch (error) {
-    console.error('Error al actualizar postulación:', error)
+    logger.error('Error al actualizar postulación', error)
     return NextResponse.json(
       { error: 'Error al actualizar postulación' },
       { status: 500 }
@@ -112,7 +113,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error al eliminar postulación:', error)
+    logger.error('Error al eliminar postulación', error)
     return NextResponse.json(
       { error: 'Error al eliminar postulación' },
       { status: 500 }

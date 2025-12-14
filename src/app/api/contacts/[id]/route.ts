@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-
+import { logger } from '@/lib/logger'
 interface RouteParams {
   params: Promise<{
     id: string
@@ -36,7 +36,7 @@ export async function GET(
 
     return NextResponse.json(contact)
   } catch (error) {
-    console.error('Error al obtener contacto:', error)
+    logger.error('Error al obtener contacto', error)
     return NextResponse.json(
       { error: 'Error al obtener contacto' },
       { status: 500 }
@@ -78,7 +78,7 @@ export async function PATCH(
 
     return NextResponse.json(contact)
   } catch (error) {
-    console.error('Error al actualizar contacto:', error)
+    logger.error('Error al actualizar contacto', error)
     return NextResponse.json(
       { error: 'Error al actualizar contacto' },
       { status: 500 }
@@ -107,7 +107,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Contacto eliminado' })
   } catch (error) {
-    console.error('Error al eliminar contacto:', error)
+    logger.error('Error al eliminar contacto', error)
     return NextResponse.json(
       { error: 'Error al eliminar contacto' },
       { status: 500 }

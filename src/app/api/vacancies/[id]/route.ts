@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 // Función helper para normalizar ubicaciones
 function normalizeLocation(location: string): string {
@@ -47,7 +48,7 @@ export async function GET(
 
     return NextResponse.json(vacancy)
   } catch (error) {
-    console.error('Error al obtener vacante:', error)
+    logger.error('Error al obtener vacante', error)
     return NextResponse.json(
       { error: 'Error al obtener vacante' },
       { status: 500 }
@@ -55,11 +56,8 @@ export async function GET(
   }
 }
 
-// PUT /api/vacancies/[id] - Actualizar vacante (admin)
-export async function PUT(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+// Función compartida para actualizar vacante
+async function updateVacancy(request: NextRequest, params: Promise<{ id: string }>) {
   try {
     // Verificar autenticación
     const session = await auth()
@@ -100,12 +98,28 @@ export async function PUT(
 
     return NextResponse.json(vacancy)
   } catch (error) {
-    console.error('Error al actualizar vacante:', error)
+    logger.error('Error al actualizar vacante', error)
     return NextResponse.json(
       { error: 'Error al actualizar vacante' },
       { status: 500 }
     )
   }
+}
+
+// PUT /api/vacancies/[id] - Actualizar vacante (admin)
+export async function PUT(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  return updateVacancy(request, params)
+}
+
+// PATCH /api/vacancies/[id] - Actualizar vacante parcialmente (admin)
+export async function PATCH(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  return updateVacancy(request, params)
 }
 
 // DELETE /api/vacancies/[id] - Eliminar vacante (admin)
@@ -131,7 +145,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Vacante eliminada exitosamente' })
   } catch (error) {
-    console.error('Error al eliminar vacante:', error)
+    logger.error('Error al eliminar vacante', error)
     return NextResponse.json(
       { error: 'Error al eliminar vacante' },
       { status: 500 }

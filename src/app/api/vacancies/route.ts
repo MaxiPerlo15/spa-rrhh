@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 // Función helper para normalizar ubicaciones
 function normalizeLocation(location: string): string {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(formattedVacancies)
   } catch (error) {
-    console.error('Error al obtener vacantes:', error)
+    logger.error('Error al obtener vacantes', error)
     return NextResponse.json(
       { error: 'Error al obtener vacantes' },
       { status: 500 }
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(vacancy, { status: 201 })
   } catch (error) {
-    console.error('Error al crear vacante:', error)
+    logger.error('Error al crear vacante', error)
     return NextResponse.json(
       { error: 'Error al crear vacante' },
       { status: 500 }
