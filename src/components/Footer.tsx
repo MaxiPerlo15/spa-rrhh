@@ -11,11 +11,11 @@ export default function Footer() {
   const scrollToSection = (sectionId: string) => {
     // Si no estamos en home, navegar a home primero
     if (!isHomePage) {
-      router.push(`/${sectionId}`)
+      router.push(`/#${sectionId.replace('#','')}`)
       return
     }
     
-    const element = document.querySelector(sectionId)
+    const element = document.querySelector(`#${sectionId}`)
     if (element) {
       const elementPosition = element.getBoundingClientRect().top + window.scrollY
       const offsetPosition = elementPosition - 64
@@ -57,7 +57,7 @@ export default function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => scrollToSection('#inicio')}
+                  onClick={() => scrollToSection('inicio')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                   aria-label="Ir a la sección Inicio"
                 >
@@ -66,7 +66,7 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#nosotros')}
+                  onClick={() => scrollToSection('nosotros')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Nosotros
@@ -74,7 +74,7 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#servicios')}
+                  onClick={() => scrollToSection('servicios')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Servicios
@@ -82,7 +82,7 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#empresas')}
+                  onClick={() => scrollToSection('empresas')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Empresas
@@ -90,7 +90,7 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#contacto')}
+                  onClick={() => scrollToSection('contacto')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Contacto

@@ -146,37 +146,25 @@ npm install
 ```
 
 ### 3. Configurar variables de entorno
+
 ```bash
 cp .env.example .env
 ```
 
-Editar `.env` con tus credenciales de PostgreSQL y secretos de NextAuth.
+Edita `.env` con tus credenciales reales y secretos.
 
-**Variables requeridas:**
-- `DATABASE_URL`: Conexión a PostgreSQL
-- `NEXTAUTH_URL`: URL de tu aplicación (http://localhost:3000 en dev)
-- `NEXTAUTH_SECRET`: Secreto para NextAuth (generar con `openssl rand -base64 32`)
-- `ADMIN_EMAIL`: Email del admin (opcional, default: admin@sparrhh.com)
-- `ADMIN_PASSWORD`: Password del admin (opcional, default: ChangeMe123!)
+Consulta la política completa y checklist en [`SECRETS_POLICY.md`](./SECRETS_POLICY.md).
 
-**Variables opcionales (Emails):**
-- `RESEND_API_KEY`: API key de Resend para envío de emails
-- `FROM_EMAIL`: Email remitente (ej: onboarding@resend.dev)
+**Validación automática:**
+El proyecto incluye un validador de variables requeridas en [`src/lib/checkEnv.ts`](src/lib/checkEnv.ts). Si falta alguna variable crítica, la app fallará con un mensaje claro.
 
-**Variables opcionales (Almacenamiento de CVs):**
-- `UPLOADTHING_TOKEN`: Token de UploadThing para subida de archivos
-  - Obtén tu token en https://uploadthing.com/dashboard
-  - Plan gratuito: 2GB almacenamiento + 2GB/mes upload
-  - Sin token, la subida de CVs no funcionará
+**Variables requeridas y opcionales:**
+Revisa `.env.example` y la tabla en `SECRETS_POLICY.md` para conocer el detalle de cada variable, su uso y si es obligatoria u opcional.
 
-**Variables opcionales (Monitoreo con Sentry):**
-- `NEXT_PUBLIC_SENTRY_DSN`: DSN de Sentry para error tracking
-  - Obtén tu DSN en https://sentry.io/settings/projects/
-  - Plan gratuito: 5,000 errores/mes + 10,000 performance events
-  - Sin DSN, el monitoreo no funcionará
-- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`: Porcentaje de transacciones a monitorear (default: 0.1)
-  - Valores: 0.0 (0%) a 1.0 (100%)
-  - Recomendado desarrollo: 1.0, producción: 0.1
+**Recomendaciones:**
+- Nunca subas `.env.local` ni `.env` con datos reales al repo.
+- Usa solo GitHub Secrets para CI/CD y producción.
+- Rota los secrets sensibles periódicamente.
 
 > **Nota**: Sin `RESEND_API_KEY` configurada, las notificaciones se simularán en consola.
 

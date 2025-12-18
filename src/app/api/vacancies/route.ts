@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { isNotEmpty, normalizeLocation } from '@/lib/utils'
 
-// Función helper para normalizar ubicaciones
-function normalizeLocation(location: string): string {
-  return location
-    .trim() // Eliminar espacios al inicio y final
-    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
-    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
-}
 
 // GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
@@ -72,7 +66,7 @@ export async function POST(request: NextRequest) {
     const { title, description, location, workday, modality, salary, requirements, benefits } = body
 
     // Validaciones básicas
-    if (!title || !description || !location || !workday || !modality) {
+    if (!isNotEmpty(title) || !isNotEmpty(description) || !isNotEmpty(location) || !isNotEmpty(workday) || !isNotEmpty(modality)) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
         { status: 400 }

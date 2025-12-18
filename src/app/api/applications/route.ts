@@ -4,6 +4,7 @@ import { ApplicationStatus } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { sendNewApplicationEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { isNotEmpty } from '@/lib/utils'
 
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validaciones
-    if (!vacancyId || !candidateName || !email || !phone || !resumeUrl) {
+    if (!isNotEmpty(vacancyId) || !isNotEmpty(candidateName) || !isNotEmpty(email) || !isNotEmpty(phone)) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
         { status: 400 }

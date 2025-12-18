@@ -54,6 +54,9 @@ jobs:
           name: build-${{ matrix.node-version }}
           path: .next
           retention-days: 7
+    
+      - name: Run unit tests
+        run: npx vitest run --coverage
 
   test:
     name: Run Tests

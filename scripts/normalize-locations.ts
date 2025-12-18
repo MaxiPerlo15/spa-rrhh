@@ -1,19 +1,14 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
+import { normalizeLocation } from '@/lib/utils'
+
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://maxiperlo@localhost:5432/spa_rrhh_db?schema=public'
 const pool = new pg.Pool({ connectionString })
 const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
-// Función helper para normalizar ubicaciones
-function normalizeLocation(location: string): string {
-  return location
-    .trim() // Eliminar espacios al inicio y final
-    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
-    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
-}
 
 async function normalizeAllLocations() {
   try {

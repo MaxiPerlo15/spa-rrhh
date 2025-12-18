@@ -268,10 +268,11 @@ export default function Home() {
         )}
 
         {/* Sección Empresas */}
-        <Empresas />
+          <Empresas />
+                
 
         {/* Sección Contacto */}
-        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
+        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll  ${contactoVisible ? 'is-visible' : ''}`}>
           <div className="container-custom">
             {/* Título y descripción */}
             <div className="text-center max-w-3xl mx-auto mb-12">

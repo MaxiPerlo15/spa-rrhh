@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { normalizeLocation } from '@/lib/utils'
 
-// Función helper para normalizar ubicaciones
-function normalizeLocation(location: string): string {
-  return location
-    .trim() // Eliminar espacios al inicio y final
-    .replace(/\s+/g, ' ') // Reemplazar múltiples espacios por uno solo
-    .replace(/\s*,\s*/g, ', ') // Normalizar espacios alrededor de comas
-}
 
 interface RouteParams {
   params: Promise<{

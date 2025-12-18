@@ -12,19 +12,19 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ userEmail, onSignOut }: AdminHeaderProps) {
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-10">
+    <header className= "bg-primary-600 shadow-sm sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Panel Administrativo</h1>
-            <p className="text-sm text-gray-600 mt-1">Meinardi&Perlo RRHH</p>
+            <h1 className="text-2xl font-bold text-white">Panel Administrativo</h1>
+            <p className="text-sm text-gray-300 mt-1">Meinardi&Perlo RRHH</p>
           </div>
           
           <div className="flex items-center gap-4">
             {userEmail && (
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-gray-900">{userEmail}</p>
-                <p className="text-xs text-gray-500">Administrador</p>
+                <p className="text-sm font-medium text-white">{userEmail}</p>
+                <p className="text-xs text-gray-300">Administrador</p>
               </div>
             )}
             
