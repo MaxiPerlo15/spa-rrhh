@@ -2,14 +2,7 @@ import { getServerSession } from "next-auth/next"
 import type { NextAuthOptions } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcrypt"
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import pg from 'pg'
-
-const connectionString = process.env.DATABASE_URL || ''
-const pool = new pg.Pool({ connectionString })
-const adapter = new PrismaPg(pool)
-const prisma = new PrismaClient({ adapter })
+import { prisma } from '@/lib/prisma'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -78,5 +71,4 @@ export const authOptions: NextAuthOptions = {
 export function auth() {
   return getServerSession(authOptions)
 }
-
 

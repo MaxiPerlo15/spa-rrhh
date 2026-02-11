@@ -137,6 +137,12 @@ export async function deleteVacancy(id: string): Promise<void>
 - **Schema**: Definición de modelos en `prisma/schema.prisma`
 - **Seeds**: Datos iniciales en `prisma/seed.ts`
 
+Regla operativa:
+
+- Toda lectura/escritura en runtime (API routes, auth, servicios de servidor) debe usar exclusivamente `src/lib/prisma.ts`.
+- No crear `PrismaClient` adicional en otros módulos para evitar pools duplicados.
+- `DATABASE_URL` es obligatoria en runtime (sin fallback hardcodeado).
+
 ### 5. Capa de API Routes (`src/app/api`)
 
 **Responsabilidad**: Endpoints HTTP que conectan frontend con base de datos.

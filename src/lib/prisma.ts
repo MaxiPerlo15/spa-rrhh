@@ -6,9 +6,12 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://maxiperlo@localhost:5432/spa_rrhh_db?schema=public'
-
 const createPrismaClient = () => {
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    throw new Error('DATABASE_URL no está configurada')
+  }
+
   const pool = new pg.Pool({ connectionString })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
