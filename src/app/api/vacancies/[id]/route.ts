@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { normalizeLocation } from '@/lib/utils'
+import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
 
 
 interface RouteParams {
@@ -17,7 +18,11 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     const session = await auth()
     const isAdmin = session?.user?.role === 'ADMIN'
     
@@ -68,32 +73,26 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       )
     }
 
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
+
     const body = await request.json()
-
-    // Convertir status si viene del frontend
-    if (body.status) {
-      const statusMap: Record<string, string> = {
-        'active': 'ACTIVE',
-        'closed': 'CLOSED',
-        'draft': 'DRAFT'
-      }
-      body.status = statusMap[body.status] || body.status.toUpperCase()
+    const bodyValidation = updateVacancySchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
+    const normalizedBody = { ...bodyValidation.data }
 
-    // Normalizar ubicación si viene en el body
-    if (body.location) {
-      body.location = normalizeLocation(body.location)
-    }
-
-    // Normalizar título si viene en el body
-    if (body.title) {
-      body.title = body.title.trim()
+    if (normalizedBody.location) {
+      normalizedBody.location = normalizeLocation(normalizedBody.location)
     }
 
     const vacancy = await prisma.vacancy.update({
       where: { id },
-      data: body
+      data: normalizedBody
     })
 
     return NextResponse.json(vacancy)
@@ -137,7 +136,11 @@ export async function DELETE(
       )
     }
 
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     
     await prisma.vacancy.delete({
       where: { id }

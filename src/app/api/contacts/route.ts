@@ -4,8 +4,11 @@ import { ContactStatus } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { sendNewContactEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
-import { isValidEmail } from '@/lib/utils'
-import { isNotEmpty } from '@/lib/utils'
+import {
+  contactsListQuerySchema,
+  createContactSchema,
+  formatValidationError
+} from '@/lib/apiValidation'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
@@ -20,10 +23,16 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const statusParam = searchParams.get('status')
+    const queryValidation = contactsListQuerySchema.safeParse({
+      status: searchParams.get('status') ?? undefined
+    })
+    if (!queryValidation.success) {
+      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+    }
+    const { status: statusParam } = queryValidation.data
 
     const where: { status?: ContactStatus } = {}
-    if (statusParam) where.status = statusParam as ContactStatus
+    if (statusParam) where.status = statusParam
 
     const contacts = await prisma.contact.findMany({
       where,
@@ -46,23 +55,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, phone, subject, message } = body
-
-    // Validaciones
-    if (!isNotEmpty(name) || !isNotEmpty(email) || !isNotEmpty(subject) || !isNotEmpty(message)) {
-      return NextResponse.json(
-        { error: 'Todos los campos son requeridos' },
-        { status: 400 }
-      )
+    const bodyValidation = createContactSchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
-
-    // Validar email
-    if (!isValidEmail(email)) {
-      return NextResponse.json(
-        { error: 'Email inválido' },
-        { status: 400 }
-      )
-    }
+    const { name, email, phone, subject, message } = bodyValidation.data
 
     // Crear contacto
     const contact = await prisma.contact.create({

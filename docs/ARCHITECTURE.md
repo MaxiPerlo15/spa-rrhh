@@ -210,6 +210,33 @@ Para evitar exposición de datos sensibles, las rutas deben aplicar autorizació
 
 Este criterio evita IDOR y asegura principio de mínimo privilegio en el panel administrativo.
 
+## Estándar de Validación (Zod)
+
+Las rutas API usan validación runtime centralizada en:
+
+- `src/lib/apiValidation.ts`
+
+Reglas actuales:
+
+- Validación de `params` (IDs), `query` y `body` con Zod.
+- Normalización de strings opcionales (ejemplo: `""` -> `undefined` cuando aplica).
+- Validación de enums para estados y catálogos (`workday`, `modality`, `status`).
+- Respuesta uniforme para input inválido con HTTP `400`.
+
+Formato de error de validación:
+
+```json
+{
+  "error": "Datos inválidos",
+  "details": [
+    {
+      "field": "status",
+      "message": "Invalid enum value"
+    }
+  ]
+}
+```
+
 ## Patrones de Diseño Implementados
 
 ### 1. **Repository Pattern** (Capa de API Services)

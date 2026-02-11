@@ -4,7 +4,11 @@ import { ApplicationStatus } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { sendNewApplicationEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
-import { isNotEmpty } from '@/lib/utils'
+import {
+  applicationsListQuerySchema,
+  createApplicationSchema,
+  formatValidationError
+} from '@/lib/apiValidation'
 
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
@@ -20,12 +24,18 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const vacancyId = searchParams.get('vacancyId')
-    const statusParam = searchParams.get('status')
+    const queryValidation = applicationsListQuerySchema.safeParse({
+      vacancyId: searchParams.get('vacancyId') ?? undefined,
+      status: searchParams.get('status') ?? undefined
+    })
+    if (!queryValidation.success) {
+      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+    }
+    const { vacancyId, status: statusParam } = queryValidation.data
 
     const where: { vacancyId?: string; status?: ApplicationStatus } = {}
     if (vacancyId) where.vacancyId = vacancyId
-    if (statusParam) where.status = statusParam as ApplicationStatus
+    if (statusParam) where.status = statusParam
 
     const applications = await prisma.application.findMany({
       where,
@@ -57,24 +67,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      vacancyId, 
-      candidateName, 
-      email, 
-      phone, 
-      resumeUrl, 
-      resumeFileName, 
-      resumeKey,
-      coverLetter 
-    } = body
-
-    // Validaciones
-    if (!isNotEmpty(vacancyId) || !isNotEmpty(candidateName) || !isNotEmpty(email) || !isNotEmpty(phone)) {
-      return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
-        { status: 400 }
-      )
+    const bodyValidation = createApplicationSchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
+    const {
+      vacancyId,
+      candidateName,
+      email,
+      phone,
+      resumeUrl,
+      resumeFileName,
+      resumeKey,
+      coverLetter
+    } = bodyValidation.data
 
     // Verificar que la vacante existe y está activa
     const vacancy = await prisma.vacancy.findUnique({
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest) {
         resumeUrl,
         resumeFileName,
         resumeKey,
-        coverLetter: body.coverLetter,
+        coverLetter,
         status: 'PENDING'
       }
     })
@@ -116,7 +122,6 @@ export async function POST(request: NextRequest) {
       applicantName: candidateName,
       applicantEmail: email,
       applicantPhone: phone,
-      applicantLinkedin: body.linkedin,
       message: coverLetter
     }).catch(error => {
       logger.error('Error al enviar email de notificación', error, {

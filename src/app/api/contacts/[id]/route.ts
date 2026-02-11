@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import {
+  formatValidationError,
+  routeIdSchema,
+  updateContactStatusSchema
+} from '@/lib/apiValidation'
 interface RouteParams {
   params: Promise<{
     id: string
@@ -14,7 +19,11 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -50,7 +59,11 @@ export async function PATCH(
   { params }: RouteParams
 ) {
   try {
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -60,16 +73,11 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { status } = body
-
-    // Validar estado
-    const validStatuses = ['PENDING', 'RESPONDED', 'ARCHIVED']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: 'Estado inválido' },
-        { status: 400 }
-      )
+    const bodyValidation = updateContactStatusSchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
+    const { status } = bodyValidation.data
 
     const contact = await prisma.contact.update({
       where: { id },
@@ -92,7 +100,11 @@ export async function DELETE(
   { params }: RouteParams
 ) {
   try {
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json(

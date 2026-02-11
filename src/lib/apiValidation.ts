@@ -1,0 +1,112 @@
+import { z } from 'zod'
+
+const nonEmptyString = z.string().trim().min(1, 'Campo requerido')
+const optionalTrimmedString = z
+  .string()
+  .optional()
+  .transform((value) => {
+    if (value === undefined) return undefined
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : undefined
+  })
+
+export const routeIdSchema = z.object({
+  id: z.string().cuid('ID inválido')
+})
+
+const vacancyWorkdaySchema = z.enum(['FULL_TIME', 'PART_TIME', 'PROJECT_BASED', 'INTERNSHIP'])
+const vacancyModalitySchema = z.enum(['ON_SITE', 'REMOTE', 'HYBRID'])
+type VacancyStatus = 'ACTIVE' | 'CLOSED' | 'DRAFT'
+
+const applicationStatusSchema = z.enum(['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED'])
+const contactStatusSchema = z.enum(['PENDING', 'RESPONDED', 'ARCHIVED'])
+
+export const vacanciesListQuerySchema = z.object({
+  all: z
+    .enum(['1', 'true', 'yes', 'on', '0', 'false', 'no', 'off'])
+    .optional()
+    .transform((value) => {
+      if (!value) return false
+      return ['1', 'true', 'yes', 'on'].includes(value)
+    })
+})
+
+export const createVacancySchema = z.object({
+  title: nonEmptyString,
+  description: nonEmptyString,
+  location: nonEmptyString,
+  workday: vacancyWorkdaySchema,
+  modality: vacancyModalitySchema,
+  salary: optionalTrimmedString,
+  requirements: optionalTrimmedString,
+  benefits: optionalTrimmedString
+})
+
+const updateVacancyStatusSchema = z
+  .enum(['active', 'closed', 'draft', 'ACTIVE', 'CLOSED', 'DRAFT'])
+  .transform((status) => status.toUpperCase() as VacancyStatus)
+
+export const updateVacancySchema = z
+  .object({
+    title: optionalTrimmedString,
+    description: optionalTrimmedString,
+    location: optionalTrimmedString,
+    workday: vacancyWorkdaySchema.optional(),
+    modality: vacancyModalitySchema.optional(),
+    salary: optionalTrimmedString,
+    requirements: optionalTrimmedString,
+    benefits: optionalTrimmedString,
+    status: updateVacancyStatusSchema.optional()
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: 'Debes enviar al menos un campo para actualizar'
+  })
+
+export const applicationsListQuerySchema = z.object({
+  vacancyId: z.string().cuid('vacancyId inválido').optional(),
+  status: applicationStatusSchema.optional()
+})
+
+export const createApplicationSchema = z.object({
+  vacancyId: z.string().cuid('vacancyId inválido'),
+  candidateName: nonEmptyString,
+  email: z.string().trim().email('Email inválido'),
+  phone: nonEmptyString,
+  resumeUrl: z.string().url('resumeUrl inválido').optional(),
+  resumeFileName: optionalTrimmedString,
+  resumeKey: optionalTrimmedString,
+  coverLetter: optionalTrimmedString
+})
+
+export const updateApplicationStatusSchema = z.object({
+  status: applicationStatusSchema
+})
+
+export const contactsListQuerySchema = z.object({
+  status: contactStatusSchema.optional()
+})
+
+export const createContactSchema = z.object({
+  name: nonEmptyString,
+  email: z.string().trim().email('Email inválido'),
+  phone: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim() ?? ''),
+  subject: nonEmptyString,
+  message: nonEmptyString
+})
+
+export const updateContactStatusSchema = z.object({
+  status: contactStatusSchema
+})
+
+export function formatValidationError(error: z.ZodError) {
+  return {
+    error: 'Datos inválidos',
+    details: error.issues.map((issue) => ({
+      field: issue.path.join('.'),
+      message: issue.message
+    }))
+  }
+}

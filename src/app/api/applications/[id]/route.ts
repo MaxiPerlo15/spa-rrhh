@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import {
+  formatValidationError,
+  routeIdSchema,
+  updateApplicationStatusSchema
+} from '@/lib/apiValidation'
 
 interface RouteParams {
   params: Promise<{
@@ -23,7 +28,11 @@ export async function GET(
       )
     }
 
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
     
     const application = await prisma.application.findUnique({
       where: { id },
@@ -70,18 +79,18 @@ export async function PATCH(
       )
     }
 
-    const { id } = await params
-    const body = await request.json()
-    const { status } = body
-
-    // Validar estado
-    const validStatuses = ['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: 'Estado inválido' },
-        { status: 400 }
-      )
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
+    const { id } = parsedParams.data
+
+    const body = await request.json()
+    const bodyValidation = updateApplicationStatusSchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+    }
+    const { status } = bodyValidation.data
 
     const application = await prisma.application.update({
       where: { id },
@@ -113,7 +122,11 @@ export async function DELETE(
       )
     }
 
-    const { id } = await params
+    const parsedParams = routeIdSchema.safeParse(await params)
+    if (!parsedParams.success) {
+      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+    }
+    const { id } = parsedParams.data
 
     await prisma.application.delete({
       where: { id }

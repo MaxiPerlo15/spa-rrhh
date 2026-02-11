@@ -2,14 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { isNotEmpty, normalizeLocation } from '@/lib/utils'
+import { normalizeLocation } from '@/lib/utils'
+import {
+  createVacancySchema,
+  formatValidationError,
+  vacanciesListQuerySchema
+} from '@/lib/apiValidation'
 
 
 // GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const all = searchParams.get('all') // Para el admin dashboard
+    const queryValidation = vacanciesListQuerySchema.safeParse({
+      all: searchParams.get('all')?.toLowerCase()
+    })
+    if (!queryValidation.success) {
+      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+    }
+    const { all } = queryValidation.data // Para el admin dashboard
     
     // Solo admins pueden pedir todas las vacantes
     if (all) {
@@ -67,19 +78,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, description, location, workday, modality, salary, requirements, benefits } = body
-
-    // Validaciones básicas
-    if (!isNotEmpty(title) || !isNotEmpty(description) || !isNotEmpty(location) || !isNotEmpty(workday) || !isNotEmpty(modality)) {
-      return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
-        { status: 400 }
-      )
+    const bodyValidation = createVacancySchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
+    const { title, description, location, workday, modality, salary, requirements, benefits } = bodyValidation.data
 
     const vacancy = await prisma.vacancy.create({
       data: {
-        title: title.trim(),
+        title,
         description,
         location: normalizeLocation(location),
         workday,
