@@ -111,6 +111,7 @@
 
 ### Landing page (MIS-73)
 - Hero con reveals escalonados y performance guardrails en parallax (`requestAnimationFrame` + listener pasivo).
+- Stats del hero con count-up al entrar en viewport (ejecución única).
 - Efectos de fondo flotantes sutiles para dar más profundidad visual.
 - Refuerzo de reveal en secciones `Nosotros`, `Servicios`, `Contacto`.
 - Modo accesible conservado con `prefers-reduced-motion`.
@@ -120,6 +121,10 @@
 - Transición suave al aplicar filtros (`results-transition`).
 - Entrada escalonada de tarjetas de vacantes tras filtrado.
 - Pulido de badges, botones y elevación de `VacancyCard`.
+
+### Ajuste adicional de servicios
+- Cards de servicios con reveal por stagger controlado desde la sección (`delayMs` por índice).
+- Cada card mantiene hover premium sin interferir con la animación de entrada.
 
 ### Modal y formularios (MIS-75)
 - Modal de postulación con animación de entrada/salida real.

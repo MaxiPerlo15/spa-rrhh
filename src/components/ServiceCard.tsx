@@ -1,22 +1,21 @@
 'use client'
 import Image from 'next/image'
-import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 
 interface ServiceCardProps {
   title: string
   description: string
   imageUrl: string
+  isVisible: boolean
+  delayMs: number
 }
 
-export default function ServiceCard({ title, description, imageUrl }: ServiceCardProps) {
-  const { ref, isVisible } = useScrollAnimation()
-
+export default function ServiceCard({ title, description, imageUrl, isVisible, delayMs }: ServiceCardProps) {
   return (
     <article 
-      ref={ref}
-      className={`bg-white rounded-2xl shadow-card overflow-hidden transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl hover:scale-105 ${
-        isVisible ? 'animate-on-scroll is-visible' : 'animate-on-scroll'
+      className={`group card-lift bg-white rounded-2xl shadow-card overflow-hidden hover:shadow-2xl hover:scale-[1.03] animate-on-scroll ${
+        isVisible ? 'is-visible' : ''
       }`}
+      style={{ transitionDelay: `${delayMs}ms` }}
     >
       {/* Imagen del servicio */}
       <div className="relative h-56 w-full overflow-hidden bg-gray-100">
@@ -24,7 +23,7 @@ export default function ServiceCard({ title, description, imageUrl }: ServiceCar
           src={imageUrl}
           alt={title}
           fill
-          className="object-cover transition-transform duration-500 hover:scale-110"
+          className="object-cover transition-transform duration-500 group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         {/* Overlay sutil */}

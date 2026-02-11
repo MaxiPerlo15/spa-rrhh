@@ -21,13 +21,15 @@ export default function Servicios() {
         </div>
 
         {/* Grid de servicios */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto animate-on-scroll reveal-delay-3 ${isVisible ? 'is-visible' : ''}`}>
-          {services.map((service) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+          {services.map((service, index) => (
             <ServiceCard
               key={service.id}
               title={service.title}
               description={service.description}
               imageUrl={service.imageUrl}
+              isVisible={isVisible}
+              delayMs={120 + (index * 90)}
             />
           ))}
         </div>

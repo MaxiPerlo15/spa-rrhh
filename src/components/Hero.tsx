@@ -1,9 +1,17 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 
 export default function Hero() {
   const [scrollY, setScrollY] = useState(0)
+  const [stats, setStats] = useState({
+    candidates: 0,
+    companies: 0,
+    satisfaction: 0,
+  })
+  const hasAnimatedStatsRef = useRef(false)
+  const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation<HTMLDivElement>(0.3)
   const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
@@ -27,6 +35,52 @@ export default function Hero() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [prefersReducedMotion])
+
+  useEffect(() => {
+    if (!statsVisible || hasAnimatedStatsRef.current) {
+      return
+    }
+
+    const targetStats = {
+      candidates: 100,
+      companies: 50,
+      satisfaction: 98,
+    }
+
+    hasAnimatedStatsRef.current = true
+
+    if (prefersReducedMotion) {
+      const reducedMotionTimer = setTimeout(() => {
+        setStats(targetStats)
+      }, 0)
+      return () => clearTimeout(reducedMotionTimer)
+    }
+
+    const duration = 1400
+    const startTime = performance.now()
+    let animationFrame = 0
+
+    const easeOutCubic = (progress: number) => 1 - Math.pow(1 - progress, 3)
+
+    const animate = (time: number) => {
+      const progress = Math.min((time - startTime) / duration, 1)
+      const easedProgress = easeOutCubic(progress)
+
+      setStats({
+        candidates: Math.round(targetStats.candidates * easedProgress),
+        companies: Math.round(targetStats.companies * easedProgress),
+        satisfaction: Math.round(targetStats.satisfaction * easedProgress),
+      })
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate)
+      }
+    }
+
+    animationFrame = requestAnimationFrame(animate)
+
+    return () => cancelAnimationFrame(animationFrame)
+  }, [statsVisible, prefersReducedMotion])
 
   const scrollToSection = (sectionId: string) => {
     const element = document.querySelector(sectionId)
@@ -88,17 +142,21 @@ export default function Hero() {
           </div>
 
           {/* Stats con animación y mejor visibilidad */}
-          <div className="grid grid-cols-3 gap-4 md:gap-8 pt-12 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.42s' }}>
+          <div
+            ref={statsRef}
+            className="grid grid-cols-3 gap-4 md:gap-8 pt-12 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in"
+            style={{ animationDelay: '0.42s' }}
+          >
             <div className="text-center group cursor-default bg-white/10 backdrop-blur-sm rounded-xl p-4 md:p-6 hover:bg-white/20 transition-all duration-300">
-              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">+100</p>
+              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">+{stats.candidates}</p>
               <p className="text-xs md:text-base text-white font-medium mt-2">Postulantes</p>
             </div>
             <div className="text-center group cursor-default bg-white/10 backdrop-blur-sm rounded-xl p-4 md:p-6 hover:bg-white/20 transition-all duration-300">
-              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">+50</p>
+              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">+{stats.companies}</p>
               <p className="text-xs md:text-base text-white font-medium mt-2">Empresas</p>
             </div>
             <div className="text-center group cursor-default bg-white/10 backdrop-blur-sm rounded-xl p-4 md:p-6 hover:bg-white/20 transition-all duration-300">
-              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">98%</p>
+              <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">{stats.satisfaction}%</p>
               <p className="text-xs md:text-base text-white font-medium mt-2">Satisfacción</p>
             </div>
           </div>
