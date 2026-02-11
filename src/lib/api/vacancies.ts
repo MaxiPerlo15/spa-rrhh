@@ -45,8 +45,9 @@ export interface UpdateVacancyData extends Partial<CreateVacancyData> {
 /**
  * Obtiene todas las vacantes
  */
-export async function getVacancies(): Promise<Vacancy[]> {
-  const response = await fetch('/api/vacancies')
+export async function getVacancies(options?: { includeAll?: boolean }): Promise<Vacancy[]> {
+  const query = options?.includeAll ? '?all=1' : ''
+  const response = await fetch(`/api/vacancies${query}`)
   if (!response.ok) {
     throw new Error('Error al obtener vacantes')
   }

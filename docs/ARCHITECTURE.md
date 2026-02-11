@@ -216,6 +216,11 @@ Para evitar exposición de datos sensibles, las rutas deben aplicar autorizació
 
 Este criterio evita IDOR y asegura principio de mínimo privilegio en el panel administrativo.
 
+Nota de implementación:
+
+- El panel admin consume `GET /api/vacancies?all=1` para gestionar el ciclo completo (`active`, `closed`, `draft`).
+- El flujo de edición en admin debe precargar campos opcionales (`salary`, `requirements`, `benefits`) para evitar sobrescrituras accidentales.
+
 ## Estándar de Validación (Zod)
 
 Las rutas API usan validación runtime centralizada en:

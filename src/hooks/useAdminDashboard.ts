@@ -42,7 +42,7 @@ export function useAdminDashboard() {
 
     try {
       const [vacanciesData, applicationsData, contactsData] = await Promise.all([
-        vacanciesApi.getVacancies(),
+        vacanciesApi.getVacancies({ includeAll: true }),
         applicationsApi.getApplications(),
         contactsApi.getContacts()
       ])

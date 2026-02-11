@@ -188,9 +188,9 @@ export default function AdminDashboard() {
       location: vacancy.location,
       workday: vacancy.workday,
       modality: vacancy.modality,
-      salary: '',
-      requirements: '',
-      benefits: ''
+      salary: vacancy.salary || '',
+      requirements: vacancy.requirements || '',
+      benefits: vacancy.benefits || ''
     })
     setEditingVacancy(vacancy)
     setShowCreateModal(true)
