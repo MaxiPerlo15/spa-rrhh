@@ -11,8 +11,13 @@ Este proyecto es una aplicación Next.js 16 con TypeScript que implementa un sis
 - **Base de Datos**: PostgreSQL con Prisma ORM
 - **Autenticación**: NextAuth.js
 - **Estilos**: Tailwind CSS v4
-- **Testing**: Playwright (E2E)
+- **Testing**: Vitest + React Testing Library (unit), Playwright (E2E)
 - **CI/CD**: GitHub Actions
+
+Configuración de tests unitarios:
+
+- `vitest.config.ts` usa entorno `node` por defecto para tests de servicios/utilidades.
+- Tests de hooks/componentes se ejecutan en `jsdom` con anotación por archivo (`@vitest-environment jsdom`).
 
 ## Estructura de Carpetas
 

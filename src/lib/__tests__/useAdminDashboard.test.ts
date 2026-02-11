@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { renderHook, act} from '@testing-library/react'
 import {expect, vi, describe, it} from 'vitest'
 import { useAdminDashboard } from '../../hooks/useAdminDashboard'
@@ -62,4 +64,3 @@ describe('useAdminDashboard', () => {
         expect(result.current.error).toBe('Error de red')
     })
 })
-

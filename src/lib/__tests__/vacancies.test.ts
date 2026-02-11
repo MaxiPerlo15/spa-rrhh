@@ -8,7 +8,6 @@ import {
   toggleVacancyStatus,
   type Vacancy
 } from '../api/vacancies'
-import * as vacancyApi from '../api/vacancies'
 
 
 describe('Vacancies API Service', () => {
@@ -107,10 +106,20 @@ describe('Vacancies API Service', () => {
   })
 
   it('toggleVacancyStatus alterna el estado correctamente', async () => {
-    // Mock updateVacancy para devolver el estado cambiado
-    vi.spyOn(vacancyApi, 'updateVacancy').mockResolvedValueOnce({
-      id: '1', title: 'Dev', location: '', workday: '', modality: '', status: 'closed', createdAt: ''
-    })
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          id: '1',
+          title: 'Dev',
+          location: '',
+          workday: '',
+          modality: '',
+          status: 'CLOSED',
+          createdAt: ''
+        })
+      })
+    ))
 
     const vacancy: Vacancy = { id: '1', title: 'Dev', location: '', workday: '', modality: '', status: 'active', createdAt: '' }
     const result = await toggleVacancyStatus(vacancy)
