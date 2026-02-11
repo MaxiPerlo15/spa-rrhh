@@ -103,7 +103,7 @@ export default function ContactForm() {
           component: 'ContactForm'
         },
         extra: {
-          contactEmail: formData.email,
+          contactDomain: formData.email.includes('@') ? formData.email.split('@')[1] : 'invalid_email',
           subject: formData.subject
         }
       })
@@ -244,6 +244,14 @@ export default function ContactForm() {
 
         {/* Botón submit */}
         <TurnstileWidget action="contact_form" onTokenChange={setCaptchaToken} />
+        <p className="text-xs leading-relaxed text-gray-500">
+          Al enviar este formulario, aceptas que tratemos tus datos para responder tu consulta.
+          Más información en nuestra{' '}
+          <a href="/privacy" className="text-primary-500 hover:text-primary-600">
+            Política de Privacidad
+          </a>
+          .
+        </p>
 
         <button
           type="submit"

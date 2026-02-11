@@ -103,7 +103,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         },
         extra: {
           vacancyTitle,
-          candidateEmail: formData.email
+          candidateDomain: formData.email.includes('@') ? formData.email.split('@')[1] : 'invalid_email'
         }
       })
     } finally {
@@ -290,6 +290,14 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
 
           {/* Botones */}
           <TurnstileWidget action="application_form" onTokenChange={setCaptchaToken} />
+          <p className="text-xs leading-relaxed text-gray-500">
+            Al enviar tu postulación, aceptas el tratamiento de tus datos para fines de selección y contacto
+            profesional. Puedes consultar más detalles en nuestra{' '}
+            <a href="/privacy" className="text-primary-500 hover:text-primary-600">
+              Política de Privacidad
+            </a>
+            .
+          </p>
 
           <div className="flex gap-4 pt-4">
             <button

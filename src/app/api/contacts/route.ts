@@ -11,6 +11,7 @@ import {
 } from '@/lib/apiValidation'
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
 import { verifyTurnstileToken } from '@/lib/botProtection'
+import { toContactAdminDto } from '@/lib/dto/contact'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
@@ -38,12 +39,22 @@ export async function GET(request: NextRequest) {
 
     const contacts = await prisma.contact.findMany({
       where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        subject: true,
+        message: true,
+        status: true,
+        createdAt: true
+      },
       orderBy: {
         createdAt: 'desc'
       }
     })
 
-    return NextResponse.json(contacts)
+    return NextResponse.json(contacts.map(toContactAdminDto))
   } catch (error) {
     logger.error('Error al obtener contactos', error)
     return NextResponse.json(
@@ -64,7 +75,7 @@ export async function POST(request: NextRequest) {
     const { name, email, phone, subject, message, captchaToken } = bodyValidation.data
 
     const clientIp = getClientIp(request.headers)
-    const rateLimitResult = rateLimit({
+    const rateLimitResult = await rateLimit({
       key: `contacts:${clientIp}`,
       windowMs: 10 * 60 * 1000,
       maxRequests: 5

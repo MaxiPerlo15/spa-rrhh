@@ -26,6 +26,8 @@ export function validateRuntimeEnv() {
     requireVar('UPLOADTHING_TOKEN', errors)
     requireVar('NEXT_PUBLIC_TURNSTILE_SITE_KEY', errors)
     requireVar('TURNSTILE_SECRET_KEY', errors)
+    requireVar('UPSTASH_REDIS_REST_URL', errors)
+    requireVar('UPSTASH_REDIS_REST_TOKEN', errors)
   }
 
   // Integration-specific checks

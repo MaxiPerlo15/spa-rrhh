@@ -4,6 +4,10 @@
 
 Este proyecto es una aplicación Next.js 16 con TypeScript que implementa un sistema de gestión de recursos humanos. Está estructurado siguiendo principios de modularidad, reutilización de código y separación de responsabilidades.
 
+Documentación operativa relacionada:
+- `docs/SECURITY-HARDENING.md`
+- `docs/INCIDENT-RUNBOOK.md`
+
 ## Stack Tecnológico
 
 - **Framework**: Next.js 16 (App Router)

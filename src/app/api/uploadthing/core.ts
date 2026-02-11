@@ -7,7 +7,11 @@ export const ourFileRouter = {
     resumeUploader: f({ pdf: {
         maxFileSize: '4MB', maxFileCount: 1 }})
         .onUploadComplete(async({file}) => {
-            logger.info('CV subido en UploadThing', { fileUrl: file.ufsUrl });
+            logger.info('CV subido en UploadThing', {
+                fileKey: file.key,
+                fileSize: file.size,
+                fileType: file.type
+            });
             return {url: file.ufsUrl};
         }),
 } satisfies FileRouter;

@@ -199,6 +199,10 @@ ADMIN_PASSWORD="TuPasswordSegura123!"
 
 Ver más detalles en [docs/DATABASE-SETUP.md](docs/DATABASE-SETUP.md)
 
+Para hardening y respuesta a incidentes:
+- [docs/SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md)
+- [docs/INCIDENT-RUNBOOK.md](docs/INCIDENT-RUNBOOK.md)
+
 ### 5. Ejecutar el servidor de desarrollo
 ```bash
 npm run dev

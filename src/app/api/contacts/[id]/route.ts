@@ -7,6 +7,7 @@ import {
   routeIdSchema,
   updateContactStatusSchema
 } from '@/lib/apiValidation'
+import { toContactAdminDto } from '@/lib/dto/contact'
 interface RouteParams {
   params: Promise<{
     id: string
@@ -33,7 +34,17 @@ export async function GET(
     }
 
     const contact = await prisma.contact.findUnique({
-      where: { id }
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        subject: true,
+        message: true,
+        status: true,
+        createdAt: true
+      }
     })
 
     if (!contact) {
@@ -43,7 +54,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(contact)
+    return NextResponse.json(toContactAdminDto(contact))
   } catch (error) {
     logger.error('Error al obtener contacto', error)
     return NextResponse.json(
@@ -81,10 +92,20 @@ export async function PATCH(
 
     const contact = await prisma.contact.update({
       where: { id },
-      data: { status }
+      data: { status },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        subject: true,
+        message: true,
+        status: true,
+        createdAt: true
+      }
     })
 
-    return NextResponse.json(contact)
+    return NextResponse.json(toContactAdminDto(contact))
   } catch (error) {
     logger.error('Error al actualizar contacto', error)
     return NextResponse.json(

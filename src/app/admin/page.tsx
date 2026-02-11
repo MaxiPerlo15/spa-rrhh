@@ -320,7 +320,7 @@ const handleTestSentry = () => {
       },
       extra: {
         timestamp: new Date().toISOString(),
-        userEmail: session?.user?.email,
+        userId: session?.user?.id,
         totalVacancies: stats.totalVacancies,
         totalApplications: stats.totalApplications
       },

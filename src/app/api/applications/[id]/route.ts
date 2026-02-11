@@ -7,6 +7,7 @@ import {
   routeIdSchema,
   updateApplicationStatusSchema
 } from '@/lib/apiValidation'
+import { toApplicationAdminDto } from '@/lib/dto/application'
 
 interface RouteParams {
   params: Promise<{
@@ -36,7 +37,16 @@ export async function GET(
     
     const application = await prisma.application.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        candidateName: true,
+        email: true,
+        phone: true,
+        resumeUrl: true,
+        resumeFileName: true,
+        coverLetter: true,
+        status: true,
+        submittedAt: true,
         vacancy: {
           select: {
             id: true,
@@ -54,7 +64,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(application)
+    return NextResponse.json(toApplicationAdminDto(application))
   } catch (error) {
     logger.error('Error al obtener postulación', error)
     return NextResponse.json(
@@ -94,10 +104,28 @@ export async function PATCH(
 
     const application = await prisma.application.update({
       where: { id },
-      data: { status }
+      data: { status },
+      select: {
+        id: true,
+        candidateName: true,
+        email: true,
+        phone: true,
+        resumeUrl: true,
+        resumeFileName: true,
+        coverLetter: true,
+        status: true,
+        submittedAt: true,
+        vacancy: {
+          select: {
+            id: true,
+            title: true,
+            location: true
+          }
+        }
+      }
     })
 
-    return NextResponse.json(application)
+    return NextResponse.json(toApplicationAdminDto(application))
   } catch (error) {
     logger.error('Error al actualizar postulación', error)
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { redactSensitiveData } from '@/lib/redaction'
 
 /**
  * Logger centralizado que:
@@ -11,7 +12,13 @@ export const logger = {
    * Siempre imprime en consola + envía a Sentry en producción
    */
   error: (message: string, error: Error | unknown, context?: Record<string, unknown>) => {
-    console.error(`[ERROR] ${message}`, error)
+    const safeContext = context ? (redactSensitiveData(context) as Record<string, unknown>) : undefined
+    const safeError =
+      error instanceof Error
+        ? { name: error.name, message: error.message }
+        : (redactSensitiveData(error) as unknown)
+
+    console.error(`[ERROR] ${message}`, safeError, safeContext || '')
     
     // Solo enviar a Sentry en producción
     if (process.env.NODE_ENV !== 'development') {
@@ -21,7 +28,7 @@ export const logger = {
         },
         extra: {
           message,
-          ...context,
+          ...safeContext,
         },
       })
     }
@@ -32,7 +39,8 @@ export const logger = {
    * Solo imprime en consola, NO envía a Sentry
    */
   info: (message: string, context?: Record<string, unknown>) => {
-    console.log(`[INFO] ${message}`, context || '')
+    const safeContext = context ? (redactSensitiveData(context) as Record<string, unknown>) : undefined
+    console.log(`[INFO] ${message}`, safeContext || '')
   },
 
   /**
@@ -40,7 +48,8 @@ export const logger = {
    * Imprime en consola, NO envía a Sentry
    */
   warn: (message: string, context?: Record<string, unknown>) => {
-    console.warn(`[WARN] ${message}`, context || '')
+    const safeContext = context ? (redactSensitiveData(context) as Record<string, unknown>) : undefined
+    console.warn(`[WARN] ${message}`, safeContext || '')
   },
 
   /**

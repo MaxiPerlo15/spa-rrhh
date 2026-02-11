@@ -12,10 +12,11 @@ export function SentryUserContext() {
   const { data: session } = useSession()
 
   useEffect(() => {
-    if (session?.user?.email) {
+    if (session?.user?.id) {
       // Configurar usuario en Sentry para contexto de errores
       Sentry.setUser({
-        email: session.user.email,
+        id: session.user.id,
+        username: 'admin-user'
       })
 
       // Tag para filtrar errores de admins
@@ -24,7 +25,7 @@ export function SentryUserContext() {
       
       // Debug en desarrollo
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Sentry] User context set:', session.user.email)
+        console.log('[Sentry] User context set for admin session')
       }
     } else {
       // Limpiar usuario cuando cierra sesión

@@ -4,6 +4,11 @@ import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcrypt"
 import { prisma } from '@/lib/prisma'
 
+const defaultSecureCookies = process.env.NODE_ENV === 'production'
+const secureCookiesEnabled = process.env.SESSION_COOKIE_SECURE
+  ? process.env.SESSION_COOKIE_SECURE === 'true'
+  : defaultSecureCookies
+
 export const authOptions: NextAuthOptions = {
   providers: [
     Credentials({
@@ -63,7 +68,24 @@ export const authOptions: NextAuthOptions = {
     signIn: '/admin/signin',
   },
   session: {
-    strategy: "jwt"
+    strategy: "jwt",
+    maxAge: 60 * 60 * 8,
+    updateAge: 60 * 60
+  },
+  jwt: {
+    maxAge: 60 * 60 * 8
+  },
+  useSecureCookies: secureCookiesEnabled,
+  cookies: {
+    sessionToken: {
+      name: secureCookiesEnabled ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: secureCookiesEnabled
+      }
+    }
   },
   secret: process.env.NEXTAUTH_SECRET
 }
@@ -71,4 +93,3 @@ export const authOptions: NextAuthOptions = {
 export function auth() {
   return getServerSession(authOptions)
 }
-

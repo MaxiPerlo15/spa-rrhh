@@ -14,6 +14,63 @@ if (!globalForRateLimit.rateLimitStore) {
   globalForRateLimit.rateLimitStore = rateLimitStore
 }
 
+type RateLimitResponse = {
+  allowed: boolean
+  remaining: number
+  retryAfterSeconds: number
+}
+
+const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
+const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
+const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
+
+async function executeUpstashCommand<T>(...command: (string | number)[]) {
+  if (!upstashUrl || !upstashToken) {
+    throw new Error('Upstash no configurado')
+  }
+
+  const encoded = command.map((value) => encodeURIComponent(String(value))).join('/')
+  const response = await fetch(`${upstashUrl}/${encoded}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${upstashToken}`
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Upstash error: ${response.status}`)
+  }
+
+  const data = (await response.json()) as { result: T }
+  return data.result
+}
+
+async function sharedRateLimit({
+  key,
+  windowMs,
+  maxRequests
+}: {
+  key: string
+  windowMs: number
+  maxRequests: number
+}): Promise<RateLimitResponse> {
+  const namespacedKey = `ratelimit:${key}`
+  const count = await executeUpstashCommand<number>('INCR', namespacedKey)
+
+  if (count === 1) {
+    await executeUpstashCommand('PEXPIRE', namespacedKey, windowMs)
+  }
+
+  const ttlMs = await executeUpstashCommand<number>('PTTL', namespacedKey)
+  const remaining = Math.max(0, maxRequests - count)
+
+  return {
+    allowed: count <= maxRequests,
+    remaining,
+    retryAfterSeconds: Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : windowMs) / 1000))
+  }
+}
+
 export function getClientIp(headers: Headers): string {
   const forwardedFor = headers.get('x-forwarded-for')
   if (forwardedFor) {
@@ -27,7 +84,7 @@ export function getClientIp(headers: Headers): string {
   return 'unknown'
 }
 
-export function rateLimit({
+export async function rateLimit({
   key,
   windowMs,
   maxRequests
@@ -36,6 +93,14 @@ export function rateLimit({
   windowMs: number
   maxRequests: number
 }) {
+  if (isSharedStoreEnabled) {
+    try {
+      return await sharedRateLimit({ key, windowMs, maxRequests })
+    } catch {
+      // Fallback silencioso a memoria local para no interrumpir el servicio.
+    }
+  }
+
   const now = Date.now()
   const current = rateLimitStore.get(key)
 

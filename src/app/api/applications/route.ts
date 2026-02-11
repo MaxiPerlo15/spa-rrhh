@@ -11,6 +11,7 @@ import {
 } from '@/lib/apiValidation'
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
 import { verifyTurnstileToken } from '@/lib/botProtection'
+import { toApplicationAdminDto } from '@/lib/dto/application'
 
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
@@ -41,7 +42,16 @@ export async function GET(request: NextRequest) {
 
     const applications = await prisma.application.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        candidateName: true,
+        email: true,
+        phone: true,
+        resumeUrl: true,
+        resumeFileName: true,
+        coverLetter: true,
+        status: true,
+        submittedAt: true,
         vacancy: {
           select: {
             id: true,
@@ -55,7 +65,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(applications)
+    return NextResponse.json(applications.map(toApplicationAdminDto))
   } catch (error) {
     logger.error('Error al obtener aplicaciones', error)
     return NextResponse.json(
@@ -86,7 +96,7 @@ export async function POST(request: NextRequest) {
     } = bodyValidation.data
 
     const clientIp = getClientIp(request.headers)
-    const rateLimitResult = rateLimit({
+    const rateLimitResult = await rateLimit({
       key: `applications:${clientIp}`,
       windowMs: 10 * 60 * 1000,
       maxRequests: 8
