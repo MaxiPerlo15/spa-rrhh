@@ -65,6 +65,20 @@ Required production env vars:
 
 These are validated in `src/lib/checkEnv.ts`.
 
+## MIS-81: Cross-Origin Policy Hardening
+
+Implemented baseline:
+- Centralized origin checks in `src/middleware.ts` for all `/api/*` requests.
+- Explicit preflight (`OPTIONS`) handling with controlled CORS response headers.
+- Strict allowlist resolution from:
+  - `NEXTAUTH_URL` origin (default app origin)
+  - optional `CORS_ALLOWED_ORIGINS` (comma-separated additional origins)
+- Requests with foreign `Origin` outside allowlist are rejected with `403`.
+
+Configuration:
+- Add additional trusted origins via `CORS_ALLOWED_ORIGINS`.
+- Keep allowlist minimal per environment.
+
 ## MIS-72: Sentry Alerting + Runbook
 
 Alert strategy and incident handling process are documented in:
