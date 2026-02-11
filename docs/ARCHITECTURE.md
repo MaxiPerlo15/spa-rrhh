@@ -193,6 +193,23 @@ src/app/api/
 └─────────────┘
 ```
 
+## Matriz de Autorización de API
+
+Para evitar exposición de datos sensibles, las rutas deben aplicar autorización en servidor:
+
+- `GET /api/vacancies`: público (solo vacantes `ACTIVE`).
+- `GET /api/vacancies?all=1`: solo `ADMIN`.
+- `GET /api/vacancies/[id]`: público para datos de vacante, con `applications` solo para `ADMIN`.
+- `POST /api/vacancies`: solo `ADMIN`.
+- `GET /api/applications`: solo `ADMIN`.
+- `GET /api/applications/[id]`: solo `ADMIN`.
+- `PATCH/DELETE /api/applications/[id]`: solo `ADMIN`.
+- `GET /api/contacts`: solo `ADMIN`.
+- `GET /api/contacts/[id]`: solo `ADMIN`.
+- `PATCH/DELETE /api/contacts/[id]`: solo `ADMIN`.
+
+Este criterio evita IDOR y asegura principio de mínimo privilegio en el panel administrativo.
+
 ## Patrones de Diseño Implementados
 
 ### 1. **Repository Pattern** (Capa de API Services)

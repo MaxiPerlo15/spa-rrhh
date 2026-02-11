@@ -11,15 +11,19 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const all = searchParams.get('all') // Para el admin dashboard
     
-    let whereClause = {}
-    
-    // Si no es petición de admin, solo mostrar activas
-    if (!all) {
-      whereClause = { status: 'ACTIVE' }
+    // Solo admins pueden pedir todas las vacantes
+    if (all) {
+      const session = await auth()
+      if (!session || session.user?.role !== 'ADMIN') {
+        return NextResponse.json(
+          { error: 'No autorizado' },
+          { status: 401 }
+        )
+      }
     }
 
     const vacancies = await prisma.vacancy.findMany({
-      where: whereClause,
+      where: all ? {} : { status: 'ACTIVE' },
       orderBy: {
         createdAt: 'desc'
       }

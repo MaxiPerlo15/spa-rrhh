@@ -15,6 +15,14 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     
     const application = await prisma.application.findUnique({

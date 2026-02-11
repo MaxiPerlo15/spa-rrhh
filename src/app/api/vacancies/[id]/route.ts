@@ -18,20 +18,26 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const session = await auth()
+    const isAdmin = session?.user?.role === 'ADMIN'
     
-    const vacancy = await prisma.vacancy.findUnique({
-      where: { id },
-      include: {
-        applications: {
-          select: {
-            id: true,
-            candidateName: true,
-            status: true,
-            submittedAt: true
+    const vacancy = isAdmin
+      ? await prisma.vacancy.findUnique({
+          where: { id },
+          include: {
+            applications: {
+              select: {
+                id: true,
+                candidateName: true,
+                status: true,
+                submittedAt: true
+              }
+            }
           }
-        }
-      }
-    })
+        })
+      : await prisma.vacancy.findUnique({
+          where: { id }
+        })
 
     if (!vacancy) {
       return NextResponse.json(
