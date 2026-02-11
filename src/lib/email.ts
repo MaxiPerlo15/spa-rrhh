@@ -283,7 +283,7 @@ export async function sendNewApplicationEmail(data: {
   try {
     // Si no hay API key configurada, solo logear
     if (!resend) {
-      console.log('📧 Email no enviado (RESEND_API_KEY no configurada):', {
+      logger.info('Email de postulación no enviado (modo simulado)', {
         to: ADMIN_EMAIL,
         subject: `Nueva postulación: ${data.vacancyTitle}`,
         from: data.applicantName
@@ -306,7 +306,7 @@ export async function sendNewApplicationEmail(data: {
       return { success: false, error }
     }
 
-    console.log('✅ Email de postulación enviado:', emailData)
+    logger.info('Email de postulación enviado', { emailData })
     return { success: true, data: emailData }
   } catch (error) {
     logger.error('Error al enviar email de postulación', error)
@@ -327,7 +327,7 @@ export async function sendNewContactEmail(data: {
   try {
     // Si no hay API key configurada, solo logear
     if (!resend) {
-      console.log('📧 Email no enviado (RESEND_API_KEY no configurada):', {
+      logger.info('Email de contacto no enviado (modo simulado)', {
         to: ADMIN_EMAIL,
         subject: `Nuevo contacto de: ${data.name}`,
         from: data.email
@@ -350,7 +350,7 @@ export async function sendNewContactEmail(data: {
       return { success: false, error }
     }
 
-    console.log('✅ Email de contacto enviado:', emailData)
+    logger.info('Email de contacto enviado', { emailData })
     return { success: true, data: emailData }
   } catch (error) {
     logger.error('Error al enviar email de contacto', error)

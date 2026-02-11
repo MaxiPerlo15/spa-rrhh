@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { normalizeLocation } from '@/lib/utils'
 import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
+import { toVacancyDto } from '@/lib/dto/vacancy'
 
 
 interface RouteParams {
@@ -51,7 +52,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(vacancy)
+    return NextResponse.json(toVacancyDto(vacancy))
   } catch (error) {
     logger.error('Error al obtener vacante', error)
     return NextResponse.json(
@@ -95,7 +96,7 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       data: normalizedBody
     })
 
-    return NextResponse.json(vacancy)
+    return NextResponse.json(toVacancyDto(vacancy))
   } catch (error) {
     logger.error('Error al actualizar vacante', error)
     return NextResponse.json(

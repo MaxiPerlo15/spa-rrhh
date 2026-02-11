@@ -8,6 +8,7 @@ import {
   formatValidationError,
   vacanciesListQuerySchema
 } from '@/lib/apiValidation'
+import { toVacancyDto } from '@/lib/dto/vacancy'
 
 
 // GET /api/vacancies - Listar vacantes
@@ -40,20 +41,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Transformar para compatibilidad con el frontend
-    const formattedVacancies = vacancies.map(v => ({
-      id: v.id,
-      title: v.title,
-      description: v.description,
-      location: v.location,
-      workday: v.workday,
-      modality: v.modality,
-      salary: v.salary || undefined,
-      requirements: v.requirements || undefined,
-      benefits: v.benefits || undefined,
-      status: v.status.toLowerCase(),
-      createdAt: v.createdAt.toISOString()
-    }))
+    const formattedVacancies = vacancies.map(toVacancyDto)
 
     return NextResponse.json(formattedVacancies)
   } catch (error) {
@@ -98,7 +86,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(vacancy, { status: 201 })
+    return NextResponse.json(toVacancyDto(vacancy), { status: 201 })
   } catch (error) {
     logger.error('Error al crear vacante', error)
     return NextResponse.json(

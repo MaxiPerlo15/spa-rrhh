@@ -253,6 +253,18 @@ Formato de error de validación:
 }
 ```
 
+## Contratos de Respuesta (DTO)
+
+Para reducir divergencias entre endpoints, los contratos de salida se centralizan en DTOs:
+
+- `src/lib/dto/vacancy.ts`
+
+Regla actual para vacantes:
+
+- Todas las respuestas de `/api/vacancies` y `/api/vacancies/[id]` exponen `status` en minúsculas (`active`, `closed`, `draft`).
+- Fechas serializadas en ISO string.
+- Campos opcionales normalizados a `undefined` cuando no tienen valor.
+
 ## Protección Anti-Abuso (Formularios Públicos)
 
 Los endpoints públicos `POST /api/contacts` y `POST /api/applications` aplican dos capas:
