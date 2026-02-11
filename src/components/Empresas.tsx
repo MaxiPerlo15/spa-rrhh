@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 
 interface Company {
   id: number
@@ -26,6 +28,66 @@ const companies: Company[] = [
 
 export default function Empresas() {
   const { ref, isVisible } = useScrollAnimation()
+  const prefersReducedMotion = useReducedMotion()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isPausedRef = useRef(false)
+
+  useEffect(() => {
+    const scrollElement = scrollContainerRef.current
+
+    if (!scrollElement || prefersReducedMotion || !isVisible) {
+      return
+    }
+
+    let animationFrame = 0
+    let lastTime = performance.now()
+    let edgePauseUntil = 0
+    let direction: 1 | -1 = 1
+    const speedPxPerSecond = 36
+    const edgePauseMs = 1200
+
+    const animate = (time: number) => {
+      const maxScroll = scrollElement.scrollWidth - scrollElement.clientWidth
+
+      if (maxScroll <= 0) {
+        animationFrame = requestAnimationFrame(animate)
+        return
+      }
+
+      if (isPausedRef.current) {
+        lastTime = time
+        animationFrame = requestAnimationFrame(animate)
+        return
+      }
+
+      if (time < edgePauseUntil) {
+        lastTime = time
+        animationFrame = requestAnimationFrame(animate)
+        return
+      }
+
+      const deltaSeconds = (time - lastTime) / 1000
+      lastTime = time
+      let nextScrollLeft = scrollElement.scrollLeft + direction * speedPxPerSecond * deltaSeconds
+
+      if (nextScrollLeft >= maxScroll) {
+        nextScrollLeft = maxScroll
+        direction = -1
+        edgePauseUntil = time + edgePauseMs
+      } else if (nextScrollLeft <= 0) {
+        nextScrollLeft = 0
+        direction = 1
+        edgePauseUntil = time + edgePauseMs
+      }
+
+      scrollElement.scrollLeft = nextScrollLeft
+      animationFrame = requestAnimationFrame(animate)
+    }
+
+    animationFrame = requestAnimationFrame(animate)
+
+    return () => cancelAnimationFrame(animationFrame)
+  }, [isVisible, prefersReducedMotion])
 
   return (
     <section id="empresas" className="section-padding bg-linear-to-b from-gray-800 to-gray-900">
@@ -51,7 +113,22 @@ export default function Empresas() {
           <div className="absolute right-0 top-0 bottom-0 w-20 bg-linear-to-l from-gray-900 to-transparent z-10 pointer-events-none"></div>
           
           {/* Scroll horizontal de logos */}
-          <div className="overflow-x-auto scrollbar-hide pb-4">
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto scrollbar-hide pb-4"
+            onMouseEnter={() => {
+              isPausedRef.current = true
+            }}
+            onMouseLeave={() => {
+              isPausedRef.current = false
+            }}
+            onTouchStart={() => {
+              isPausedRef.current = true
+            }}
+            onTouchEnd={() => {
+              isPausedRef.current = false
+            }}
+          >
             <div className="flex gap-8 min-w-max px-4">
               {companies.map((company, index) => (
                 <div
