@@ -45,17 +45,17 @@ export default function VacancyCard({ id, title, description, location, workday,
   }
 
   return (
-    <div className="group bg-white rounded-xl shadow-sm p-6 hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-primary-400 transform">
+    <div className="group card-lift bg-white rounded-xl shadow-sm p-6 hover:shadow-xl border border-gray-200 hover:border-primary-400 transform-gpu">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         {/* Información principal */}
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3 flex-wrap">
             {/* Badge de jornada */}
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${workdayBadgeColors[workday]}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-transform duration-200 group-hover:scale-105 ${workdayBadgeColors[workday]}`}>
               {workdayLabels[workday]}
             </span>
             {/* Badge de modalidad */}
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${modalityBadgeColors[modality]}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-transform duration-200 group-hover:scale-105 ${modalityBadgeColors[modality]}`}>
               {modalityLabels[modality]}
             </span>
             {salary && (
@@ -120,7 +120,7 @@ export default function VacancyCard({ id, title, description, location, workday,
             <button
               onClick={() => setShowDetails(!showDetails)}
               title={showDetails ? 'Ver menos' : 'Ver más detalles'}
-              className="mt-4 text-primary-500 hover:text-primary-600 font-bold text-xl flex items-center gap-1 transition-colors"
+              className="btn-motion mt-4 text-primary-500 hover:text-primary-600 font-bold text-xl flex items-center gap-1"
             >
               <span>{showDetails ? '−' : '+'}</span>
             </button>
@@ -131,7 +131,7 @@ export default function VacancyCard({ id, title, description, location, workday,
         <div className="md:ml-6 shrink-0">
           <button
             onClick={() => onApply(id, title)}
-            className="relative w-full md:w-auto px-8 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
+            className="btn-motion relative w-full md:w-auto px-8 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
           >
             Postularme
           </button>

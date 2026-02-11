@@ -82,7 +82,7 @@ export default function NavBar() {
             {/* Botón CTA Ver Ofertas */}
             <a
               href="/ofertas-laborales"
-              className="px-6 py-2.5 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+              className="btn-motion px-6 py-2.5 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 hover:scale-105 hover:shadow-lg"
             >
               Ver Ofertas Laborales
             </a>
@@ -131,7 +131,7 @@ export default function NavBar() {
               {/* Botón CTA en mobile */}
               <a
                 href="/ofertas-laborales"
-                className="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-all duration-300 text-center"
+                className="btn-motion px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 text-center"
               >
                 Ver Ofertas Laborales
               </a>

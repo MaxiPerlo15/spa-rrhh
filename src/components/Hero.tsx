@@ -1,14 +1,32 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 
 export default function Hero() {
   const [scrollY, setScrollY] = useState(0)
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', handleScroll)
+    if (prefersReducedMotion) {
+      return
+    }
+
+    let ticking = false
+    const handleScroll = () => {
+      if (ticking) {
+        return
+      }
+
+      ticking = true
+      requestAnimationFrame(() => {
+        setScrollY(window.scrollY)
+        ticking = false
+      })
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [prefersReducedMotion])
 
   const scrollToSection = (sectionId: string) => {
     const element = document.querySelector(sectionId)
@@ -47,30 +65,30 @@ export default function Hero() {
             <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Oportunidades</span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <p className="text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
             Somos una consultora especializada en Recursos Humanos que acompaña a empresas 
             y profesionales en su crecimiento. Encuentra tu próxima oportunidad laboral con nosotros.
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 animate-fade-in" style={{ animationDelay: '0.28s' }}>
             <button
               onClick={() => scrollToSection('#vacantes')}
-              className="group relative px-10 py-5 bg-primary-500 text-white font-semibold text-lg rounded-lg shadow-2xl hover:bg-primary-600 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 overflow-hidden"
+              className="btn-motion group relative px-10 py-5 bg-primary-500 text-white font-semibold text-lg rounded-lg shadow-2xl hover:bg-primary-600 hover:shadow-xl hover:scale-105 overflow-hidden"
             >
               <span className="relative z-10">Ver Vacantes</span>
               <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
             </button>
             <button
               onClick={() => scrollToSection('#contacto')}
-              className="group px-10 py-5 bg-white text-primary-500 font-semibold text-lg rounded-lg shadow-2xl hover:bg-gray-50 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 border-2 border-white/20 hover:border-primary-300"
+              className="btn-motion group px-10 py-5 bg-white text-primary-500 font-semibold text-lg rounded-lg shadow-2xl hover:bg-gray-50 hover:scale-105 border-2 border-white/20 hover:border-primary-300"
             >
               Contactanos
             </button>
           </div>
 
           {/* Stats con animación y mejor visibilidad */}
-          <div className="grid grid-cols-3 gap-4 md:gap-8 pt-12 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.6s' }}>
+          <div className="grid grid-cols-3 gap-4 md:gap-8 pt-12 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.42s' }}>
             <div className="text-center group cursor-default bg-white/10 backdrop-blur-sm rounded-xl p-4 md:p-6 hover:bg-white/20 transition-all duration-300">
               <p className="text-3xl md:text-5xl font-bold text-white drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">+100</p>
               <p className="text-xs md:text-base text-white font-medium mt-2">Postulantes</p>
@@ -86,6 +104,9 @@ export default function Hero() {
           </div>
         </div>
       </div>
+
+      <div className="hero-float pointer-events-none absolute -left-12 top-28 h-40 w-40 rounded-full bg-yellow-400/15 blur-3xl"></div>
+      <div className="hero-float hero-float-delay pointer-events-none absolute -right-10 top-44 h-48 w-48 rounded-full bg-primary-200/25 blur-3xl"></div>
 
       {/* Onda decorativa inferior */}
       <div className="absolute bottom-0 left-0 right-0 z-10">

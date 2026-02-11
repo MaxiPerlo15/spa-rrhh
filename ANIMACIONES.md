@@ -94,3 +94,34 @@
 3. **Micro-interacciones**: Feedback visual en acciones específicas
 4. **Lottie animations**: Para animaciones vectoriales complejas
 5. **Progressive blur**: En imágenes de fondo al hacer scroll
+
+---
+
+## ✅ Upgrade de Motion (MIS-73, MIS-74, MIS-75)
+
+### Sistema unificado de motion
+- Se agregaron tokens globales de movimiento (`duration`, `easing`) en `:root`.
+- Nuevo set de utilidades reutilizables:
+  - `btn-motion` (hover/active/focus consistente)
+  - `card-lift` (elevación de tarjetas)
+  - `results-transition` (transición al filtrar resultados)
+  - `skeleton-shimmer` (estado de carga para vacantes)
+  - `modal-shell` / `modal-panel` (entrada/salida de modal)
+  - `field-feedback-enter` (feedback inline en validaciones)
+
+### Landing page (MIS-73)
+- Hero con reveals escalonados y performance guardrails en parallax (`requestAnimationFrame` + listener pasivo).
+- Efectos de fondo flotantes sutiles para dar más profundidad visual.
+- Refuerzo de reveal en secciones `Nosotros`, `Servicios`, `Contacto`.
+- Modo accesible conservado con `prefers-reduced-motion`.
+
+### Página de vacantes (MIS-74)
+- Skeleton loading shimmer para mejorar percepción de carga.
+- Transición suave al aplicar filtros (`results-transition`).
+- Entrada escalonada de tarjetas de vacantes tras filtrado.
+- Pulido de badges, botones y elevación de `VacancyCard`.
+
+### Modal y formularios (MIS-75)
+- Modal de postulación con animación de entrada/salida real.
+- Validación inline animada en formularios clave (`PostularForm` y `ContactForm`).
+- Estados de foco, hover y press estandarizados en botones principales.

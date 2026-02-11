@@ -26,6 +26,13 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-primary: 0 4px 15px -3px rgba(0, 85, 164, 0.2);
+
+  /* Motion tokens */
+  --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-duration-fast: 180ms;
+  --motion-duration-base: 320ms;
+  --motion-duration-slow: 560ms;
 }
 
 @theme inline {
@@ -92,8 +99,11 @@ body {
   /* Animaciones de scroll reveal */
   .animate-on-scroll {
     opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    transform: translateY(26px);
+    transition:
+      opacity var(--motion-duration-slow) var(--motion-ease-standard),
+      transform var(--motion-duration-slow) var(--motion-ease-standard);
+    will-change: opacity, transform;
   }
 
   .animate-on-scroll.is-visible {
@@ -104,7 +114,9 @@ body {
   .animate-slide-in-left {
     opacity: 0;
     transform: translateX(-50px);
-    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+    transition:
+      opacity var(--motion-duration-slow) var(--motion-ease-standard),
+      transform var(--motion-duration-slow) var(--motion-ease-standard);
   }
 
   .animate-slide-in-left.is-visible {
@@ -115,7 +127,9 @@ body {
   .animate-slide-in-right {
     opacity: 0;
     transform: translateX(50px);
-    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+    transition:
+      opacity var(--motion-duration-slow) var(--motion-ease-standard),
+      transform var(--motion-duration-slow) var(--motion-ease-standard);
   }
 
   .animate-slide-in-right.is-visible {
@@ -126,12 +140,127 @@ body {
   .animate-scale-in {
     opacity: 0;
     transform: scale(0.9);
-    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    transition:
+      opacity var(--motion-duration-base) var(--motion-ease-standard),
+      transform var(--motion-duration-base) var(--motion-ease-standard);
   }
 
   .animate-scale-in.is-visible {
     opacity: 1;
     transform: scale(1);
+  }
+
+  .reveal-delay-1 {
+    transition-delay: 80ms;
+  }
+
+  .reveal-delay-2 {
+    transition-delay: 160ms;
+  }
+
+  .reveal-delay-3 {
+    transition-delay: 240ms;
+  }
+
+  .reveal-delay-4 {
+    transition-delay: 320ms;
+  }
+
+  .btn-motion {
+    transition:
+      transform var(--motion-duration-fast) var(--motion-ease-emphasized),
+      box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+      background-color var(--motion-duration-fast) var(--motion-ease-standard),
+      border-color var(--motion-duration-fast) var(--motion-ease-standard),
+      color var(--motion-duration-fast) var(--motion-ease-standard),
+      opacity var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  .btn-motion:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  .btn-motion:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .btn-motion:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px #ffffff,
+      0 0 0 4px var(--color-primary);
+  }
+
+  .card-lift {
+    transition:
+      transform var(--motion-duration-base) var(--motion-ease-emphasized),
+      box-shadow var(--motion-duration-base) var(--motion-ease-standard),
+      border-color var(--motion-duration-fast) var(--motion-ease-standard),
+      background-color var(--motion-duration-fast) var(--motion-ease-standard);
+    will-change: transform;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-4px);
+  }
+
+  .hero-float {
+    animation: floatY 6s ease-in-out infinite;
+  }
+
+  .hero-float-delay {
+    animation-delay: 1.5s;
+  }
+
+  .results-transition {
+    transition:
+      opacity var(--motion-duration-base) var(--motion-ease-standard),
+      transform var(--motion-duration-base) var(--motion-ease-standard);
+  }
+
+  .results-transition.is-filtering {
+    opacity: 0.5;
+    transform: translateY(6px);
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: #e5e7eb;
+  }
+
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.75),
+      transparent
+    );
+    animation: shimmer 1.4s infinite;
+  }
+
+  .field-feedback-enter {
+    animation: fieldFeedback var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  .modal-shell {
+    animation: modalBackdropIn var(--motion-duration-base) var(--motion-ease-standard);
+  }
+
+  .modal-shell.is-closing {
+    animation: modalBackdropOut var(--motion-duration-fast) var(--motion-ease-standard) forwards;
+  }
+
+  .modal-panel {
+    animation: modalPanelIn var(--motion-duration-base) var(--motion-ease-emphasized);
+  }
+
+  .modal-panel.is-closing {
+    animation: modalPanelOut var(--motion-duration-fast) var(--motion-ease-standard) forwards;
   }
 
   /* Efecto de brillo en hover */
@@ -183,11 +312,11 @@ body {
 
   /* Animaciones para Toast y Dialog */
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn var(--motion-duration-base) var(--motion-ease-standard);
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.3s ease-out;
+    animation: scaleIn var(--motion-duration-base) var(--motion-ease-standard);
   }
 
   @keyframes fadeIn {
@@ -207,6 +336,72 @@ body {
     to {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  @keyframes shimmer {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes fieldFeedback {
+    from {
+      opacity: 0;
+      transform: translateY(-3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes floatY {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+
+  @keyframes modalBackdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes modalBackdropOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes modalPanelIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes modalPanelOut {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
     }
   }
 
@@ -233,6 +428,18 @@ body {
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+
+    .hero-float,
+    .hero-float-delay,
+    .animate-on-scroll,
+    .animate-slide-in-left,
+    .animate-slide-in-right,
+    .animate-scale-in,
+    .results-transition {
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+    }
   }
 }
 
@@ -245,4 +452,3 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-

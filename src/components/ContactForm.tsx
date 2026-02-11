@@ -17,16 +17,50 @@ export default function ContactForm() {
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
+
+  const validateField = (name: string, value: string) => {
+    if (['name', 'subject', 'message'].includes(name) && !value.trim()) return 'Este campo es obligatorio.'
+    if (name === 'email') {
+      if (!value.trim()) return 'Este campo es obligatorio.'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un email válido.'
+    }
+    return ''
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+
+    if (touched[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: validateField(name, value) }))
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setTouched(prev => ({ ...prev, [name]: true }))
+    setFieldErrors(prev => ({ ...prev, [name]: validateField(name, value) }))
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+
+    const nextErrors = {
+      name: validateField('name', formData.name),
+      email: validateField('email', formData.email),
+      subject: validateField('subject', formData.subject),
+      message: validateField('message', formData.message),
+    }
+    setFieldErrors(nextErrors)
+    setTouched({ name: true, email: true, subject: true, message: true })
+    if (nextErrors.name || nextErrors.email || nextErrors.subject || nextErrors.message) {
+      showError('Revisa los campos marcados para continuar.')
+      return
+    }
 
     if (captchaEnabled && !captchaToken) {
       showError('Completa la verificación captcha para continuar.')
@@ -111,9 +145,15 @@ export default function ContactForm() {
               required
               value={formData.name}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.name ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="Juan Pérez"
             />
+            {touched.name && fieldErrors.name && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div>
@@ -127,9 +167,15 @@ export default function ContactForm() {
               required
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.email ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="juan@ejemplo.com"
             />
+            {touched.email && fieldErrors.email && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.email}</p>
+            )}
           </div>
         </div>
 
@@ -161,9 +207,15 @@ export default function ContactForm() {
               required
               value={formData.subject}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.subject ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="Consulta sobre servicios"
             />
+            {touched.subject && fieldErrors.subject && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.subject}</p>
+            )}
           </div>
         </div>
 
@@ -178,10 +230,16 @@ export default function ContactForm() {
             required
             value={formData.message}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             rows={6}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none ${
+              fieldErrors.message ? 'border-red-400' : 'border-gray-300'
+            }`}
             placeholder="Escribe tu consulta aquí..."
           />
+          {touched.message && fieldErrors.message && (
+            <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.message}</p>
+          )}
         </div>
 
         {/* Botón submit */}
@@ -190,7 +248,7 @@ export default function ContactForm() {
         <button
           type="submit"
           disabled={loading || (captchaEnabled && !captchaToken)}
-          className="w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-all duration-200 transform hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          className="btn-motion w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {loading ? 'Enviando...' : 'Enviar Mensaje'}
         </button>

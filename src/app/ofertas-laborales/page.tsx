@@ -23,6 +23,7 @@ export default function VacantesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [filteredVacancies, setFilteredVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
+  const [isFiltering, setIsFiltering] = useState(false)
   const [selectedVacancy, setSelectedVacancy] = useState<{ id: string; title: string } | null>(null)
   
   // Filtros
@@ -68,8 +69,11 @@ export default function VacantesPage() {
 
       setFilteredVacancies(filtered)
     }
-    
+
+    setIsFiltering(true)
     applyFilters()
+    const timer = setTimeout(() => setIsFiltering(false), 220)
+    return () => clearTimeout(timer)
   }, [searchTerm, filterWorkday, filterModality, filterLocation, vacancies])
 
   const fetchVacancies = async () => {
@@ -132,7 +136,7 @@ export default function VacantesPage() {
                 placeholder="Buscar por título, descripción o ubicación..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 transition-shadow"
               />
               <svg
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
@@ -190,7 +194,7 @@ export default function VacantesPage() {
             {(searchTerm || filterWorkday !== 'all' || filterModality !== 'all' || filterLocation !== 'all') && (
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2"
+                className="btn-motion px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -217,28 +221,49 @@ export default function VacantesPage() {
       {/* Lista de Vacantes */}
       <section className="section-padding">
         <div className="container-custom">
-          <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+          <div className={`results-transition flex flex-col gap-4 max-w-5xl mx-auto ${isFiltering ? 'is-filtering' : ''}`}>
             {loading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
-                <p className="text-gray-600 mt-4">Cargando vacantes...</p>
-              </div>
+              <>
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex flex-wrap gap-3">
+                      <div className="skeleton-shimmer h-6 w-32 rounded-full" />
+                      <div className="skeleton-shimmer h-6 w-24 rounded-full" />
+                    </div>
+                    <div className="skeleton-shimmer mb-3 h-8 w-2/3 rounded-lg" />
+                    <div className="skeleton-shimmer mb-2 h-4 w-1/3 rounded-md" />
+                    <div className="space-y-2">
+                      <div className="skeleton-shimmer h-4 w-full rounded-md" />
+                      <div className="skeleton-shimmer h-4 w-[92%] rounded-md" />
+                      <div className="skeleton-shimmer h-4 w-[84%] rounded-md" />
+                    </div>
+                    <div className="mt-6 flex justify-end">
+                      <div className="skeleton-shimmer h-11 w-40 rounded-lg" />
+                    </div>
+                  </div>
+                ))}
+              </>
             ) : filteredVacancies.length > 0 ? (
               <>
-                {filteredVacancies.map((vacancy) => (
-                  <VacancyCard
+                {filteredVacancies.map((vacancy, index) => (
+                  <div
                     key={vacancy.id}
-                    id={vacancy.id}
-                    title={vacancy.title}
-                    description={vacancy.description}
-                    location={vacancy.location}
-                    workday={vacancy.workday}
-                    modality={vacancy.modality}
-                    salary={vacancy.salary}
-                    requirements={vacancy.requirements}
-                    benefits={vacancy.benefits}
-                    onApply={handleApply}
-                  />
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${Math.min(index, 6) * 70}ms` }}
+                  >
+                    <VacancyCard
+                      id={vacancy.id}
+                      title={vacancy.title}
+                      description={vacancy.description}
+                      location={vacancy.location}
+                      workday={vacancy.workday}
+                      modality={vacancy.modality}
+                      salary={vacancy.salary}
+                      requirements={vacancy.requirements}
+                      benefits={vacancy.benefits}
+                      onApply={handleApply}
+                    />
+                  </div>
                 ))}
               </>
             ) : (
@@ -262,7 +287,7 @@ export default function VacantesPage() {
                 {(searchTerm || filterWorkday !== 'all' || filterModality !== 'all' || filterLocation !== 'all') && (
                   <button
                     onClick={clearFilters}
-                    className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                    className="btn-motion px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
                   >
                     Limpiar filtros
                   </button>

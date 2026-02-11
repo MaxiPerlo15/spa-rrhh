@@ -154,17 +154,17 @@ export default function Home() {
           <div className="container-custom relative z-10">
             {/* Título y descripción de la consultora */}
             <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg">
+              <h2 className={`text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg animate-on-scroll ${nosotrosVisible ? 'is-visible' : ''}`}>
                 Sobre <span className="text-yellow-400">Nosotros</span>
               </h2>
-              <p className="text-lg text-white/95 leading-relaxed drop-shadow-md">
+              <p className={`text-lg text-white/95 leading-relaxed drop-shadow-md animate-on-scroll reveal-delay-2 ${nosotrosVisible ? 'is-visible' : ''}`}>
                 Somos una consultora de Recursos Humanos de la localidad de Las Varillas, Córdoba
                 dedicada a conectar talento con oportunidades laborales,
               </p>
             </div>
 
             {/* Cards de fundadoras */}
-            <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div className={`grid md:grid-cols-2 gap-8 max-w-5xl mx-auto animate-on-scroll reveal-delay-3 ${nosotrosVisible ? 'is-visible' : ''}`}>
               <FounderCard
                 name="María Soledad Perlo"
                 role="Fundadora"
@@ -198,7 +198,7 @@ export default function Home() {
               </p>
               <a
                 href="/ofertas-laborales"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
+                className="btn-motion inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 shadow-lg hover:shadow-xl"
               >
                 Ver todas las ofertas laborales
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,7 +235,7 @@ export default function Home() {
                     <div className="text-center mt-8">
                       <a
                         href="/ofertas-laborales"
-                        className="inline-flex items-center gap-2 px-8 py-4 bg-white text-primary-500 font-bold text-lg rounded-lg hover:bg-primary-50 transition-all border-2 border-primary-500 shadow-md hover:shadow-lg"
+                        className="btn-motion inline-flex items-center gap-2 px-8 py-4 bg-white text-primary-500 font-bold text-lg rounded-lg hover:bg-primary-50 border-2 border-primary-500 shadow-md hover:shadow-lg"
                       >
                         Ver todas las ofertas disponibles
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,14 +272,14 @@ export default function Home() {
                 
 
         {/* Sección Contacto */}
-        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll  ${contactoVisible ? 'is-visible' : ''}`}>
+        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
           <div className="container-custom">
             {/* Título y descripción */}
             <div className="text-center max-w-3xl mx-auto mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              <h2 className={`text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
                 Ponte en <span className="text-primary-500">Contacto</span>
               </h2>
-              <p className="text-lg text-gray-600">
+              <p className={`text-lg text-gray-600 animate-on-scroll reveal-delay-2 ${contactoVisible ? 'is-visible' : ''}`}>
                 ¿Tienes alguna consulta? Completa el formulario y nos comunicaremos contigo a la brevedad. 
                 Estamos aquí para ayudarte.
               </p>

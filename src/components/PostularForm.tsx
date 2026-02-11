@@ -26,12 +26,44 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     key: string
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
+  const validateField = (name: string, value: string) => {
+    if (name === 'candidateName' && !value.trim()) return 'El nombre es obligatorio.'
+    if (name === 'email') {
+      if (!value.trim()) return 'El email es obligatorio.'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un email válido.'
+    }
+    if (name === 'phone' && !value.trim()) return 'El teléfono es obligatorio.'
+    return ''
+  }
+
+  const closeWithAnimation = () => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(onClose, 220)
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    
+
+    const nextErrors = {
+      candidateName: validateField('candidateName', formData.candidateName),
+      email: validateField('email', formData.email),
+      phone: validateField('phone', formData.phone)
+    }
+    setFieldErrors(nextErrors)
+    setTouched({ candidateName: true, email: true, phone: true })
+
+    if (nextErrors.candidateName || nextErrors.email || nextErrors.phone) {
+      showError('Revisa los campos marcados para continuar.')
+      return
+    }
+
     if (!resumeInfo) {
       showError('Debes subir tu CV')
       return
@@ -59,7 +91,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
 
       showSuccess(`✅ Postulación enviada exitosamente para ${vacancyTitle}`)
       setTimeout(() => {
-        onClose()
+        closeWithAnimation()
       }, 2000)
     } catch (error) {
       showError('Error al enviar la postulación. Por favor, intenta nuevamente.')
@@ -84,11 +116,33 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
       ...prev,
       [e.target.name]: e.target.value
     }))
+
+    if (touched[e.target.name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [e.target.name]: validateField(e.target.name, e.target.value)
+      }))
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    setTouched(prev => ({ ...prev, [e.target.name]: true }))
+    setFieldErrors(prev => ({
+      ...prev,
+      [e.target.name]: validateField(e.target.name, e.target.value)
+    }))
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className={`modal-shell fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 ${isClosing ? 'is-closing' : ''}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeWithAnimation()
+        }
+      }}
+    >
+      <div className={`modal-panel bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isClosing ? 'is-closing' : ''}`}>
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
@@ -96,8 +150,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             <p className="text-gray-600 mt-1">{vacancyTitle}</p>
           </div>
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={closeWithAnimation}
+            className="btn-motion text-gray-400 hover:text-gray-600"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,9 +173,15 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               name="candidateName"
               value={formData.candidateName}
               onChange={handleChange}
+              onBlur={handleBlur}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 transition-colors ${
+                fieldErrors.candidateName ? 'border-red-400' : 'border-gray-300'
+              }`}
             />
+            {touched.candidateName && fieldErrors.candidateName && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.candidateName}</p>
+            )}
           </div>
 
           {/* Email */}
@@ -135,9 +195,15 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               name="email"
               value={formData.email}
               onChange={handleChange}
+              onBlur={handleBlur}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 transition-colors ${
+                fieldErrors.email ? 'border-red-400' : 'border-gray-300'
+              }`}
             />
+            {touched.email && fieldErrors.email && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.email}</p>
+            )}
           </div>
 
           {/* Teléfono */}
@@ -151,9 +217,15 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               name="phone"
               value={formData.phone}
               onChange={handleChange}
+              onBlur={handleBlur}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 transition-colors ${
+                fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
+              }`}
             />
+            {touched.phone && fieldErrors.phone && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.phone}</p>
+            )}
           </div>
 
           {/* Upload CV */}
@@ -192,7 +264,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 <button
                   type="button"
                   onClick={() => setResumeInfo(null)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  className="btn-motion text-red-600 hover:text-red-800 text-sm font-medium"
                 >
                   Cambiar
                 </button>
@@ -222,15 +294,15 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
           <div className="flex gap-4 pt-4">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              onClick={closeWithAnimation}
+              className="btn-motion flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !resumeInfo || (captchaEnabled && !captchaToken)}
-              className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-motion flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Enviando...' : 'Enviar Postulación'}
             </button>
