@@ -9,6 +9,8 @@ import {
   createContactSchema,
   formatValidationError
 } from '@/lib/apiValidation'
+import { getClientIp, rateLimit } from '@/lib/rateLimit'
+import { verifyTurnstileToken } from '@/lib/botProtection'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
@@ -59,7 +61,40 @@ export async function POST(request: NextRequest) {
     if (!bodyValidation.success) {
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
-    const { name, email, phone, subject, message } = bodyValidation.data
+    const { name, email, phone, subject, message, captchaToken } = bodyValidation.data
+
+    const clientIp = getClientIp(request.headers)
+    const rateLimitResult = rateLimit({
+      key: `contacts:${clientIp}`,
+      windowMs: 10 * 60 * 1000,
+      maxRequests: 5
+    })
+    if (!rateLimitResult.allowed) {
+      logger.warn('Rate limit bloqueó un contacto', {
+        ip: clientIp,
+        retryAfterSeconds: rateLimitResult.retryAfterSeconds
+      })
+      return NextResponse.json(
+        { error: `Demasiadas solicitudes. Intenta nuevamente en ${rateLimitResult.retryAfterSeconds}s.` },
+        { status: 429 }
+      )
+    }
+
+    const captchaVerification = await verifyTurnstileToken({
+      token: captchaToken,
+      remoteIp: clientIp,
+      action: 'contact_form'
+    })
+    if (!captchaVerification.success) {
+      logger.warn('Captcha inválido al crear contacto', {
+        ip: clientIp,
+        reason: captchaVerification.reason
+      })
+      return NextResponse.json(
+        { error: 'No se pudo verificar el captcha' },
+        { status: 400 }
+      )
+    }
 
     // Crear contacto
     const contact = await prisma.contact.create({

@@ -29,6 +29,7 @@ export interface CreateApplicationData {
   resumeFileName?: string
   resumeKey?: string
   coverLetter?: string
+  captchaToken?: string
 }
 
 /**

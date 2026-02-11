@@ -4,6 +4,7 @@ import { UploadButton } from '@/lib/uploadthing'
 import { useToast } from '@/contexts/ToastContext'
 import { createApplication } from '@/lib/api/applications'
 import * as Sentry from '@sentry/nextjs'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 interface PostularFormProps {
   vacancyId: string
@@ -25,12 +26,19 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     key: string
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     
     if (!resumeInfo) {
       showError('Debes subir tu CV')
+      return
+    }
+
+    if (captchaEnabled && !captchaToken) {
+      showError('Completa la verificación captcha para continuar.')
       return
     }
 
@@ -45,7 +53,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         resumeUrl: resumeInfo.url,
         resumeFileName: resumeInfo.name,
         resumeKey: resumeInfo.key,
-        coverLetter: formData.coverLetter
+        coverLetter: formData.coverLetter,
+        captchaToken
       })
 
       showSuccess(`✅ Postulación enviada exitosamente para ${vacancyTitle}`)
@@ -208,6 +217,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
           </div>
 
           {/* Botones */}
+          <TurnstileWidget action="application_form" onTokenChange={setCaptchaToken} />
+
           <div className="flex gap-4 pt-4">
             <button
               type="button"
@@ -218,7 +229,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !resumeInfo}
+              disabled={isSubmitting || !resumeInfo || (captchaEnabled && !captchaToken)}
               className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Enviando...' : 'Enviar Postulación'}

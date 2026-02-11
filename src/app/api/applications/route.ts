@@ -9,6 +9,8 @@ import {
   createApplicationSchema,
   formatValidationError
 } from '@/lib/apiValidation'
+import { getClientIp, rateLimit } from '@/lib/rateLimit'
+import { verifyTurnstileToken } from '@/lib/botProtection'
 
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
@@ -79,8 +81,42 @@ export async function POST(request: NextRequest) {
       resumeUrl,
       resumeFileName,
       resumeKey,
-      coverLetter
+      coverLetter,
+      captchaToken
     } = bodyValidation.data
+
+    const clientIp = getClientIp(request.headers)
+    const rateLimitResult = rateLimit({
+      key: `applications:${clientIp}`,
+      windowMs: 10 * 60 * 1000,
+      maxRequests: 8
+    })
+    if (!rateLimitResult.allowed) {
+      logger.warn('Rate limit bloqueó una postulación', {
+        ip: clientIp,
+        retryAfterSeconds: rateLimitResult.retryAfterSeconds
+      })
+      return NextResponse.json(
+        { error: `Demasiadas solicitudes. Intenta nuevamente en ${rateLimitResult.retryAfterSeconds}s.` },
+        { status: 429 }
+      )
+    }
+
+    const captchaVerification = await verifyTurnstileToken({
+      token: captchaToken,
+      remoteIp: clientIp,
+      action: 'application_form'
+    })
+    if (!captchaVerification.success) {
+      logger.warn('Captcha inválido al crear postulación', {
+        ip: clientIp,
+        reason: captchaVerification.reason
+      })
+      return NextResponse.json(
+        { error: 'No se pudo verificar el captcha' },
+        { status: 400 }
+      )
+    }
 
     // Verificar que la vacante existe y está activa
     const vacancy = await prisma.vacancy.findUnique({

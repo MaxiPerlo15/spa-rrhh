@@ -75,7 +75,8 @@ export const createApplicationSchema = z.object({
   resumeUrl: z.string().url('resumeUrl inválido').optional(),
   resumeFileName: optionalTrimmedString,
   resumeKey: optionalTrimmedString,
-  coverLetter: optionalTrimmedString
+  coverLetter: optionalTrimmedString,
+  captchaToken: optionalTrimmedString
 })
 
 export const updateApplicationStatusSchema = z.object({
@@ -94,7 +95,8 @@ export const createContactSchema = z.object({
     .optional()
     .transform((value) => value?.trim() ?? ''),
   subject: nonEmptyString,
-  message: nonEmptyString
+  message: nonEmptyString,
+  captchaToken: optionalTrimmedString
 })
 
 export const updateContactStatusSchema = z.object({

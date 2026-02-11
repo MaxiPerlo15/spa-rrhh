@@ -3,6 +3,7 @@ import { useState, FormEvent } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { createContact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 
 export default function ContactForm() {
@@ -16,6 +17,8 @@ export default function ContactForm() {
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -24,6 +27,12 @@ export default function ContactForm() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+
+    if (captchaEnabled && !captchaToken) {
+      showError('Completa la verificación captcha para continuar.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -32,7 +41,8 @@ export default function ContactForm() {
         email: formData.email,
         phone: formData.phone,
         subject: formData.subject,
-        message: formData.message
+        message: formData.message,
+        captchaToken
       })
 
       // Mostrar éxito y resetear
@@ -45,6 +55,7 @@ export default function ContactForm() {
         subject: '',
         message: ''
       })
+      setCaptchaToken('')
 
       // Ocultar mensaje de éxito después de 5 segundos
       setTimeout(() => {
@@ -174,9 +185,11 @@ export default function ContactForm() {
         </div>
 
         {/* Botón submit */}
+        <TurnstileWidget action="contact_form" onTokenChange={setCaptchaToken} />
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (captchaEnabled && !captchaToken)}
           className="w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-all duration-200 transform hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {loading ? 'Enviando...' : 'Enviar Mensaje'}

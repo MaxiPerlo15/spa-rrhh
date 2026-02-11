@@ -237,6 +237,24 @@ Formato de error de validación:
 }
 ```
 
+## Protección Anti-Abuso (Formularios Públicos)
+
+Los endpoints públicos `POST /api/contacts` y `POST /api/applications` aplican dos capas:
+
+- Rate limiting por IP en memoria (ventana de 10 minutos).
+- Verificación de bot con Cloudflare Turnstile en servidor.
+
+Variables de entorno:
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `TURNSTILE_SECRET_KEY`
+
+Comportamiento:
+
+- Si se supera el límite, la API responde `429`.
+- Si falla captcha, la API responde `400`.
+- Se registran eventos bloqueados con `logger.warn` para observabilidad.
+
 ## Patrones de Diseño Implementados
 
 ### 1. **Repository Pattern** (Capa de API Services)
