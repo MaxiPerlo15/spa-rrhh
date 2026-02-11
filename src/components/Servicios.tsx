@@ -29,7 +29,7 @@ export default function Servicios() {
               description={service.description}
               imageUrl={service.imageUrl}
               isVisible={isVisible}
-              delayMs={120 + (index * 90)}
+              delayMs={220 + (index * 180)}
             />
           ))}
         </div>
