@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  getEmailValidationMessage,
+  resolveAllowedEmailDomains,
+  shouldBlockDisposableEmails,
+  validateInternationalPhone
+} from '@/lib/formValidationPolicy'
 
 const nonEmptyString = z.string().trim().min(1, 'Campo requerido')
 const optionalTrimmedString = z
@@ -20,6 +26,46 @@ type VacancyStatus = 'ACTIVE' | 'CLOSED' | 'DRAFT'
 
 const applicationStatusSchema = z.enum(['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED'])
 const contactStatusSchema = z.enum(['PENDING', 'RESPONDED', 'ARCHIVED'])
+const allowedEmailDomains = resolveAllowedEmailDomains()
+const blockDisposableEmails = shouldBlockDisposableEmails()
+
+const emailSchema = z.string().trim().email('Email inválido').superRefine((value, context) => {
+  const message = getEmailValidationMessage(value, {
+    allowlist: allowedEmailDomains,
+    blockDisposable: blockDisposableEmails
+  })
+
+  if (message) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message
+    })
+  }
+})
+
+const requiredPhoneSchema = z.string().trim().superRefine((value, context) => {
+  const result = validateInternationalPhone(value, { required: true })
+  if (!result.isValid) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: result.message || 'Teléfono inválido'
+    })
+  }
+})
+
+const optionalPhoneSchema = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim() ?? '')
+  .superRefine((value, context) => {
+    const result = validateInternationalPhone(value, { required: false })
+    if (!result.isValid) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message || 'Teléfono inválido'
+      })
+    }
+  })
 
 export const vacanciesListQuerySchema = z.object({
   all: z
@@ -70,8 +116,8 @@ export const applicationsListQuerySchema = z.object({
 export const createApplicationSchema = z.object({
   vacancyId: z.string().cuid('vacancyId inválido'),
   candidateName: nonEmptyString,
-  email: z.string().trim().email('Email inválido'),
-  phone: nonEmptyString,
+  email: emailSchema,
+  phone: requiredPhoneSchema,
   resumeUrl: z.string().url('resumeUrl inválido').optional(),
   resumeFileName: optionalTrimmedString,
   resumeKey: optionalTrimmedString,
@@ -89,11 +135,8 @@ export const contactsListQuerySchema = z.object({
 
 export const createContactSchema = z.object({
   name: nonEmptyString,
-  email: z.string().trim().email('Email inválido'),
-  phone: z
-    .string()
-    .optional()
-    .transform((value) => value?.trim() ?? ''),
+  email: emailSchema,
+  phone: optionalPhoneSchema,
   subject: nonEmptyString,
   message: nonEmptyString,
   captchaToken: optionalTrimmedString

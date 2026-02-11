@@ -85,6 +85,26 @@ describe('Contacts API Service', () => {
     })).rejects.toThrow('Error custom')
   })
 
+  it('createContact prioriza el detalle de validación del backend', async () => {
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({
+          error: 'Datos inválidos',
+          details: [{ field: 'email', message: 'El dominio del email no está permitido' }]
+        })
+      })
+    ))
+
+    await expect(createContact({
+      name: 'Ana',
+      email: 'ana@mail.com',
+      phone: '123',
+      subject: 'Hola',
+      message: 'Mensaje'
+    })).rejects.toThrow('El dominio del email no está permitido')
+  })
+
   it('updateContactStatus actualiza y devuelve el contacto', async () => {
     const mockContact: Contact = { id: '1', name: 'Ana', email: 'ana@mail.com', phone: '123', subject: 'Hola', message: 'Mensaje', status: 'RESPONDED', createdAt: '' }
     vi.stubGlobal('fetch', vi.fn(() =>

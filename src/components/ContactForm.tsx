@@ -4,6 +4,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { createContact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
 
 
 export default function ContactForm() {
@@ -27,6 +28,12 @@ export default function ContactForm() {
     if (name === 'email') {
       if (!value.trim()) return 'Este campo es obligatorio.'
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un email válido.'
+      const message = getEmailValidationMessage(value)
+      if (message) return message
+    }
+    if (name === 'phone' && value.trim()) {
+      const result = validateInternationalPhone(value, { required: false })
+      if (!result.isValid) return result.message || 'Ingresa un teléfono válido.'
     }
     return ''
   }
@@ -52,12 +59,13 @@ export default function ContactForm() {
     const nextErrors = {
       name: validateField('name', formData.name),
       email: validateField('email', formData.email),
+      phone: validateField('phone', formData.phone),
       subject: validateField('subject', formData.subject),
       message: validateField('message', formData.message),
     }
     setFieldErrors(nextErrors)
-    setTouched({ name: true, email: true, subject: true, message: true })
-    if (nextErrors.name || nextErrors.email || nextErrors.subject || nextErrors.message) {
+    setTouched({ name: true, email: true, phone: true, subject: true, message: true })
+    if (nextErrors.name || nextErrors.email || nextErrors.phone || nextErrors.subject || nextErrors.message) {
       showError('Revisa los campos marcados para continuar.')
       return
     }
@@ -96,7 +104,10 @@ export default function ContactForm() {
         setSubmitted(false)
       }, 5000)
     } catch (error) {
-      showError('Error al enviar el mensaje. Por favor, intenta nuevamente.')
+      const message = error instanceof Error
+        ? error.message
+        : 'Error al enviar el mensaje. Por favor, intenta nuevamente.'
+      showError(message)
       
       Sentry.captureException(error, {
         tags: {
@@ -191,9 +202,15 @@ export default function ContactForm() {
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="+54 11 1234-5678"
             />
+            {touched.phone && fieldErrors.phone && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.phone}</p>
+            )}
           </div>
 
           <div>

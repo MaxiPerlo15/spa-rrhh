@@ -83,6 +83,25 @@ describe('Applications API Service', () => {
     })).rejects.toThrow('Error custom')
   })
 
+  it('createApplication prioriza el detalle de validación del backend', async () => {
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({
+          error: 'Datos inválidos',
+          details: [{ field: 'phone', message: 'El teléfono debe tener entre 8 y 15 dígitos' }]
+        })
+      })
+    ))
+
+    await expect(createApplication({
+      vacancyId: 'v1',
+      candidateName: 'Juan',
+      email: 'a@a.com',
+      phone: '123'
+    })).rejects.toThrow('El teléfono debe tener entre 8 y 15 dígitos')
+  })
+
   it('updateApplicationStatus actualiza y devuelve la postulación', async () => {
     const mockApp: Application = { id: '1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'ACCEPTED', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
     vi.stubGlobal('fetch', vi.fn(() =>

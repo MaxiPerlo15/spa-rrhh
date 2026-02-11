@@ -79,6 +79,23 @@ Configuration:
 - Add additional trusted origins via `CORS_ALLOWED_ORIGINS`.
 - Keep allowlist minimal per environment.
 
+## MIS-82: Forms Validation Policy (Email + Phone)
+
+Implemented baseline:
+- Shared validation policy in `src/lib/formValidationPolicy.ts`.
+- Backend Zod schemas (`src/lib/apiValidation.ts`) now enforce:
+  - optional domain allowlist for emails
+  - disposable email blocking
+  - phone format and digit-length validation
+- Public forms (`ContactForm` and `PostularForm`) reuse the same policy for consistent UX.
+- API clients surface first backend validation detail to users when available.
+
+Configuration:
+- `FORM_ALLOWED_EMAIL_DOMAINS`: comma-separated email domain allowlist.
+  - Empty means no allowlist restriction.
+- `FORM_BLOCK_DISPOSABLE_EMAILS`: defaults to `true`.
+- `NEXT_PUBLIC_FORM_ALLOWED_EMAIL_DOMAINS`: optional client-side mirror to align instant UI validation with server policy.
+
 ## MIS-72: Sentry Alerting + Runbook
 
 Alert strategy and incident handling process are documented in:

@@ -23,6 +23,21 @@ export interface CreateContactData {
   captchaToken?: string
 }
 
+type ApiValidationError = {
+  error?: string
+  details?: Array<{ field?: string; message?: string }>
+}
+
+async function getApiErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
+  try {
+    const error = (await response.json()) as ApiValidationError
+    const firstDetail = error.details?.find((detail) => detail.message)?.message
+    return firstDetail || error.error || fallbackMessage
+  } catch {
+    return fallbackMessage
+  }
+}
+
 /**
  * Obtiene todos los contactos
  */
@@ -56,8 +71,7 @@ export async function createContact(data: CreateContactData): Promise<Contact> {
   })
   
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Error al crear el contacto')
+    throw new Error(await getApiErrorMessage(response, 'Error al crear el contacto'))
   }
   
   return response.json()

@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { createApplication } from '@/lib/api/applications'
 import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
 
 interface PostularFormProps {
   vacancyId: string
@@ -37,8 +38,13 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     if (name === 'email') {
       if (!value.trim()) return 'El email es obligatorio.'
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un email válido.'
+      const message = getEmailValidationMessage(value)
+      if (message) return message
     }
-    if (name === 'phone' && !value.trim()) return 'El teléfono es obligatorio.'
+    if (name === 'phone') {
+      const result = validateInternationalPhone(value, { required: true })
+      if (!result.isValid) return result.message || 'El teléfono es inválido.'
+    }
     return ''
   }
 
@@ -94,7 +100,10 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         closeWithAnimation()
       }, 2000)
     } catch (error) {
-      showError('Error al enviar la postulación. Por favor, intenta nuevamente.')
+      const message = error instanceof Error
+        ? error.message
+        : 'Error al enviar la postulación. Por favor, intenta nuevamente.'
+      showError(message)
 
       Sentry.captureException(error,{
         tags: {

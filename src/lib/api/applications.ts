@@ -32,6 +32,21 @@ export interface CreateApplicationData {
   captchaToken?: string
 }
 
+type ApiValidationError = {
+  error?: string
+  details?: Array<{ field?: string; message?: string }>
+}
+
+async function getApiErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
+  try {
+    const error = (await response.json()) as ApiValidationError
+    const firstDetail = error.details?.find((detail) => detail.message)?.message
+    return firstDetail || error.error || fallbackMessage
+  } catch {
+    return fallbackMessage
+  }
+}
+
 /**
  * Obtiene todas las postulaciones
  */
@@ -65,8 +80,7 @@ export async function createApplication(data: CreateApplicationData): Promise<Ap
   })
   
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Error al crear la postulación')
+    throw new Error(await getApiErrorMessage(response, 'Error al crear la postulación'))
   }
   
   return response.json()
