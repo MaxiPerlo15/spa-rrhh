@@ -125,12 +125,12 @@ Plataforma digital que conecta talento con oportunidades laborales, facilitando:
 - **ORM**: Prisma 7.1.0
 - **Autenticación**: NextAuth.js
 - **Tipografías**: Geist Sans & Geist Mono
-- **Runtime**: Node.js 24.x
+- **Runtime**: Node.js 20.19+ (LTS)
 
 ## 🚀 Instalación y Configuración
 
 ### Prerequisitos
-- Node.js 24.x o superior
+- Node.js 20.19 o superior
 - PostgreSQL 16
 - npm, yarn, pnpm o bun
 
@@ -156,7 +156,11 @@ Edita `.env` con tus credenciales reales y secretos.
 Consulta la política completa y checklist en [`SECRETS_POLICY.md`](./SECRETS_POLICY.md).
 
 **Validación automática:**
-El proyecto incluye un validador de variables requeridas en [`src/lib/checkEnv.ts`](src/lib/checkEnv.ts). Si falta alguna variable crítica, la app fallará con un mensaje claro.
+El proyecto incluye validación de entorno en [`src/lib/checkEnv.ts`](src/lib/checkEnv.ts), ejecutada al iniciar el runtime de servidor.
+Reglas principales:
+- Requeridas siempre: `DATABASE_URL`, `NEXTAUTH_SECRET`.
+- Requeridas en producción: `NEXTAUTH_URL`, `UPLOADTHING_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`.
+- Integración condicional: si configuras `RESEND_API_KEY`, también debes configurar `FROM_EMAIL`.
 
 **Variables requeridas y opcionales:**
 Revisa `.env.example` y la tabla en `SECRETS_POLICY.md` para conocer el detalle de cada variable, su uso y si es obligatoria u opcional.
@@ -166,7 +170,7 @@ Revisa `.env.example` y la tabla en `SECRETS_POLICY.md` para conocer el detalle 
 - Usa solo GitHub Secrets para CI/CD y producción.
 - Rota los secrets sensibles periódicamente.
 
-> **Nota**: Sin `RESEND_API_KEY` configurada, las notificaciones se simularán en consola.
+> **Nota**: Sin `RESEND_API_KEY` configurada, las notificaciones se simulan en consola (modo desarrollo).
 
 ### 4. Configurar base de datos
 ```bash

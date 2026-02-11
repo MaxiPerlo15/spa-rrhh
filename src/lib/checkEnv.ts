@@ -1,14 +1,47 @@
-// Validador de variables de entorno requeridas
-const requiredVars = [
-  'DATABASE_URL',
-  'NEXTAUTH_URL',
-  'NEXTAUTH_SECRET',
-  'RESEND_API_KEY',
-  'UPLOADTHING_TOKEN'
-]
+type ValidationContext = {
+  isProduction: boolean
+}
 
-for (const v of requiredVars) {
-  if (!process.env[v]) {
-    throw new Error(`Falta la variable de entorno requerida: ${v}`)
+function requireVar(name: string, errors: string[]) {
+  if (!process.env[name]) {
+    errors.push(`- ${name}`)
+  }
+}
+
+export function validateRuntimeEnv() {
+  const context: ValidationContext = {
+    isProduction: process.env.NODE_ENV === 'production'
+  }
+
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // Core runtime requirements
+  requireVar('DATABASE_URL', errors)
+  requireVar('NEXTAUTH_SECRET', errors)
+
+  // Production-specific hard requirements
+  if (context.isProduction) {
+    requireVar('NEXTAUTH_URL', errors)
+    requireVar('UPLOADTHING_TOKEN', errors)
+    requireVar('NEXT_PUBLIC_TURNSTILE_SITE_KEY', errors)
+    requireVar('TURNSTILE_SECRET_KEY', errors)
+  }
+
+  // Integration-specific checks
+  if (process.env.RESEND_API_KEY && !process.env.FROM_EMAIL) {
+    errors.push('- FROM_EMAIL (required when RESEND_API_KEY is configured)')
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    warnings.push('- RESEND_API_KEY no está configurada (emails en modo simulado)')
+  }
+
+  if (warnings.length > 0) {
+    console.warn(`[ENV] Advertencias de configuración:\n${warnings.join('\n')}`)
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Configuración de entorno inválida. Faltan variables requeridas:\n${errors.join('\n')}`)
   }
 }

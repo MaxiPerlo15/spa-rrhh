@@ -271,6 +271,18 @@ Comportamiento:
 - Si falla captcha, la API responde `400`.
 - Se registran eventos bloqueados con `logger.warn` para observabilidad.
 
+## Contrato de Entorno
+
+La validación de entorno vive en `src/lib/checkEnv.ts` y se ejecuta al iniciar runtime Node desde `src/instrumentation.ts`.
+
+Reglas de validación:
+
+- Requeridas siempre: `DATABASE_URL`, `NEXTAUTH_SECRET`.
+- Requeridas en producción: `NEXTAUTH_URL`, `UPLOADTHING_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`.
+- Reglas condicionales: si existe `RESEND_API_KEY`, también debe existir `FROM_EMAIL`.
+
+Este esquema permite fail-fast en producción sin bloquear flujos de desarrollo con integraciones opcionales.
+
 ## Patrones de Diseño Implementados
 
 ### 1. **Repository Pattern** (Capa de API Services)
