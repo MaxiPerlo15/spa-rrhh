@@ -100,6 +100,11 @@ spa-rrhh/
 - Mantener componentes pequeños y enfocados (máx 200-300 líneas)
 - Extraer lógica compleja a custom hooks
 
+**Estándar de diálogos (admin)**:
+- Confirmaciones críticas (eliminar/cerrar sesión) deben pasar por `src/components/ConfirmDialog.tsx`.
+- Los modales de detalle/edición deben cerrar con `Esc`, clic de backdrop o botón explícito.
+- Mantener consistencia visual entre modales: `rounded-2xl`, borde sutil y `backdrop-blur`.
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.

@@ -60,6 +60,9 @@ export default function AdminDashboard() {
     title: string
     message: string
     onConfirm: () => void
+    confirmText?: string
+    cancelText?: string
+    closeOnBackdropClick?: boolean
     type?: 'danger' | 'warning' | 'info'
   }>({
     isOpen: false,
@@ -137,11 +140,12 @@ export default function AdminDashboard() {
   }, [filterContactStatus, searchContacts])
 
   const handleDeleteVacancy = async (id: string, title: string) => {
-    setConfirmDialog({
+    openConfirmDialog({
       isOpen: true,
-      title: '⚠️ Eliminar Vacante',
+      title: 'Eliminar vacante',
       message: `¿Estás seguro de eliminar la vacante "${title}"?\n\nEsta acción también eliminará todas las postulaciones asociadas y no se puede deshacer.`,
       type: 'danger',
+      confirmText: 'Eliminar vacante',
       onConfirm: async () => {
         try {
           await deleteVacancyApi(id)
@@ -277,11 +281,12 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteContact = async (contactId: string, contactName: string) => {
-    setConfirmDialog({
+    openConfirmDialog({
       isOpen: true,
-      title: '⚠️ Eliminar Contacto',
+      title: 'Eliminar contacto',
       message: `¿Estás seguro de eliminar el contacto de "${contactName}"?\n\nEsta acción no se puede deshacer.`,
       type: 'danger',
+      confirmText: 'Eliminar contacto',
       onConfirm: async () => {
         try {
           await deleteContactApi(contactId)
@@ -292,6 +297,25 @@ export default function AdminDashboard() {
         } finally {
           setConfirmDialog(prev => ({ ...prev, isOpen: false }))
         }
+      }
+    })
+  }
+
+  const openConfirmDialog = (config: typeof confirmDialog) => {
+    setConfirmDialog(config)
+  }
+
+  const handleSignOut = () => {
+    openConfirmDialog({
+      isOpen: true,
+      title: 'Cerrar sesión',
+      message: '¿Deseas cerrar sesión del panel administrativo ahora?',
+      type: 'warning',
+      confirmText: 'Sí, cerrar sesión',
+      cancelText: 'Permanecer',
+      closeOnBackdropClick: true,
+      onConfirm: () => {
+        signOut({ callbackUrl: '/' })
       }
     })
   }
@@ -360,7 +384,7 @@ const handleTestSentry = () => {
     <div className="min-h-screen bg-gray-50">
       <AdminHeader 
         userEmail={session.user?.email ?? undefined}
-        onSignOut={() => signOut({ callbackUrl: '/' })}
+        onSignOut={handleSignOut}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -820,8 +844,15 @@ const handleTestSentry = () => {
 
       {/* Contact Detail Modal */}
       {showContactDetail && selectedContact && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowContactDetail(false)
+            }
+          }}
+        >
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -833,7 +864,8 @@ const handleTestSentry = () => {
                 </div>
                 <button
                   onClick={() => setShowContactDetail(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="rounded-md px-2 text-2xl text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label="Cerrar detalle de contacto"
                 >
                   ×
                 </button>
@@ -933,8 +965,15 @@ const handleTestSentry = () => {
 
       {/* Application Detail Modal */}
       {showApplicationDetail && selectedApplication && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowApplicationDetail(false)
+            }
+          }}
+        >
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -948,7 +987,8 @@ const handleTestSentry = () => {
                 </div>
                 <button
                   onClick={() => setShowApplicationDetail(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="rounded-md px-2 text-2xl text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label="Cerrar detalle de postulación"
                 >
                   ×
                 </button>
@@ -1071,8 +1111,15 @@ const handleTestSentry = () => {
 
       {/* Create/Edit Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCloseModal()
+            }
+          }}
+        >
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <form onSubmit={handleSubmitVacancy} className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-900">
@@ -1081,7 +1128,8 @@ const handleTestSentry = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="rounded-md px-2 text-2xl text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label="Cerrar formulario de vacante"
                 >
                   ×
                 </button>
@@ -1247,6 +1295,9 @@ const handleTestSentry = () => {
           title={confirmDialog.title}
           message={confirmDialog.message}
           type={confirmDialog.type}
+          confirmText={confirmDialog.confirmText}
+          cancelText={confirmDialog.cancelText}
+          closeOnBackdropClick={confirmDialog.closeOnBackdropClick}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
         />
