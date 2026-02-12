@@ -6,6 +6,10 @@ import { createApplication } from '@/lib/api/applications'
 import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
+import {
+  RESUME_ALLOWED_CONTENT_TEXT,
+  getResumeUploadErrorMessage
+} from '@/lib/uploadPolicy'
 
 interface PostularFormProps {
   vacancyId: string
@@ -245,6 +249,19 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             {!resumeInfo ? (
               <UploadButton
                 endpoint="resumeUploader"
+                appearance={{
+                  container: 'w-full',
+                  button: 'w-full rounded-lg bg-primary-500 px-4 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:bg-gray-300 disabled:text-gray-600',
+                  allowedContent: 'mt-2 text-xs text-gray-500'
+                }}
+                content={{
+                  button({ isUploading }) {
+                    return isUploading ? 'Subiendo CV...' : 'Seleccionar CV (PDF)'
+                  },
+                  allowedContent() {
+                    return RESUME_ALLOWED_CONTENT_TEXT
+                  }
+                }}
                 onClientUploadComplete={(res) => {
                   if (res && res[0]) {
                     setResumeInfo({
@@ -256,7 +273,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                   }
                 }}
                 onUploadError={(error: Error) => {
-                  showError(`Error al subir CV: ${error.message}`)
+                  showError(getResumeUploadErrorMessage(error.message))
                 }}
               />
             ) : (

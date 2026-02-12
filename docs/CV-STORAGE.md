@@ -8,6 +8,7 @@ Sistema de subida y almacenamiento seguro de currículums implementado con [Uplo
 - **Validación automática**: Solo archivos PDF, máximo 4MB
 - **URLs públicas**: Accesibles vía CDN con alta disponibilidad
 - **Componente React**: Upload button con preview y estados
+- **CTA visible**: estilos base de UploadThing cargados globalmente
 - **Integración completa**: Desde formulario hasta descarga en admin panel
 
 ## 🚀 Configuración
@@ -52,7 +53,8 @@ src/
 ├── components/
 │   └── PostularForm.tsx         # Componente con UploadButton
 └── lib/
-    └── uploadthing.ts           # Cliente de UploadThing (helpers)
+    ├── uploadthing.ts           # Cliente de UploadThing (helpers)
+    └── uploadPolicy.ts          # Política centralizada de upload
 ```
 
 ## 🔧 Configuración Técnica
@@ -65,8 +67,8 @@ import { createUploadthing, type FileRouter } from "uploadthing/next";
 const f = createUploadthing();
 
 export const ourFileRouter = {
-  resumeUploader: f({ 
-    pdf: { maxFileSize: "4MB", maxFileCount: 1 } 
+  resumeUploader: f({
+    pdf: { maxFileSize: "4MB", maxFileCount: 1 }
   })
     .onUploadComplete(async ({ file }) => {
       console.log("📄 CV subido:", file.url);
@@ -82,6 +84,15 @@ export type OurFileRouter = typeof ourFileRouter;
 - **Tamaño máximo**: 4MB
 - **Cantidad**: 1 archivo por upload
 - **Callback**: `onUploadComplete` se ejecuta cuando termina la subida
+- **Fuente de verdad**: `src/lib/uploadPolicy.ts`
+
+### Estilos base requeridos
+
+Para asegurar que el botón de UploadThing sea visible en todos los navegadores soportados, importar en el layout raíz:
+
+```tsx
+import "@uploadthing/react/styles.css";
+```
 
 ### Route Handler (`src/app/api/uploadthing/route.ts`)
 
@@ -138,7 +149,7 @@ export default function PostularForm() {
         }
       }}
       onUploadError={(error: Error) => {
-        showError(`Error al subir CV: ${error.message}`)
+        showError(getResumeUploadErrorMessage(error.message))
       }}
     />
   )
@@ -206,6 +217,7 @@ https://utfs.io/f/{fileKey}
 2. **Tamaño máximo**: 4MB por archivo
 3. **Cantidad**: Máximo 1 archivo por upload
 4. **Server-side**: Validación en el file router
+5. **Feedback UX**: Mensajes claros para tipo inválido y exceso de tamaño
 
 ### Mejores Prácticas
 
