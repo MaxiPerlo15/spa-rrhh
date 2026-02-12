@@ -269,6 +269,54 @@ function getNewContactTemplate(data: {
   `.trim()
 }
 
+function getPasswordResetTemplate(data: { resetLink: string; expiresMinutes: number }) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperar contraseña</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 30px; background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%); text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
+                🔐 Recuperar contraseña
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; font-size: 16px; color: #374151; line-height: 1.5;">
+                Recibimos una solicitud para restablecer la contraseña del panel administrativo.
+              </p>
+              <p style="margin: 0 0 20px; font-size: 16px; color: #374151; line-height: 1.5;">
+                Este enlace expirará en <strong>${data.expiresMinutes} minutos</strong> y solo puede usarse una vez.
+              </p>
+              <div style="margin-top: 24px; text-align: center;">
+                <a href="${data.resetLink}" style="display: inline-block; padding: 14px 32px; background-color: #1d4ed8; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                  Crear nueva contraseña
+                </a>
+              </div>
+              <p style="margin-top: 28px; font-size: 13px; color: #6b7280; line-height: 1.5;">
+                Si no solicitaste este cambio, puedes ignorar este mensaje.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
 /**
  * Envía notificación por email de una nueva postulación
  */
@@ -354,6 +402,46 @@ export async function sendNewContactEmail(data: {
     return { success: true, data: emailData }
   } catch (error) {
     logger.error('Error al enviar email de contacto', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendPasswordResetEmail(data: {
+  toEmail: string
+  resetLink: string
+  expiresMinutes: number
+}) {
+  try {
+    if (!resend) {
+      logger.info('Email de reset no enviado (modo simulado)', {
+        to: data.toEmail,
+        subject: 'Restablece tu contraseña',
+        resetLink: data.resetLink
+      })
+      return { success: true, message: 'Email simulado (dev mode)' }
+    }
+
+    const { data: emailData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.toEmail,
+      subject: '🔐 Restablece tu contraseña',
+      html: getPasswordResetTemplate({
+        resetLink: data.resetLink,
+        expiresMinutes: data.expiresMinutes
+      })
+    })
+
+    if (error) {
+      logger.error('Error enviando email de reset', error, {
+        resetEmail: data.toEmail
+      })
+      return { success: false, error }
+    }
+
+    logger.info('Email de reset enviado', { emailData })
+    return { success: true, data: emailData }
+  } catch (error) {
+    logger.error('Error al enviar email de reset', error)
     return { success: false, error }
   }
 }

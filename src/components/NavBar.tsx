@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
 export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -39,13 +40,7 @@ export default function NavBar() {
     } else {
       const target = document.querySelector(`#${sectionId}`)
       if (target) {
-        const elementPosition = target.getBoundingClientRect().top + window.scrollY
-        const offsetPosition = elementPosition - 64
-        
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        })
+        scrollToHashWithOffset(`#${sectionId}`, 'smooth')
         setMobileMenuOpen(false)
       }
     }

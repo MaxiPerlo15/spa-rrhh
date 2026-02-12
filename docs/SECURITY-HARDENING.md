@@ -96,6 +96,24 @@ Configuration:
 - `FORM_BLOCK_DISPOSABLE_EMAILS`: defaults to `true`.
 - `NEXT_PUBLIC_FORM_ALLOWED_EMAIL_DOMAINS`: optional client-side mirror to align instant UI validation with server policy.
 
+## MIS-77: Forgot Password and Secure Reset
+
+Implemented baseline:
+- Public admin recovery pages:
+  - `/admin/forgot-password`
+  - `/admin/reset-password`
+- Endpoints:
+  - `POST /api/auth/forgot-password`
+  - `POST /api/auth/reset-password`
+- One-time token strategy:
+  - random token generated server-side
+  - stored hashed (`sha256`) in database
+  - token expiration (`PASSWORD_RESET_TOKEN_TTL_MINUTES`)
+  - invalidated after successful password change
+- Anti-abuse controls:
+  - rate limiting in forgot/reset endpoints
+  - generic response in forgot endpoint to avoid user enumeration.
+
 ## MIS-72: Sentry Alerting + Runbook
 
 Alert strategy and incident handling process are documented in:

@@ -1,31 +1,32 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
 export default function Footer() {
   const currentYear = new Date().getFullYear()
   const pathname = usePathname()
-  const router = useRouter()
   const isHomePage = pathname === '/'
 
   const scrollToSection = (sectionId: string) => {
+    const normalizedHash = `#${sectionId.replace('#', '')}`
+
     // Si no estamos en home, navegar a home primero
     if (!isHomePage) {
-      router.push(`/#${sectionId.replace('#','')}`)
+      window.location.assign(`/${normalizedHash}`)
       return
     }
-    
-    const element = document.querySelector(`#${sectionId}`)
-    if (element) {
-      const elementPosition = element.getBoundingClientRect().top + window.scrollY
-      const offsetPosition = elementPosition - 64
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
+
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
     }
+
+    window.history.replaceState(null, '', `/${normalizedHash}`)
+    window.setTimeout(() => {
+      scrollToHashWithOffset(normalizedHash, 'smooth')
+    }, 0)
   }
 
   return (

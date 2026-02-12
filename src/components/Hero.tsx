@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
 export default function Hero() {
   const [scrollY, setScrollY] = useState(0)
@@ -83,16 +84,7 @@ export default function Hero() {
   }, [statsVisible, prefersReducedMotion])
 
   const scrollToSection = (sectionId: string) => {
-    const element = document.querySelector(sectionId)
-    if (element) {
-      const elementPosition = element.getBoundingClientRect().top + window.scrollY
-      const offsetPosition = elementPosition - 64
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
-    }
+    scrollToHashWithOffset(sectionId, 'smooth')
   }
 
   return (

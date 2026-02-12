@@ -11,6 +11,7 @@ import ContactForm from '@/components/ContactForm'
 import Empresas from '@/components/Empresas'
 import Footer from '@/components/Footer'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
 interface Vacancy {
   id: string
@@ -43,20 +44,17 @@ export default function Home() {
   useEffect(() => {
     const hash = window.location.hash
     if (hash) {
-      // Usar requestAnimationFrame para scroll más suave
       requestAnimationFrame(() => {
-        const element = document.querySelector(hash)
-        if (element) {
-          const elementPosition = element.getBoundingClientRect().top + window.scrollY
-          const offsetPosition = elementPosition - 64
-          
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: 'auto' // Cambiar a 'auto' para scroll instantáneo sin sacudidas
-          })
-        }
+        scrollToHashWithOffset(hash, 'auto')
       })
     }
+
+    const onHashChange = () => {
+      scrollToHashWithOffset(window.location.hash, 'smooth')
+    }
+
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   const fetchVacancies = async () => {

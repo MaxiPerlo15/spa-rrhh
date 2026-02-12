@@ -3,8 +3,9 @@ import {
   getEmailValidationMessage,
   resolveAllowedEmailDomains,
   shouldBlockDisposableEmails,
-  validateInternationalPhone
+  validateInternationalPhone,
 } from '@/lib/formValidationPolicy'
+import { validateNewPassword } from '@/lib/passwordReset'
 
 const nonEmptyString = z.string().trim().min(1, 'Campo requerido')
 const optionalTrimmedString = z
@@ -145,6 +146,31 @@ export const createContactSchema = z.object({
 export const updateContactStatusSchema = z.object({
   status: contactStatusSchema
 })
+
+const passwordSchema = z.string().superRefine((value, context) => {
+  const message = validateNewPassword(value)
+  if (message) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message
+    })
+  }
+})
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email('Email inválido')
+})
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().trim().min(1, 'Token inválido'),
+    password: passwordSchema,
+    confirmPassword: z.string().trim().min(1, 'Debes confirmar la contraseña')
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword']
+  })
 
 export function formatValidationError(error: z.ZodError) {
   return {

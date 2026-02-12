@@ -54,6 +54,7 @@ export default function SignInPage() {
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -69,6 +70,7 @@ export default function SignInPage() {
               </label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -91,6 +93,12 @@ export default function SignInPage() {
             >
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
+
+            <div className="text-center">
+              <Link href="/admin/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 transition-colors">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </form>
 
           <div className="mt-6 text-center">

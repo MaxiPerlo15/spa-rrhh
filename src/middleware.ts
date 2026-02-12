@@ -8,7 +8,13 @@ const adminMiddleware = withAuth({
   },
 })
 
+const publicAdminPaths = new Set(['/admin/signin', '/admin/forgot-password', '/admin/reset-password'])
+
 export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  if (publicAdminPaths.has(request.nextUrl.pathname)) {
+    return NextResponse.next()
+  }
+
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const origin = request.headers.get('origin')
     const requestedHeaders = request.headers.get('access-control-request-headers')

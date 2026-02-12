@@ -110,6 +110,10 @@ spa-rrhh/
 - Tablas del admin deben ser utilizables en pantallas chicas: `overflow-x-auto` + ocultar columnas secundarias por breakpoint.
 - Acciones críticas y CTAs deben mantener objetivos táctiles cómodos (`w-full` en mobile cuando aplica).
 
+**Navegación hash estable (MIS-86)**:
+- Navegación a secciones con offset fijo centralizada en `src/lib/hashScroll.ts`.
+- Usar `scrollToHashWithOffset` desde `NavBar`, `Footer`, `Hero` y carga inicial de home.
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.
