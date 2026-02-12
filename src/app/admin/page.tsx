@@ -387,7 +387,7 @@ const handleTestSentry = () => {
         onSignOut={handleSignOut}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <DashboardStats
           totalVacancies={stats.totalVacancies}
           activeVacancies={stats.activeVacancies}
@@ -398,7 +398,7 @@ const handleTestSentry = () => {
         {/* Botón de Test de Sentry - Solo en desarrollo */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -410,7 +410,7 @@ const handleTestSentry = () => {
               </div>
               <button
                 onClick={handleTestSentry}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
                 🧪 Probar Sentry
               </button>
@@ -431,27 +431,27 @@ const handleTestSentry = () => {
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-lg font-semibold text-gray-900">Gestión de Vacantes</h2>
             <button
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
             >
               + Nueva Vacante
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[760px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jornada</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Modalidad</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
+                  <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jornada</th>
+                  <th className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Modalidad</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -471,15 +471,15 @@ const handleTestSentry = () => {
                   }
                   return (
                   <tr key={vacancy.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{vacancy.title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{vacancy.location}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{vacancy.title}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{vacancy.location}</td>
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
                       {workdayLabels[vacancy.workday as keyof typeof workdayLabels] || vacancy.workday}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="hidden xl:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
                       {modalityLabels[vacancy.modality as keyof typeof modalityLabels] || vacancy.modality}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 sm:px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         vacancy.status === 'active' 
                           ? 'bg-green-100 text-green-800' 
@@ -488,10 +488,11 @@ const handleTestSentry = () => {
                         {vacancy.status === 'active' ? 'Activa' : 'Cerrada'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
                       {new Date(vacancy.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-sm text-right space-x-2">
+                    <td className="px-4 sm:px-6 py-4 text-sm text-right">
+                      <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                       <button
                         onClick={() => handleStatusToggle(vacancy)}
                         className={`${
@@ -515,6 +516,7 @@ const handleTestSentry = () => {
                       >
                         🗑️ Eliminar
                       </button>
+                      </div>
                     </td>
                   </tr>
                 )})
@@ -537,34 +539,34 @@ const handleTestSentry = () => {
         {activeTab === 'applications' && (
           <>
             {/* Stats pequeñas para applications */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
                 <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-                <div className="text-2xl font-bold text-yellow-800">
+                <div className="text-xl sm:text-2xl font-bold text-yellow-800">
                   {applications.filter(a => a.status === 'PENDING').length}
                 </div>
               </div>
               <div className="bg-blue-50 rounded-lg shadow-sm p-4 border border-blue-200">
                 <div className="text-xs font-medium text-blue-700 mb-1">En Revisión</div>
-                <div className="text-2xl font-bold text-blue-800">
+                <div className="text-xl sm:text-2xl font-bold text-blue-800">
                   {applications.filter(a => a.status === 'REVIEWING').length}
                 </div>
               </div>
               <div className="bg-purple-50 rounded-lg shadow-sm p-4 border border-purple-200">
                 <div className="text-xs font-medium text-purple-700 mb-1">Entrevistados</div>
-                <div className="text-2xl font-bold text-purple-800">
+                <div className="text-xl sm:text-2xl font-bold text-purple-800">
                   {applications.filter(a => a.status === 'INTERVIEWED').length}
                 </div>
               </div>
               <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
                 <div className="text-xs font-medium text-green-700 mb-1">Aceptados</div>
-                <div className="text-2xl font-bold text-green-800">
+                <div className="text-xl sm:text-2xl font-bold text-green-800">
                   {applications.filter(a => a.status === 'ACCEPTED').length}
                 </div>
               </div>
               <div className="bg-red-50 rounded-lg shadow-sm p-4 border border-red-200">
                 <div className="text-xs font-medium text-red-700 mb-1">Rechazados</div>
-                <div className="text-2xl font-bold text-red-800">
+                <div className="text-xl sm:text-2xl font-bold text-red-800">
                   {applications.filter(a => a.status === 'REJECTED').length}
                 </div>
               </div>
@@ -593,12 +595,12 @@ const handleTestSentry = () => {
                 </div>
 
                 {/* Filtros */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
                   >
                     <option value="all">Todos</option>
                     <option value="PENDING">Pendientes</option>
@@ -607,7 +609,7 @@ const handleTestSentry = () => {
                     <option value="ACCEPTED">Aceptados</option>
                     <option value="REJECTED">Rechazados</option>
                   </select>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 text-center sm:text-left">
                     {filteredApplications.length} postulaciones
                   </span>
                 </div>
@@ -617,15 +619,15 @@ const handleTestSentry = () => {
             {/* Tabla de postulaciones */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Candidato</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacante</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Candidato</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacante</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                      <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -640,12 +642,12 @@ const handleTestSentry = () => {
                         .slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage)
                         .map((application) => (
                         <tr key={application.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
                             {application.candidateName}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{application.email}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{application.email}</td>
+                          <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>
+                          <td className="px-4 sm:px-6 py-4 text-sm">
                             <select
                               value={application.status}
                               onChange={(e) => handleStatusChange(application.id, e.target.value as Application['status'])}
@@ -658,10 +660,11 @@ const handleTestSentry = () => {
                               <option value="REJECTED">Rechazado</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
+                          <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
                             {new Date(application.submittedAt).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 text-sm text-right space-x-2">
+                          <td className="px-4 sm:px-6 py-4 text-sm text-right">
+                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                             <button
                               onClick={() => handleViewApplicationDetails(application)}
                               className="text-blue-600 hover:text-blue-800 font-medium"
@@ -676,6 +679,7 @@ const handleTestSentry = () => {
                                 📄 CV
                               </button>
                             )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -699,22 +703,22 @@ const handleTestSentry = () => {
         {activeTab === 'contacts' && (
           <>
             {/* Stats pequeñas para contactos */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
                 <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-                <div className="text-2xl font-bold text-yellow-800">
+                <div className="text-xl sm:text-2xl font-bold text-yellow-800">
                   {contacts.filter(c => c.status === 'PENDING').length}
                 </div>
               </div>
               <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
                 <div className="text-xs font-medium text-green-700 mb-1">Respondidos</div>
-                <div className="text-2xl font-bold text-green-800">
+                <div className="text-xl sm:text-2xl font-bold text-green-800">
                   {contacts.filter(c => c.status === 'RESPONDED').length}
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg shadow-sm p-4 border border-gray-200">
                 <div className="text-xs font-medium text-gray-700 mb-1">Archivados</div>
-                <div className="text-2xl font-bold text-gray-800">
+                <div className="text-xl sm:text-2xl font-bold text-gray-800">
                   {contacts.filter(c => c.status === 'ARCHIVED').length}
                 </div>
               </div>
@@ -743,19 +747,19 @@ const handleTestSentry = () => {
                 </div>
 
                 {/* Filtros */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
                   <select
                     value={filterContactStatus}
                     onChange={(e) => setFilterContactStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
                   >
                     <option value="all">Todos</option>
                     <option value="PENDING">Pendientes</option>
                     <option value="RESPONDED">Respondidos</option>
                     <option value="ARCHIVED">Archivados</option>
                   </select>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 text-center sm:text-left">
                     {filteredContacts.length} contactos
                   </span>
                 </div>
@@ -765,15 +769,15 @@ const handleTestSentry = () => {
             {/* Tabla de contactos */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asunto</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asunto</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                      <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -788,14 +792,14 @@ const handleTestSentry = () => {
                         .slice((currentContactPage - 1) * itemsPerPage, currentContactPage * itemsPerPage)
                         .map((contact) => (
                         <tr key={contact.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
                             {contact.name}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{contact.email}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                          <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{contact.email}</td>
+                          <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                             {contact.subject}
                           </td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-4 sm:px-6 py-4 text-sm">
                             <select
                               value={contact.status}
                               onChange={(e) => handleContactStatusChange(contact.id, e.target.value as Contact['status'])}
@@ -806,10 +810,11 @@ const handleTestSentry = () => {
                               <option value="ARCHIVED">Archivado</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
+                          <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
                             {new Date(contact.createdAt).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 text-sm text-right space-x-2">
+                          <td className="px-4 sm:px-6 py-4 text-sm text-right">
+                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                             <button
                               onClick={() => handleViewContactDetails(contact)}
                               className="text-blue-600 hover:text-blue-800 font-medium"
@@ -822,6 +827,7 @@ const handleTestSentry = () => {
                             >
                               🗑️
                             </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -857,7 +863,7 @@ const handleTestSentry = () => {
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
                     {selectedContact.name}
                   </h3>
                   <p className="text-gray-600">{selectedContact.email}</p>
@@ -922,7 +928,7 @@ const handleTestSentry = () => {
               {/* Cambiar estado */}
               <div className="border-t pt-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     onClick={() => {
                       handleContactStatusChange(selectedContact.id, 'PENDING')
@@ -978,7 +984,7 @@ const handleTestSentry = () => {
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
                     {selectedApplication.candidateName}
                   </h3>
                   <p className="text-gray-600">
@@ -1050,7 +1056,7 @@ const handleTestSentry = () => {
               {/* Cambiar estado */}
               <div className="border-t pt-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'PENDING')
@@ -1120,9 +1126,9 @@ const handleTestSentry = () => {
           }}
         >
           <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
-            <form onSubmit={handleSubmitVacancy} className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">
+            <form onSubmit={handleSubmitVacancy} className="p-4 sm:p-6">
+              <div className="flex justify-between items-start mb-6">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                   {editingVacancy ? 'Editar Vacante' : 'Nueva Vacante'}
                 </h3>
                 <button
@@ -1268,11 +1274,11 @@ const handleTestSentry = () => {
               </div>
 
               {/* Botones */}
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6 pt-4 border-t">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                   disabled={isSaving}
                 >
                   Cancelar
@@ -1280,7 +1286,7 @@ const handleTestSentry = () => {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? 'Guardando...' : (editingVacancy ? 'Actualizar' : 'Crear Vacante')}
                 </button>

@@ -59,7 +59,7 @@ export default function NavBar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <span className="text-2xl font-bold text-white tracking-tight">
+            <span className="text-lg sm:text-2xl font-bold text-white tracking-tight">
               Meinardi&Perlo{' '}
               <span className="text-yellow-400 animate-pulse-subtle inline-block">
                 RRHH

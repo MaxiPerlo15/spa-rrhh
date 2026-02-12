@@ -112,14 +112,14 @@ export default function Hero() {
       <div className="absolute inset-0 bg-linear-to-b from-primary-600/70 via-primary-500/60 to-primary-700/70"></div>
       
       {/* Contenido superpuesto */}
-      <div className="container-custom relative z-10 text-center px-4 pb-32">
-        <div className="max-w-4xl mx-auto space-y-8">
-          <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight drop-shadow-lg animate-fade-in">
+      <div className="container-custom relative z-10 text-center px-4 pb-24 sm:pb-32">
+        <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight drop-shadow-lg animate-fade-in">
             Conectamos <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Talento</span> con{' '}
             <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Oportunidades</span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
+          <p className="text-base sm:text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
             Somos una consultora especializada en Recursos Humanos que acompaña a empresas 
             y profesionales en su crecimiento. Encuentra tu próxima oportunidad laboral con nosotros.
           </p>
@@ -128,14 +128,14 @@ export default function Hero() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 animate-fade-in" style={{ animationDelay: '0.28s' }}>
             <button
               onClick={() => scrollToSection('#vacantes')}
-              className="btn-motion group relative px-10 py-5 bg-primary-500 text-white font-semibold text-lg rounded-lg shadow-2xl hover:bg-primary-600 hover:shadow-xl hover:scale-105 overflow-hidden"
+              className="btn-motion group relative w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-primary-500 text-white font-semibold text-base sm:text-lg rounded-lg shadow-2xl hover:bg-primary-600 hover:shadow-xl hover:scale-105 overflow-hidden"
             >
               <span className="relative z-10">Ver Vacantes</span>
               <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
             </button>
             <button
               onClick={() => scrollToSection('#contacto')}
-              className="btn-motion group px-10 py-5 bg-white text-primary-500 font-semibold text-lg rounded-lg shadow-2xl hover:bg-gray-50 hover:scale-105 border-2 border-white/20 hover:border-primary-300"
+              className="btn-motion group w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-white text-primary-500 font-semibold text-base sm:text-lg rounded-lg shadow-2xl hover:bg-gray-50 hover:scale-105 border-2 border-white/20 hover:border-primary-300"
             >
               Contactanos
             </button>
@@ -144,7 +144,7 @@ export default function Hero() {
           {/* Stats con animación y mejor visibilidad */}
           <div
             ref={statsRef}
-            className="grid grid-cols-3 gap-4 md:gap-8 pt-12 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-8 pt-10 md:pt-16 pb-8 max-w-3xl mx-auto animate-fade-in"
             style={{ animationDelay: '0.42s' }}
           >
             <div className="text-center group cursor-default bg-white/10 backdrop-blur-sm rounded-xl p-4 md:p-6 hover:bg-white/20 transition-all duration-300">

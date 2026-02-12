@@ -155,11 +155,11 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         }
       }}
     >
-      <div className={`modal-panel bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isClosing ? 'is-closing' : ''}`}>
+      <div className={`modal-panel bg-white rounded-2xl p-5 sm:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isClosing ? 'is-closing' : ''}`}>
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Postularme</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Postularme</h2>
             <p className="text-gray-600 mt-1">{vacancyTitle}</p>
           </div>
           <button
@@ -325,18 +325,18 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             .
           </p>
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-4">
             <button
               type="button"
               onClick={closeWithAnimation}
-              className="btn-motion flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              className="btn-motion w-full sm:flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !resumeInfo || (captchaEnabled && !captchaToken)}
-              className="btn-motion flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-motion w-full sm:flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Enviando...' : 'Enviar Postulación'}
             </button>

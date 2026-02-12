@@ -105,6 +105,11 @@ spa-rrhh/
 - Los modales de detalle/edición deben cerrar con `Esc`, clic de backdrop o botón explícito.
 - Mantener consistencia visual entre modales: `rounded-2xl`, borde sutil y `backdrop-blur`.
 
+**Estándar responsive (MIS-79)**:
+- En mobile, priorizar `flex-col`/`grid-cols-1` y escalar a `sm/md/lg` progresivamente.
+- Tablas del admin deben ser utilizables en pantallas chicas: `overflow-x-auto` + ocultar columnas secundarias por breakpoint.
+- Acciones críticas y CTAs deben mantener objetivos táctiles cómodos (`w-full` en mobile cuando aplica).
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.
