@@ -8,7 +8,7 @@ Sistema de subida y almacenamiento seguro de currículums implementado con [Uplo
 - **Validación automática**: Solo archivos PDF, máximo 4MB
 - **URLs públicas**: Accesibles vía CDN con alta disponibilidad
 - **Componente React**: Upload button con preview y estados
-- **CTA visible**: estilos base de UploadThing cargados globalmente
+- **CTA visible**: estilos del uploader definidos de forma local en el formulario
 - **Integración completa**: Desde formulario hasta descarga en admin panel
 
 ## 🚀 Configuración
@@ -86,13 +86,9 @@ export type OurFileRouter = typeof ourFileRouter;
 - **Callback**: `onUploadComplete` se ejecuta cuando termina la subida
 - **Fuente de verdad**: `src/lib/uploadPolicy.ts`
 
-### Estilos base requeridos
+### Estilos recomendados
 
-Para asegurar que el botón de UploadThing sea visible en todos los navegadores soportados, importar en el layout raíz:
-
-```tsx
-import "@uploadthing/react/styles.css";
-```
+Para evitar colisiones visuales globales con otros botones del sitio, el uploader se estiliza con `appearance` y `content` directamente en `PostularForm.tsx`.
 
 ### Route Handler (`src/app/api/uploadthing/route.ts`)
 
