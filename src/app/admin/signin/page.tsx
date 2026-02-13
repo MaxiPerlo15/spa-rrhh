@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function SignInPage() {
   const router = useRouter()
@@ -11,6 +12,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const { showSuccess, showError } = useToast()
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -26,12 +28,15 @@ export default function SignInPage() {
 
       if (result?.error) {
         setError('Credenciales inválidas')
+        showError('Credenciales inválidas. Verifica email y contraseña.')
       } else if (result?.ok) {
+        showSuccess('Inicio de sesión exitoso. Redirigiendo al panel.')
         router.push('/admin')
         router.refresh()
       }
     } catch (error) {
       setError('Error al iniciar sesión')
+      showError('Error al iniciar sesión. Intenta nuevamente.')
       console.error(error)
     } finally {
       setIsLoading(false)

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 const SUCCESS_MESSAGE =
   'Si existe una cuenta con ese email, enviamos un enlace para restablecer la contraseña.'
@@ -11,6 +12,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const { showSuccess, showError } = useToast()
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -28,12 +30,16 @@ export default function ForgotPasswordPage() {
       const payload = await response.json()
       if (!response.ok) {
         setError(payload.error || 'No se pudo procesar la solicitud')
+        showError(payload.error || 'No se pudo procesar la solicitud')
         return
       }
 
-      setMessage(payload.message || SUCCESS_MESSAGE)
+      const successMessage = payload.message || SUCCESS_MESSAGE
+      setMessage(successMessage)
+      showSuccess(successMessage)
     } catch {
       setError('No se pudo procesar la solicitud')
+      showError('No se pudo procesar la solicitud')
     } finally {
       setIsLoading(false)
     }

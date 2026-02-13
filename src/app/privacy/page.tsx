@@ -18,72 +18,99 @@ export default function PrivacyPage() {
 
           <div className="space-y-8 text-gray-700">
             <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">1. Datos que recopilamos</h2>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">1. Responsable del tratamiento</h2>
               <p>
-                Podemos recopilar datos de identificación y contacto (nombre, email, teléfono), información
-                profesional compartida en postulaciones (incluyendo CV) y el contenido de mensajes enviados
-                mediante formularios del sitio.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">2. Finalidad del tratamiento</h2>
-              <p>
-                Tratamos tus datos para gestionar procesos de selección, responder consultas, mejorar la calidad
-                del servicio y cumplir obligaciones legales o contractuales asociadas a nuestra actividad.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">3. Base legal y conservación</h2>
-              <p>
-                La base legal del tratamiento es tu consentimiento al enviar formularios y/o la ejecución de
-                acciones precontractuales relacionadas con búsquedas laborales. Conservamos los datos solo durante
-                el tiempo necesario para dichas finalidades o para cumplir obligaciones legales.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">4. Compartición de datos</h2>
-              <p>
-                No vendemos datos personales. Podemos compartirlos con proveedores tecnológicos que operan como
-                encargados de tratamiento (por ejemplo, servicios de correo, monitoreo y almacenamiento) bajo
-                medidas de seguridad adecuadas.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">5. Seguridad</h2>
-              <p>
-                Aplicamos controles técnicos y organizativos para proteger los datos contra accesos no autorizados,
-                alteraciones, pérdida o divulgación indebida.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">6. Tus derechos</h2>
-              <p>
-                Puedes solicitar acceso, rectificación, actualización o eliminación de tus datos personales, así
-                como revocar tu consentimiento cuando corresponda.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">7. Contacto</h2>
-              <p>
-                Para consultas sobre privacidad o ejercicio de derechos, contáctanos en{' '}
+                Meinardi&Perlo RRHH es responsable del tratamiento de los datos personales recabados
+                a través de este sitio web. Para consultas sobre privacidad puedes escribir a{' '}
                 <a className="text-primary-500 hover:text-primary-600" href="mailto:mperloing@gmail.com">
                   mperloing@gmail.com
-                </a>
-                .
+                </a>.
               </p>
             </section>
 
             <section>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900">8. Cookies</h2>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">2. Datos personales que tratamos</h2>
+              <p>
+                Dependiendo de la interacción, podemos tratar:
+              </p>
+              <ul className="mt-3 list-disc space-y-1 pl-5">
+                <li>Datos de identificación y contacto: nombre, email, teléfono.</li>
+                <li>Datos profesionales aportados en postulaciones: CV y antecedentes laborales.</li>
+                <li>Datos de consultas: asunto y mensaje enviados desde el formulario de contacto.</li>
+                <li>Datos técnicos mínimos de seguridad y operación del panel administrativo.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">3. Finalidades del tratamiento</h2>
+              <p>
+                Tratamos datos personales para:
+              </p>
+              <ul className="mt-3 list-disc space-y-1 pl-5">
+                <li>Gestionar procesos de selección, preselección y contacto con candidatos.</li>
+                <li>Responder consultas comerciales y operativas enviadas por el formulario de contacto.</li>
+                <li>Administrar y proteger el panel interno de gestión de vacantes, postulaciones y contactos.</li>
+                <li>Cumplir obligaciones legales y atender requerimientos administrativos o regulatorios.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">4. Bases legales</h2>
+              <p>
+                Las bases legales aplicables son: consentimiento del titular al enviar formularios, ejecución de
+                acciones precontractuales vinculadas a oportunidades laborales, interés legítimo en seguridad
+                operativa del servicio y cumplimiento de obligaciones legales.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">5. Conservación de datos</h2>
+              <p>
+                Conservamos los datos durante el tiempo necesario para cumplir las finalidades indicadas y por el
+                plazo que exijan obligaciones legales o de defensa de derechos. Una vez vencidos esos plazos,
+                aplicamos medidas de eliminación o anonimización cuando corresponda.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">6. Destinatarios y encargados</h2>
+              <p>
+                No comercializamos datos personales. Podemos compartir información con proveedores tecnológicos
+                estrictamente necesarios para operar el servicio (por ejemplo: correo transaccional, almacenamiento
+                de CV, monitoreo de errores y hosting), bajo obligaciones de confidencialidad y seguridad.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">7. Seguridad de la información</h2>
+              <p>
+                Aplicamos medidas técnicas y organizativas razonables para proteger los datos frente a accesos no
+                autorizados, alteración, pérdida o divulgación indebida. Ningún sistema es absolutamente invulnerable,
+                pero revisamos y mejoramos los controles de forma continua.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">8. Derechos de los titulares</h2>
               <p className="mb-4">
-                Este sitio utiliza cookies técnicas/esenciales para autenticación y seguridad del panel
-                administrativo. Actualmente no utilizamos cookies de marketing ni perfilado.
+                Puedes solicitar acceso, rectificación, actualización, supresión y, cuando corresponda, oposición o
+                limitación del tratamiento. También puedes revocar el consentimiento otorgado para finalidades basadas
+                en consentimiento.
+              </p>
+              <p>
+                Para ejercer estos derechos, escríbenos a{' '}
+                <a className="text-primary-500 hover:text-primary-600" href="mailto:mperloing@gmail.com">
+                  mperloing@gmail.com
+                </a>{' '}
+                indicando tu solicitud y un medio de contacto para responder.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">9. Cookies y tecnologías similares</h2>
+              <p className="mb-4">
+                Usamos cookies técnicas/esenciales para autenticación y seguridad del panel administrativo. No
+                utilizamos actualmente cookies de marketing ni perfilado.
               </p>
               <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="min-w-full text-left text-sm">
@@ -117,6 +144,14 @@ export default function PrivacyPage() {
                   </tbody>
                 </table>
               </div>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">10. Cambios en esta política</h2>
+              <p>
+                Podemos actualizar esta política para reflejar cambios normativos, operativos o tecnológicos.
+                Publicaremos la fecha de última actualización al inicio del documento.
+              </p>
             </section>
           </div>
         </section>

@@ -48,10 +48,10 @@ export default function Toast({ message, type, duration = 3000, onClose }: Toast
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg border-l-4 text-white transition-all duration-300 ${
+      className={`pointer-events-auto flex w-full items-center gap-3 rounded-lg border-l-4 px-6 py-4 text-white shadow-lg transition-all duration-300 ${
         styles[type]
       } ${
-        isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
       }`}
       role="alert"
     >

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const { showSuccess, showError } = useToast()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -25,6 +27,7 @@ export default function ResetPasswordPage() {
 
     if (!token) {
       setError('El enlace de recuperación es inválido')
+      showError('El enlace de recuperación es inválido')
       return
     }
 
@@ -44,15 +47,19 @@ export default function ResetPasswordPage() {
       const payload = await response.json()
       if (!response.ok) {
         setError(payload.error || 'No se pudo actualizar la contraseña')
+        showError(payload.error || 'No se pudo actualizar la contraseña')
         return
       }
 
-      setMessage(payload.message || 'Contraseña actualizada exitosamente')
+      const successMessage = payload.message || 'Contraseña actualizada exitosamente'
+      setMessage(successMessage)
+      showSuccess(successMessage)
       setTimeout(() => {
         router.push('/admin/signin')
       }, 1800)
     } catch {
       setError('No se pudo actualizar la contraseña')
+      showError('No se pudo actualizar la contraseña')
     } finally {
       setIsLoading(false)
     }

@@ -10,17 +10,20 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import AdminHeader from '@/components/admin/AdminHeader'
 import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs'
 import DashboardStats from '@/components/admin/DashboardStats'
+import AdminOnboardingDialog from '@/components/admin/AdminOnboardingDialog'
+import AdminContextHelp from '@/components/admin/AdminContextHelp'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
 import type { Contact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 
+const ONBOARDING_STORAGE_KEY = 'admin_onboarding_completed_v1'
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showInfo } = useToast()
   
   // Usar el hook customizado para manejar datos y operaciones
   const {
@@ -81,12 +84,29 @@ export default function AdminDashboard() {
     benefits: ''
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/signin')
     }
   }, [status, router])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+
+    let shouldShow = false
+    try {
+      shouldShow = window.localStorage.getItem(ONBOARDING_STORAGE_KEY) !== 'true'
+    } catch {
+      shouldShow = true
+    }
+
+    if (shouldShow) {
+      setShowOnboarding(true)
+      showInfo('Bienvenido al panel. Te mostramos un tutorial rápido.')
+    }
+  }, [status, showInfo])
 
   useEffect(() => {
     let filtered = applications
@@ -258,6 +278,7 @@ export default function AdminDashboard() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    showInfo('Descarga de CV iniciada')
   }
 
   const handleViewApplicationDetails = (application: Application) => {
@@ -318,6 +339,20 @@ export default function AdminDashboard() {
         signOut({ callbackUrl: '/' })
       }
     })
+  }
+
+  const handleOpenHelp = () => {
+    setShowOnboarding(true)
+  }
+
+  const handleCompleteOnboarding = () => {
+    try {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
+    } catch {
+      // No-op if storage is unavailable.
+    }
+    setShowOnboarding(false)
+    showSuccess('Tutorial completado. Puedes reabrirlo desde "Ayuda".')
   }
 
   const contactStatusLabels = {
@@ -385,6 +420,7 @@ const handleTestSentry = () => {
       <AdminHeader 
         userEmail={session.user?.email ?? undefined}
         onSignOut={handleSignOut}
+        onHelp={handleOpenHelp}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -427,6 +463,8 @@ const handleTestSentry = () => {
             pendingContacts: stats.pendingContacts
           }}
         />
+
+        <AdminContextHelp activeTab={activeTab} onOpenTutorial={handleOpenHelp} />
 
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
@@ -1308,6 +1346,12 @@ const handleTestSentry = () => {
           onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
         />
       )}
+
+      <AdminOnboardingDialog
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={handleCompleteOnboarding}
+      />
     </div>
   )
 }

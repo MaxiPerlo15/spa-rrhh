@@ -9,6 +9,7 @@ Documentación operativa relacionada:
 - `docs/INCIDENT-RUNBOOK.md`
 - `docs/RUNTIME-HYGIENE.md`
 - `docs/COOKIE-STRATEGY.md`
+- `docs/ADMIN-ONBOARDING.md`
 
 ## Stack Tecnológico
 
@@ -106,6 +107,7 @@ spa-rrhh/
 - Confirmaciones críticas (eliminar/cerrar sesión) deben pasar por `src/components/ConfirmDialog.tsx`.
 - Los modales de detalle/edición deben cerrar con `Esc`, clic de backdrop o botón explícito.
 - Mantener consistencia visual entre modales: `rounded-2xl`, borde sutil y `backdrop-blur`.
+- Onboarding inicial de admin en `src/components/admin/AdminOnboardingDialog.tsx` con persistencia local y reentrada desde botón de ayuda.
 
 **Estándar responsive (MIS-79)**:
 - En mobile, priorizar `flex-col`/`grid-cols-1` y escalar a `sm/md/lg` progresivamente.
@@ -115,6 +117,11 @@ spa-rrhh/
 **Navegación hash estable (MIS-86)**:
 - Navegación a secciones con offset fijo centralizada en `src/lib/hashScroll.ts`.
 - Usar `scrollToHashWithOffset` desde `NavBar`, `Footer`, `Hero` y carga inicial de home.
+
+**Feedback de UI con toasts (MIS-85)**:
+- Proveedor global en `src/contexts/ToastContext.tsx`.
+- Posicionamiento estándar: bottom-center.
+- Usar toasts para confirmaciones de éxito/error en flujos principales de formularios, auth admin y acciones CRUD del panel.
 
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 

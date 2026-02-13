@@ -39,9 +39,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, showSuccess, showError, showWarning, showInfo }}>
       {children}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
-        {toasts.map((toast, index) => (
-          <div key={toast.id} style={{ marginTop: `${index * 80}px` }}>
+      <div className="pointer-events-none fixed bottom-4 left-1/2 z-[80] flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 flex-col gap-2 sm:bottom-6">
+        {toasts.map((toast) => (
+          <div key={toast.id}>
             <Toast
               message={toast.message}
               type={toast.type}
