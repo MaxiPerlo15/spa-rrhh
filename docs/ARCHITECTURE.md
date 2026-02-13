@@ -7,6 +7,7 @@ Este proyecto es una aplicación Next.js 16 con TypeScript que implementa un sis
 Documentación operativa relacionada:
 - `docs/SECURITY-HARDENING.md`
 - `docs/INCIDENT-RUNBOOK.md`
+- `docs/RUNTIME-HYGIENE.md`
 
 ## Stack Tecnológico
 
@@ -63,7 +64,7 @@ spa-rrhh/
 │   │
 │   ├── types/               # Definiciones de tipos TypeScript
 │   ├── data/                # Datos estáticos y constantes
-│   └── middleware.ts        # Middleware de Next.js
+│   └── proxy.ts             # Proxy (anteriormente middleware) de Next.js
 │
 ├── prisma/                  # Esquema y migraciones
 │   ├── schema.prisma
