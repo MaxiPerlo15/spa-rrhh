@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
+import CookieNotice from "@/components/CookieNotice";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { SentryUserContext } from "@/components/SentryUserContext";
 
@@ -75,6 +76,7 @@ export default function RootLayout({
           <SentryUserContext /> 
           <ToastProvider>
             {children}
+            <CookieNotice />
           </ToastProvider>
         </AuthProvider>
       </body>

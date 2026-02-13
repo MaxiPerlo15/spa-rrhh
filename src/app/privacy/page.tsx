@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <main className="section-padding">
         <section className="container-custom max-w-4xl rounded-2xl border border-gray-200 bg-white p-8 shadow-sm md:p-12">
           <h1 className="mb-6 text-3xl font-bold text-gray-900 md:text-4xl">Política de Privacidad</h1>
-          <p className="mb-4 text-sm text-gray-500">Última actualización: 11 de febrero de 2026</p>
+          <p className="mb-4 text-sm text-gray-500">Última actualización: 13 de febrero de 2026</p>
 
           <div className="space-y-8 text-gray-700">
             <section>
@@ -77,6 +77,46 @@ export default function PrivacyPage() {
                 </a>
                 .
               </p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">8. Cookies</h2>
+              <p className="mb-4">
+                Este sitio utiliza cookies técnicas/esenciales para autenticación y seguridad del panel
+                administrativo. Actualmente no utilizamos cookies de marketing ni perfilado.
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Cookie</th>
+                      <th className="px-4 py-3 font-semibold">Finalidad</th>
+                      <th className="px-4 py-3 font-semibold">Categoría</th>
+                      <th className="px-4 py-3 font-semibold">Duración</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-gray-700">
+                    <tr>
+                      <td className="px-4 py-3 font-medium">__Secure-next-auth.session-token / next-auth.session-token</td>
+                      <td className="px-4 py-3">Mantener sesión autenticada de administradores.</td>
+                      <td className="px-4 py-3">Esencial</td>
+                      <td className="px-4 py-3">Hasta 8 horas (según configuración de sesión).</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 font-medium">next-auth.csrf-token</td>
+                      <td className="px-4 py-3">Protección CSRF en flujos de autenticación.</td>
+                      <td className="px-4 py-3">Esencial</td>
+                      <td className="px-4 py-3">Sesión/rotación automática.</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 font-medium">next-auth.callback-url</td>
+                      <td className="px-4 py-3">Recordar URL de retorno durante login.</td>
+                      <td className="px-4 py-3">Esencial</td>
+                      <td className="px-4 py-3">Sesión.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </section>
           </div>
         </section>

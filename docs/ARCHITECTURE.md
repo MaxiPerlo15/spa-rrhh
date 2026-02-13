@@ -8,6 +8,7 @@ Documentación operativa relacionada:
 - `docs/SECURITY-HARDENING.md`
 - `docs/INCIDENT-RUNBOOK.md`
 - `docs/RUNTIME-HYGIENE.md`
+- `docs/COOKIE-STRATEGY.md`
 
 ## Stack Tecnológico
 
