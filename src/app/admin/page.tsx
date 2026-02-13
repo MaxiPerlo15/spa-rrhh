@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
@@ -19,8 +19,29 @@ import type { Contact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 
 const ONBOARDING_STORAGE_KEY = 'admin_onboarding_completed_v1'
-type TourTarget = 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+type TourTarget =
+  | 'tabs'
+  | 'create-vacancy'
+  | 'vacancy-modal'
+  | 'vacancy-toggle-btn'
+  | 'vacancy-edit-btn'
+  | 'vacancy-delete-btn'
+  | 'applications-filters'
+  | 'application-view-btn'
+  | 'application-detail-modal'
+  | 'application-cv-btn'
+  | 'contacts-table'
+  | 'contact-view-btn'
+  | 'contact-detail-modal'
 type TutorialKind = 'vacancies' | 'applications' | 'contacts'
+
+type DomainStep = {
+  target: TourTarget
+  tab: AdminTab
+  title: string
+  body: string
+  action?: 'open-create-modal' | 'open-edit-modal' | 'open-application-detail' | 'open-contact-detail'
+}
 
 const ONBOARDING_AREAS: Array<{
   kind: TutorialKind
@@ -52,12 +73,7 @@ const ONBOARDING_AREAS: Array<{
   }
 ]
 
-const DOMAIN_TUTORIALS: Record<TutorialKind, Array<{
-  target: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
-  tab: AdminTab
-  title: string
-  body: string
-}>> = {
+const DOMAIN_TUTORIALS_BASE: Record<TutorialKind, DomainStep[]> = {
   vacancies: [
     {
       target: 'tabs',
@@ -70,6 +86,13 @@ const DOMAIN_TUTORIALS: Record<TutorialKind, Array<{
       tab: 'vacancies',
       title: 'Botón Nueva Vacante',
       body: 'Al seleccionarlo se abre el panel modal de alta para definir título, modalidad, requisitos y beneficios.'
+    },
+    {
+      target: 'vacancy-modal',
+      tab: 'vacancies',
+      title: 'Panel de creación de vacante',
+      body: 'Este diálogo centraliza toda la configuración de la nueva búsqueda antes de guardarla.',
+      action: 'open-create-modal'
     }
   ],
   applications: [
@@ -84,6 +107,19 @@ const DOMAIN_TUTORIALS: Record<TutorialKind, Array<{
       tab: 'applications',
       title: 'Filtros y búsqueda',
       body: 'Estos controles te permiten segmentar por estado y encontrar rápido por nombre, email o vacante.'
+    },
+    {
+      target: 'application-view-btn',
+      tab: 'applications',
+      title: 'Acción Ver postulación',
+      body: 'Este botón abre el panel de detalle completo del candidato y su proceso.',
+      action: 'open-application-detail'
+    },
+    {
+      target: 'application-detail-modal',
+      tab: 'applications',
+      title: 'Detalle de postulación',
+      body: 'Aquí revisas información extendida del candidato antes de avanzar estado o decidir acciones.'
     }
   ],
   contacts: [
@@ -98,6 +134,19 @@ const DOMAIN_TUTORIALS: Record<TutorialKind, Array<{
       tab: 'contacts',
       title: 'Bandeja y acciones',
       body: 'En la tabla puedes abrir detalle, responder y actualizar el estado operativo del contacto.'
+    },
+    {
+      target: 'contact-view-btn',
+      tab: 'contacts',
+      title: 'Acción Ver contacto',
+      body: 'Este botón abre el panel de detalle del mensaje recibido y sus datos de contacto.',
+      action: 'open-contact-detail'
+    },
+    {
+      target: 'contact-detail-modal',
+      tab: 'contacts',
+      title: 'Detalle de contacto',
+      body: 'Desde este panel puedes leer el mensaje, responder por email y actualizar el estado.'
     }
   ]
 }
@@ -172,6 +221,67 @@ export default function AdminDashboard() {
   const [tutorialStep, setTutorialStep] = useState(0)
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
 
+  const firstVacancyId = useMemo(() => vacancies[0]?.id ?? null, [vacancies])
+  const firstApplicationId = useMemo(() => applications[0]?.id ?? null, [applications])
+  const firstApplicationWithCvId = useMemo(
+    () => applications.find((application) => Boolean(application.resumeUrl))?.id ?? null,
+    [applications]
+  )
+  const firstContactId = useMemo(() => contacts[0]?.id ?? null, [contacts])
+
+  const tutorialStepsByKind = useMemo<Record<TutorialKind, DomainStep[]>>(() => {
+    const vacancySteps = [...DOMAIN_TUTORIALS_BASE.vacancies]
+    if (firstVacancyId) {
+      vacancySteps.push(
+        {
+          target: 'vacancy-toggle-btn',
+          tab: 'vacancies',
+          title: 'Acción Cerrar/Activar',
+          body: 'Este botón cambia visibilidad pública de la vacante (activa/cerrada).'
+        },
+        {
+          target: 'vacancy-edit-btn',
+          tab: 'vacancies',
+          title: 'Acción Editar + diálogo',
+          body: 'Al editar se abre este mismo panel con datos precargados para ajustar la vacante.',
+          action: 'open-edit-modal'
+        },
+        {
+          target: 'vacancy-delete-btn',
+          tab: 'vacancies',
+          title: 'Acción Eliminar',
+          body: 'El botón eliminar inicia confirmación y borra vacante junto con postulaciones asociadas.'
+        }
+      )
+    }
+
+    const applicationsSteps = firstApplicationId
+      ? [...DOMAIN_TUTORIALS_BASE.applications]
+      : DOMAIN_TUTORIALS_BASE.applications.filter(
+          (step) => step.target !== 'application-view-btn' && step.target !== 'application-detail-modal'
+        )
+    if (firstApplicationWithCvId) {
+      applicationsSteps.push({
+        target: 'application-cv-btn',
+        tab: 'applications',
+        title: 'Acción CV',
+        body: 'Este botón descarga el CV adjunto para revisión fuera del panel.'
+      })
+    }
+
+    const contactsSteps = firstContactId
+      ? [...DOMAIN_TUTORIALS_BASE.contacts]
+      : DOMAIN_TUTORIALS_BASE.contacts.filter(
+          (step) => step.target !== 'contact-view-btn' && step.target !== 'contact-detail-modal'
+        )
+
+    return {
+      vacancies: vacancySteps,
+      applications: applicationsSteps,
+      contacts: contactsSteps
+    }
+  }, [firstApplicationId, firstApplicationWithCvId, firstContactId, firstVacancyId])
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/signin')
@@ -196,7 +306,7 @@ export default function AdminDashboard() {
   }, [status, showInfo])
 
   const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
-  const currentTutorialSteps = activeTutorial ? DOMAIN_TUTORIALS[activeTutorial] : null
+  const currentTutorialSteps = activeTutorial ? tutorialStepsByKind[activeTutorial] : null
   const currentTutorialItem = currentTutorialSteps?.[tutorialStep]
   const currentGuidedTarget = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
   const isGuidedMode = showOnboarding || activeTutorial !== null
@@ -216,6 +326,37 @@ export default function AdminDashboard() {
 
     return () => window.clearTimeout(timeout)
   }, [isGuidedMode, activeTutorial, tutorialStep, onboardingStep, currentTutorialItem, currentOnboardingArea])
+
+  useEffect(() => {
+    if (!activeTutorial || !currentTutorialItem?.action) return
+
+    const timeout = window.setTimeout(() => {
+      switch (currentTutorialItem.action) {
+        case 'open-create-modal':
+          handleOpenCreateModal()
+          break
+        case 'open-edit-modal':
+          if (vacancies[0]) {
+            handleOpenEditModal(vacancies[0])
+          }
+          break
+        case 'open-application-detail':
+          if (applications[0]) {
+            setSelectedApplication(applications[0])
+            setShowApplicationDetail(true)
+          }
+          break
+        case 'open-contact-detail':
+          if (contacts[0]) {
+            setSelectedContact(contacts[0])
+            setShowContactDetail(true)
+          }
+          break
+      }
+    }, 160)
+
+    return () => window.clearTimeout(timeout)
+  }, [activeTutorial, applications, contacts, currentTutorialItem, vacancies])
 
   useEffect(() => {
     let filtered = applications
@@ -431,6 +572,15 @@ export default function AdminDashboard() {
     })
   }
 
+  const closeGuidedDialogs = () => {
+    setShowCreateModal(false)
+    setEditingVacancy(null)
+    setShowApplicationDetail(false)
+    setSelectedApplication(null)
+    setShowContactDetail(false)
+    setSelectedContact(null)
+  }
+
   const openConfirmDialog = (config: typeof confirmDialog) => {
     setConfirmDialog(config)
   }
@@ -451,6 +601,7 @@ export default function AdminDashboard() {
   }
 
   const handleOpenHelp = () => {
+    closeGuidedDialogs()
     setActiveTutorial(null)
     setOnboardingStep(0)
     setTutorialStep(0)
@@ -464,12 +615,14 @@ export default function AdminDashboard() {
     } catch {
       // No-op if storage is unavailable.
     }
+    closeGuidedDialogs()
     setActiveTutorial(null)
     setShowOnboarding(false)
     showSuccess('Tutorial completado. Puedes reabrirlo desde "Ayuda".')
   }
 
   const handleSkipOnboarding = () => {
+    closeGuidedDialogs()
     setActiveTutorial(null)
     setShowOnboarding(false)
     setOnboardingReturnStep(null)
@@ -485,6 +638,7 @@ export default function AdminDashboard() {
   }
 
   const openDomainTutorial = (kind: TutorialKind, fromOnboarding: boolean) => {
+    closeGuidedDialogs()
     if (fromOnboarding) {
       setOnboardingReturnStep(onboardingStep)
     } else {
@@ -505,6 +659,7 @@ export default function AdminDashboard() {
   }
 
   const handleFinishTutorial = () => {
+    closeGuidedDialogs()
     if (onboardingReturnStep !== null) {
       setOnboardingStep(onboardingReturnStep)
       setActiveTutorial(null)
@@ -522,6 +677,7 @@ export default function AdminDashboard() {
 
   const handleBackToOnboarding = () => {
     if (onboardingReturnStep === null) return
+    closeGuidedDialogs()
     setOnboardingStep(onboardingReturnStep)
     setActiveTutorial(null)
     setTutorialStep(0)
@@ -682,7 +838,7 @@ const handleTestSentry = () => {
               <tbody className="divide-y divide-gray-200">
                 {vacancies
                   .slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage)
-                  .map((vacancy) => {
+                  .map((vacancy, index) => {
                   const workdayLabels = {
                     'FULL_TIME': 'Jornada Completa',
                     'PART_TIME': 'Media Jornada',
@@ -719,6 +875,7 @@ const handleTestSentry = () => {
                     <td className="px-4 sm:px-6 py-4 text-sm text-right">
                       <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                       <button
+                        data-tour={index === 0 ? 'vacancy-toggle-btn' : undefined}
                         onClick={() => handleStatusToggle(vacancy)}
                         className={`${
                           vacancy.status === 'active' 
@@ -730,12 +887,14 @@ const handleTestSentry = () => {
                         {vacancy.status === 'active' ? '🔒 Cerrar' : '✅ Activar'}
                       </button>
                       <button
+                        data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
                         onClick={() => handleOpenEditModal(vacancy)}
                         className="text-blue-600 hover:text-blue-800 font-medium"
                       >
                         ✏️ Editar
                       </button>
                       <button
+                        data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
                         onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
                         className="text-red-600 hover:text-red-800 font-medium"
                       >
@@ -845,10 +1004,7 @@ const handleTestSentry = () => {
             </div>
 
             {/* Tabla de postulaciones */}
-            <div
-              data-tour="contacts-table"
-              className={`bg-white rounded-lg shadow overflow-hidden ${getTourClass('contacts-table')}`}
-            >
+            <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50">
@@ -897,15 +1053,17 @@ const handleTestSentry = () => {
                           <td className="px-4 sm:px-6 py-4 text-sm text-right">
                             <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                             <button
+                              data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined}
                               onClick={() => handleViewApplicationDetails(application)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
+                              className={`text-blue-600 hover:text-blue-800 font-medium ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}
                             >
                               👁️ Ver
                             </button>
                             {application.resumeUrl && (
                               <button
+                                data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined}
                                 onClick={() => handleDownloadCV(application)}
-                                className="text-green-600 hover:text-green-800 font-medium"
+                                className={`text-green-600 hover:text-green-800 font-medium ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`}
                               >
                                 📄 CV
                               </button>
@@ -998,7 +1156,10 @@ const handleTestSentry = () => {
             </div>
 
             {/* Tabla de contactos */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div
+              data-tour="contacts-table"
+              className={`bg-white rounded-lg shadow overflow-hidden ${getTourClass('contacts-table')}`}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50">
@@ -1048,7 +1209,8 @@ const handleTestSentry = () => {
                             <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
                             <button
                               onClick={() => handleViewContactDetails(contact)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
+                              data-tour={contact.id === firstContactId ? 'contact-view-btn' : undefined}
+                              className={`text-blue-600 hover:text-blue-800 font-medium ${contact.id === firstContactId ? getTourClass('contact-view-btn') : ''}`}
                             >
                               👁️ Ver
                             </button>
@@ -1089,7 +1251,10 @@ const handleTestSentry = () => {
             }
           }}
         >
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            data-tour="contact-detail-modal"
+            className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('contact-detail-modal')}`}
+          >
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -1210,7 +1375,10 @@ const handleTestSentry = () => {
             }
           }}
         >
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            data-tour="application-detail-modal"
+            className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('application-detail-modal')}`}
+          >
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -1356,7 +1524,10 @@ const handleTestSentry = () => {
             }
           }}
         >
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            data-tour="vacancy-modal"
+            className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('vacancy-modal')}`}
+          >
             <form onSubmit={handleSubmitVacancy} className="p-4 sm:p-6">
               <div className="flex justify-between items-start mb-6">
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -1573,6 +1744,7 @@ const handleTestSentry = () => {
         onNext={handleNextTutorialStep}
         onPrev={handlePrevTutorialStep}
         onSkip={() => {
+          closeGuidedDialogs()
           setActiveTutorial(null)
           setTutorialStep(0)
           setOnboardingReturnStep(null)

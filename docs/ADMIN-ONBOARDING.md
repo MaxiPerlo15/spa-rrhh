@@ -16,6 +16,22 @@ Reducir fricción para nuevos administradores mediante un tutorial inicial, ayud
 - Postulaciones
 - Contactos
 - Cada tutorial guía targets reales del módulo y mantiene navegación `anterior/siguiente/finalizar`.
+- Los pasos del tutorial pueden abrir automáticamente la UI vinculada al botón explicado para mostrar el flujo completo.
+
+6. Cobertura guiada por módulo (MIS-90):
+- Vacantes:
+  - `+ Nueva Vacante`
+  - Modal de alta/edición de vacante
+  - Botones de primera fila: `Cerrar/Activar`, `Editar`, `Eliminar`
+- Postulaciones:
+  - Filtros y buscador
+  - Botón `Ver` (abre panel de detalle)
+  - Modal de detalle de postulación
+  - Botón `CV` (cuando existe archivo)
+- Contactos:
+  - Tabla principal de contactos
+  - Botón `Ver` (abre panel de detalle)
+  - Modal de detalle de contacto
 
 3. Spotlight con blur del resto de la UI:
 - Overlay global con `backdrop-blur` sobre elementos no seleccionados.
