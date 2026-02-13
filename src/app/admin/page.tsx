@@ -19,6 +19,37 @@ import type { Contact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 
 const ONBOARDING_STORAGE_KEY = 'admin_onboarding_completed_v1'
+const TOUR_STEPS: Array<{
+  target: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+  tab: AdminTab
+  title: string
+  body: string
+}> = [
+  {
+    target: 'tabs',
+    tab: 'vacancies',
+    title: 'Navegación principal del panel',
+    body: 'Estas pestañas dividen el trabajo en vacantes, postulaciones y contactos.'
+  },
+  {
+    target: 'create-vacancy',
+    tab: 'vacancies',
+    title: 'Creación de vacantes',
+    body: 'Desde este botón publicas nuevas búsquedas y gestionas su estado operativo.'
+  },
+  {
+    target: 'applications-filters',
+    tab: 'applications',
+    title: 'Filtros de postulaciones',
+    body: 'Aquí aplicas búsqueda y filtros por estado para revisar candidatos más rápido.'
+  },
+  {
+    target: 'contacts-table',
+    tab: 'contacts',
+    title: 'Bandeja de contactos',
+    body: 'Gestiona consultas entrantes, cambia estado y mantén trazabilidad del seguimiento.'
+  }
+]
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -85,6 +116,7 @@ export default function AdminDashboard() {
   })
   const [isSaving, setIsSaving] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(0)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -103,10 +135,26 @@ export default function AdminDashboard() {
     }
 
     if (shouldShow) {
+      setOnboardingStep(0)
       setShowOnboarding(true)
       showInfo('Bienvenido al panel. Te mostramos un tutorial rápido.')
     }
   }, [status, showInfo])
+
+  useEffect(() => {
+    if (!showOnboarding) return
+
+    const step = TOUR_STEPS[onboardingStep]
+    if (!step) return
+
+    setActiveTab(step.tab)
+    const timeout = window.setTimeout(() => {
+      const targetElement = document.querySelector(`[data-tour="${step.target}"]`)
+      targetElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 120)
+
+    return () => window.clearTimeout(timeout)
+  }, [showOnboarding, onboardingStep])
 
   useEffect(() => {
     let filtered = applications
@@ -342,6 +390,7 @@ export default function AdminDashboard() {
   }
 
   const handleOpenHelp = () => {
+    setOnboardingStep(0)
     setShowOnboarding(true)
   }
 
@@ -354,6 +403,27 @@ export default function AdminDashboard() {
     setShowOnboarding(false)
     showSuccess('Tutorial completado. Puedes reabrirlo desde "Ayuda".')
   }
+
+  const handleSkipOnboarding = () => {
+    setShowOnboarding(false)
+    showInfo('Tutorial cerrado. Puedes retomarlo desde "Ayuda".')
+  }
+
+  const handleNextOnboardingStep = () => {
+    setOnboardingStep((prev) => Math.min(prev + 1, TOUR_STEPS.length - 1))
+  }
+
+  const handlePrevOnboardingStep = () => {
+    setOnboardingStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const currentTourStep = TOUR_STEPS[onboardingStep]
+  const getTourClass = (
+    key: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+  ) =>
+    showOnboarding && currentTourStep?.target === key
+      ? 'relative z-[72] ring-4 ring-primary-300 ring-offset-2 shadow-2xl transition-all duration-300'
+      : ''
 
   const contactStatusLabels = {
     'PENDING': 'Pendiente',
@@ -457,6 +527,7 @@ const handleTestSentry = () => {
         <AdminTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          className={getTourClass('tabs')}
           stats={{
             activeVacancies: stats.activeVacancies,
             pendingApplications: applications.filter(a => a.status === 'PENDING').length,
@@ -472,8 +543,9 @@ const handleTestSentry = () => {
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-lg font-semibold text-gray-900">Gestión de Vacantes</h2>
             <button
+              data-tour="create-vacancy"
               onClick={handleOpenCreateModal}
-              className="w-full sm:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              className={`w-full sm:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors ${getTourClass('create-vacancy')}`}
             >
               + Nueva Vacante
             </button>
@@ -611,7 +683,10 @@ const handleTestSentry = () => {
             </div>
 
             {/* Filtros */}
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div
+              data-tour="applications-filters"
+              className={`bg-white rounded-lg shadow p-4 mb-6 ${getTourClass('applications-filters')}`}
+            >
               <div className="flex flex-col gap-4">
                 {/* Búsqueda */}
                 <div className="relative flex-1">
@@ -655,7 +730,10 @@ const handleTestSentry = () => {
             </div>
 
             {/* Tabla de postulaciones */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div
+              data-tour="contacts-table"
+              className={`bg-white rounded-lg shadow overflow-hidden ${getTourClass('contacts-table')}`}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50">
@@ -1349,8 +1427,14 @@ const handleTestSentry = () => {
 
       <AdminOnboardingDialog
         isOpen={showOnboarding}
-        onClose={() => setShowOnboarding(false)}
-        onComplete={handleCompleteOnboarding}
+        stepIndex={onboardingStep}
+        totalSteps={TOUR_STEPS.length}
+        title={currentTourStep?.title || 'Tutorial'}
+        body={currentTourStep?.body || ''}
+        onNext={handleNextOnboardingStep}
+        onPrev={handlePrevOnboardingStep}
+        onSkip={handleSkipOnboarding}
+        onFinish={handleCompleteOnboarding}
       />
     </div>
   )

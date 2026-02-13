@@ -41,6 +41,7 @@ function TabButton({ isActive, onClick, icon, label, badge }: TabButtonProps) {
 interface AdminTabsProps {
   activeTab: AdminTab
   onTabChange: (tab: AdminTab) => void
+  className?: string
   stats?: {
     activeVacancies?: number
     pendingApplications?: number
@@ -48,9 +49,9 @@ interface AdminTabsProps {
   }
 }
 
-export default function AdminTabs({ activeTab, onTabChange, stats = {} }: AdminTabsProps) {
+export default function AdminTabs({ activeTab, onTabChange, className = '', stats = {} }: AdminTabsProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-2 mb-8">
+    <div data-tour="tabs" className={`bg-white rounded-lg shadow p-2 mb-8 ${className}`}>
       <div className="flex gap-2 overflow-x-auto pb-1">
         <TabButton
           isActive={activeTab === 'vacancies'}

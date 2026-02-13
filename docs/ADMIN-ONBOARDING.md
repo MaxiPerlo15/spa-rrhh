@@ -6,9 +6,10 @@ Reducir fricción para nuevos administradores mediante un tutorial inicial, ayud
 
 ## Implementación
 
-1. Tutorial inicial de 4 pasos:
-- Componente: `src/components/admin/AdminOnboardingDialog.tsx`
-- Persistencia: `localStorage` con clave `admin_onboarding_completed_v1`
+1. Tour guiado de 4 pasos con spotlight en UI real:
+- Componente coachmark: `src/components/admin/AdminOnboardingDialog.tsx`
+- Orquestación y targets: `src/app/admin/page.tsx`
+- Targets actuales: `tabs`, `create-vacancy`, `applications-filters`, `contacts-table`
 
 2. Ayuda contextual por pestaña:
 - Componente: `src/components/admin/AdminContextHelp.tsx`
@@ -21,6 +22,7 @@ Reducir fricción para nuevos administradores mediante un tutorial inicial, ayud
 ## Comportamiento
 
 - Si es primer ingreso (sin clave en `localStorage`), el tutorial se abre automáticamente.
+- Cada paso cambia de pestaña automáticamente para mantener visible el target del tour.
 - Si el usuario cierra sin finalizar, se volverá a mostrar en próximos ingresos.
 - Al finalizar tutorial, se guarda estado y se muestra toast de confirmación.
 
