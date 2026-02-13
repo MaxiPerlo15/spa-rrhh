@@ -27,6 +27,15 @@ export default function SignInPage() {
       })
 
       if (result?.error) {
+        if (result.error.startsWith('AUTH_THROTTLED:')) {
+          const retryAfter = Number(result.error.split(':')[1] || '0')
+          const retryAfterMinutes = Math.max(1, Math.ceil(retryAfter / 60))
+          const message = `Demasiados intentos fallidos. Intenta nuevamente en ${retryAfterMinutes} minuto(s).`
+          setError(message)
+          showError(message)
+          return
+        }
+
         setError('Credenciales inválidas')
         showError('Credenciales inválidas. Verifica email y contraseña.')
       } else if (result?.ok) {

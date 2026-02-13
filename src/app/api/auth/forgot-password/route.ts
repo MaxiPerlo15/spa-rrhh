@@ -11,6 +11,7 @@ import {
 } from '@/lib/passwordReset'
 import { sendPasswordResetEmail } from '@/lib/email'
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
+import { getAttemptLock, recordAttemptFailure, clearAttemptFailures } from '@/lib/authAttemptGuard'
 
 const GENERIC_FORGOT_PASSWORD_MESSAGE =
   'Si existe una cuenta con ese email, enviamos un enlace para restablecer la contraseña.'
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase()
 
     const clientIp = getClientIp(request.headers)
+    const identity = `${normalizedEmail}:${clientIp}`
+    const lockState = getAttemptLock('forgot-password', identity)
+    if (lockState.blocked) {
+      return NextResponse.json(
+        { error: `Temporalmente bloqueado. Intenta nuevamente en ${lockState.retryAfterSeconds}s.` },
+        { status: 429 }
+      )
+    }
+
     const rateLimitResult = await rateLimit({
       key: `forgot-password:${clientIp}`,
       windowMs: 10 * 60 * 1000,
@@ -67,6 +77,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (!emailResult.success) {
+        recordAttemptFailure('forgot-password', identity)
         await prisma.passwordResetToken.delete({
           where: { tokenHash }
         }).catch(() => {
@@ -86,8 +97,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      clearAttemptFailures('forgot-password', identity)
+
       logger.info('Solicitud de reset emitida', { userId: user.id, ip: clientIp })
     } else {
+      recordAttemptFailure('forgot-password', identity)
       logger.info('Solicitud de reset ignorada por usuario inexistente/no-admin', { ip: clientIp })
     }
 

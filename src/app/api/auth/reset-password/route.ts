@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 import { formatValidationError, resetPasswordSchema } from '@/lib/apiValidation'
 import { hashResetToken } from '@/lib/passwordReset'
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
+import { clearAttemptFailures, getAttemptLock, recordAttemptFailure } from '@/lib/authAttemptGuard'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +20,15 @@ export async function POST(request: NextRequest) {
     const now = new Date()
 
     const clientIp = getClientIp(request.headers)
+    const identity = `${tokenHash}:${clientIp}`
+    const lockState = getAttemptLock('reset-password', identity)
+    if (lockState.blocked) {
+      return NextResponse.json(
+        { error: `Temporalmente bloqueado. Intenta nuevamente en ${lockState.retryAfterSeconds}s.` },
+        { status: 429 }
+      )
+    }
+
     const rateLimitResult = await rateLimit({
       key: `reset-password:${clientIp}`,
       windowMs: 10 * 60 * 1000,
@@ -43,6 +53,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!passwordResetToken || passwordResetToken.usedAt || passwordResetToken.expiresAt < now) {
+      recordAttemptFailure('reset-password', identity)
       return NextResponse.json(
         { error: 'El enlace de recuperación es inválido o expiró' },
         { status: 400 }
@@ -72,6 +83,7 @@ export async function POST(request: NextRequest) {
       userId: passwordResetToken.userId,
       ip: clientIp
     })
+    clearAttemptFailures('reset-password', identity)
 
     return NextResponse.json({ message: 'Contraseña actualizada exitosamente' })
   } catch (error) {

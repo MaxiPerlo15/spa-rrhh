@@ -128,3 +128,17 @@ Alert strategy and incident handling process are documented in:
 Ownership recommendation:
 - Primary owner: project maintainer/admin
 - Secondary owner: technical backup with Sentry access
+
+## MIS-93: Login/Reset Attempt Controls
+
+Implemented baseline:
+- Login throttling by identity (`email + ip`) with temporary lock escalation:
+  - 5 fallos => 10 minutos
+  - 8 fallos => 30 minutos
+  - 10 fallos => 2 horas
+- Successful login clears lock state for that identity.
+- Forgot-password and reset-password now include additional temporary lock checks by identity, beyond standard per-IP rate limits.
+
+UX behavior:
+- Sign-in surface shows a user-friendly cooldown message when login is temporarily blocked.
+- Error messages remain generic enough to avoid user enumeration.

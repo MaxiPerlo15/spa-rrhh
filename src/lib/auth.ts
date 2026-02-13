@@ -3,6 +3,7 @@ import type { NextAuthOptions } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcrypt"
 import { prisma } from '@/lib/prisma'
+import { clearAttemptFailures, getAttemptLock, recordAttemptFailure } from '@/lib/authAttemptGuard'
 
 const defaultSecureCookies = process.env.NODE_ENV === 'production'
 const secureCookiesEnabled = process.env.SESSION_COOKIE_SECURE
@@ -17,16 +18,32 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
 
+        const normalizedEmail = String(credentials.email).toLowerCase()
+        const forwardedFor = req?.headers?.['x-forwarded-for']
+        const ip = Array.isArray(forwardedFor)
+          ? forwardedFor[0]?.split(',')[0]?.trim() || 'unknown'
+          : forwardedFor?.split(',')[0]?.trim() || 'unknown'
+        const identity = `${normalizedEmail}:${ip}`
+
+        const lockState = getAttemptLock('login', identity)
+        if (lockState.blocked) {
+          throw new Error(`AUTH_THROTTLED:${lockState.retryAfterSeconds}`)
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string }
+          where: { email: normalizedEmail }
         })
 
         if (!user) {
+          const attemptState = recordAttemptFailure('login', identity)
+          if (attemptState.blocked) {
+            throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
+          }
           return null
         }
 
@@ -36,8 +53,14 @@ export const authOptions: NextAuthOptions = {
         )
 
         if (!isValidPassword) {
+          const attemptState = recordAttemptFailure('login', identity)
+          if (attemptState.blocked) {
+            throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
+          }
           return null
         }
+
+        clearAttemptFailures('login', identity)
 
         return {
           id: user.id,
