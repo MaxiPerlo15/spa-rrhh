@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
@@ -220,6 +220,7 @@ export default function AdminDashboard() {
   const [activeTutorial, setActiveTutorial] = useState<TutorialKind | null>(null)
   const [tutorialStep, setTutorialStep] = useState(0)
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
+  const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
 
   const paginatedVacancies = useMemo(
     () => vacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
@@ -339,7 +340,30 @@ export default function AdminDashboard() {
     setActiveTab(targetTab)
     const timeout = window.setTimeout(() => {
       const targetElement = document.querySelector(`[data-tour="${targetSelector}"]`)
+      if (!targetElement) {
+        setGuideDialogPosition(undefined)
+        return
+      }
+
       targetElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      const targetRect = targetElement.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const dialogWidth = Math.min(420, viewportWidth - 32)
+      const dialogHeight = 280
+      const margin = 16
+
+      const targetCenterX = targetRect.left + targetRect.width / 2
+      const targetCenterY = targetRect.top + targetRect.height / 2
+
+      const placeRight = targetCenterX < viewportWidth / 2
+      const placeBottom = targetCenterY < viewportHeight / 2
+
+      const left = placeRight ? viewportWidth - dialogWidth - margin : margin
+      const top = placeBottom ? viewportHeight - dialogHeight - margin : margin
+
+      setGuideDialogPosition({ left: Math.max(margin, left), top: Math.max(margin, top) })
     }, 120)
 
     return () => window.clearTimeout(timeout)
@@ -653,6 +677,7 @@ export default function AdminDashboard() {
       // No-op if storage is unavailable.
     }
     closeGuidedDialogs()
+    setGuideDialogPosition(undefined)
     setActiveTutorial(null)
     setShowOnboarding(false)
     showSuccess('Tutorial completado. Puedes reabrirlo desde "Ayuda".')
@@ -660,6 +685,7 @@ export default function AdminDashboard() {
 
   const handleSkipOnboarding = () => {
     closeGuidedDialogs()
+    setGuideDialogPosition(undefined)
     setActiveTutorial(null)
     setShowOnboarding(false)
     setOnboardingReturnStep(null)
@@ -716,6 +742,7 @@ export default function AdminDashboard() {
 
     setActiveTutorial(null)
     setTutorialStep(0)
+    setGuideDialogPosition(undefined)
     showSuccess('Tutorial de sección completado.')
   }
 
@@ -926,7 +953,7 @@ const handleTestSentry = () => {
                           vacancy.status === 'active' 
                             ? 'text-orange-600 hover:text-orange-800' 
                             : 'text-green-600 hover:text-green-800'
-                        } font-medium`}
+                        } font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-toggle-btn')}` : ''}`}
                         title={vacancy.status === 'active' ? 'Cerrar esta vacante (no aparecerá en la página pública)' : 'Activar esta vacante (aparecerá en la página pública)'}
                       >
                         {vacancy.status === 'active' ? '🔒 Cerrar' : '✅ Activar'}
@@ -934,14 +961,14 @@ const handleTestSentry = () => {
                       <button
                         data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
                         onClick={() => handleOpenEditModal(vacancy)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
+                        className={`text-blue-600 hover:text-blue-800 font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-edit-btn')}` : ''}`}
                       >
                         ✏️ Editar
                       </button>
                       <button
                         data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
                         onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
-                        className="text-red-600 hover:text-red-800 font-medium"
+                        className={`text-red-600 hover:text-red-800 font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
                       >
                         🗑️ Eliminar
                       </button>
@@ -1771,6 +1798,7 @@ const handleTestSentry = () => {
         onPrev={handlePrevOnboardingStep}
         onSkip={handleSkipOnboarding}
         onFinish={handleCompleteOnboarding}
+        positionStyle={guideDialogPosition}
       />
 
       <AdminOnboardingDialog
@@ -1793,8 +1821,10 @@ const handleTestSentry = () => {
           setActiveTutorial(null)
           setTutorialStep(0)
           setOnboardingReturnStep(null)
+          setGuideDialogPosition(undefined)
         }}
         onFinish={handleFinishTutorial}
+        positionStyle={guideDialogPosition}
       />
     </div>
   )

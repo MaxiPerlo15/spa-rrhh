@@ -1,5 +1,7 @@
 'use client'
 
+import type { CSSProperties } from 'react'
+
 interface AdminOnboardingDialogProps {
   isOpen: boolean
   stepIndex: number
@@ -13,6 +15,7 @@ interface AdminOnboardingDialogProps {
   onSecondaryAction?: () => void
   backActionLabel?: string
   onBackAction?: () => void
+  positionStyle?: CSSProperties
   onNext: () => void
   onPrev: () => void
   onSkip: () => void
@@ -32,6 +35,7 @@ export default function AdminOnboardingDialog({
   onSecondaryAction,
   backActionLabel,
   onBackAction,
+  positionStyle,
   onNext,
   onPrev,
   onSkip,
@@ -44,7 +48,10 @@ export default function AdminOnboardingDialog({
   if (!isOpen) return null
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[75] w-[calc(100%-2rem)] max-w-md">
+    <div
+      className="pointer-events-none fixed z-[75] w-[calc(100%-2rem)] max-w-md"
+      style={positionStyle ?? { right: 16, bottom: 16 }}
+    >
       <div className="pointer-events-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-600">
           {modeLabel} ({stepIndex + 1}/{totalSteps})
