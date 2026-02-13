@@ -420,6 +420,15 @@ export default function AdminDashboard() {
   }, [activeTutorial, currentTutorialItem, showApplicationDetail, showContactDetail, showCreateModal])
 
   useEffect(() => {
+    if (!isGuidedMode) return
+
+    // Evita que un control previo quede enfocado y dispare acciones por teclado.
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }, [isGuidedMode, tutorialStep, onboardingStep])
+
+  useEffect(() => {
     let filtered = applications
 
     // Filtro por estado
@@ -835,6 +844,7 @@ const handleTestSentry = () => {
       {isGuidedMode && (
         <div className="pointer-events-none fixed inset-0 z-[71] bg-gray-900/35 backdrop-blur-[2px]" />
       )}
+      {isGuidedMode && <div aria-hidden className="fixed inset-0 z-[74]" />}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <DashboardStats
