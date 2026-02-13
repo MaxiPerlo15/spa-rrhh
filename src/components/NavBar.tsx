@@ -1,9 +1,11 @@
 'use client'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
 export default function NavBar() {
+  const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -24,26 +26,34 @@ export default function NavBar() {
   ]
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    // Si es un enlace externo (como /ofertas-laborales), no prevenir default
     if (href.startsWith('/ofertas-laborales')) {
       setMobileMenuOpen(false)
       return
     }
-    
+
     e.preventDefault()
-    // Si el href incluye "/" significa que estamos en otra página
-    const sectionId = href.includes('/') ? href.split('#')[1] : href.substring(1)
-    
-    if (href.includes('/')) {
-      // Si estamos en otra página, navegar a home primero
-      window.location.assign(href)
-    } else {
-      const target = document.querySelector(`#${sectionId}`)
-      if (target) {
-        scrollToHashWithOffset(`#${sectionId}`, 'smooth')
-        setMobileMenuOpen(false)
-      }
+    const sectionId = href.split('#')[1]
+    if (!sectionId) {
+      setMobileMenuOpen(false)
+      return
     }
+
+    const normalizedHash = `#${sectionId}`
+
+    if (pathname !== '/') {
+      window.location.assign(`/${normalizedHash}`)
+      setMobileMenuOpen(false)
+      return
+    }
+
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
+    }
+
+    window.history.replaceState(null, '', `/${normalizedHash}`)
+    scrollToHashWithOffset(normalizedHash, 'smooth')
+    setMobileMenuOpen(false)
   }
   
   return (
