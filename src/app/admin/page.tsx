@@ -112,14 +112,14 @@ const DOMAIN_TUTORIALS_BASE: Record<TutorialKind, DomainStep[]> = {
       target: 'application-view-btn',
       tab: 'applications',
       title: 'Acción Ver postulación',
-      body: 'Este botón abre el panel de detalle completo del candidato y su proceso.',
-      action: 'open-application-detail'
+      body: 'Este botón abre el panel de detalle completo del candidato y su proceso.'
     },
     {
       target: 'application-detail-modal',
       tab: 'applications',
       title: 'Detalle de postulación',
-      body: 'Aquí revisas información extendida del candidato antes de avanzar estado o decidir acciones.'
+      body: 'Aquí revisas información extendida del candidato antes de avanzar estado o decidir acciones.',
+      action: 'open-application-detail'
     }
   ],
   contacts: [
@@ -139,14 +139,14 @@ const DOMAIN_TUTORIALS_BASE: Record<TutorialKind, DomainStep[]> = {
       target: 'contact-view-btn',
       tab: 'contacts',
       title: 'Acción Ver contacto',
-      body: 'Este botón abre el panel de detalle del mensaje recibido y sus datos de contacto.',
-      action: 'open-contact-detail'
+      body: 'Este botón abre el panel de detalle del mensaje recibido y sus datos de contacto.'
     },
     {
       target: 'contact-detail-modal',
       tab: 'contacts',
       title: 'Detalle de contacto',
-      body: 'Desde este panel puedes leer el mensaje, responder por email y actualizar el estado.'
+      body: 'Desde este panel puedes leer el mensaje, responder por email y actualizar el estado.',
+      action: 'open-contact-detail'
     }
   ]
 }
@@ -221,13 +221,25 @@ export default function AdminDashboard() {
   const [tutorialStep, setTutorialStep] = useState(0)
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
 
-  const firstVacancyId = useMemo(() => vacancies[0]?.id ?? null, [vacancies])
-  const firstApplicationId = useMemo(() => applications[0]?.id ?? null, [applications])
-  const firstApplicationWithCvId = useMemo(
-    () => applications.find((application) => Boolean(application.resumeUrl))?.id ?? null,
-    [applications]
+  const paginatedVacancies = useMemo(
+    () => vacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
+    [currentVacancyPage, itemsPerPage, vacancies]
   )
-  const firstContactId = useMemo(() => contacts[0]?.id ?? null, [contacts])
+  const paginatedApplications = useMemo(
+    () => filteredApplications.slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage),
+    [currentApplicationPage, filteredApplications, itemsPerPage]
+  )
+  const paginatedContacts = useMemo(
+    () => filteredContacts.slice((currentContactPage - 1) * itemsPerPage, currentContactPage * itemsPerPage),
+    [currentContactPage, filteredContacts, itemsPerPage]
+  )
+  const firstVacancyId = useMemo(() => paginatedVacancies[0]?.id ?? null, [paginatedVacancies])
+  const firstApplicationId = useMemo(() => paginatedApplications[0]?.id ?? null, [paginatedApplications])
+  const firstApplicationWithCvId = useMemo(
+    () => paginatedApplications.find((application) => Boolean(application.resumeUrl))?.id ?? null,
+    [paginatedApplications]
+  )
+  const firstContactId = useMemo(() => paginatedContacts[0]?.id ?? null, [paginatedContacts])
 
   const tutorialStepsByKind = useMemo<Record<TutorialKind, DomainStep[]>>(() => {
     const vacancySteps = [...DOMAIN_TUTORIALS_BASE.vacancies]
@@ -243,7 +255,13 @@ export default function AdminDashboard() {
           target: 'vacancy-edit-btn',
           tab: 'vacancies',
           title: 'Acción Editar + diálogo',
-          body: 'Al editar se abre este mismo panel con datos precargados para ajustar la vacante.',
+          body: 'Al presionar editar se abrirá el diálogo con datos precargados para ajustar la vacante.'
+        },
+        {
+          target: 'vacancy-modal',
+          tab: 'vacancies',
+          title: 'Diálogo de edición',
+          body: 'Este panel se reutiliza para editar la vacante seleccionada.',
           action: 'open-edit-modal'
         },
         {
@@ -336,19 +354,19 @@ export default function AdminDashboard() {
           handleOpenCreateModal()
           break
         case 'open-edit-modal':
-          if (vacancies[0]) {
-            handleOpenEditModal(vacancies[0])
+          if (paginatedVacancies[0]) {
+            handleOpenEditModal(paginatedVacancies[0])
           }
           break
         case 'open-application-detail':
-          if (applications[0]) {
-            setSelectedApplication(applications[0])
+          if (paginatedApplications[0]) {
+            setSelectedApplication(paginatedApplications[0])
             setShowApplicationDetail(true)
           }
           break
         case 'open-contact-detail':
-          if (contacts[0]) {
-            setSelectedContact(contacts[0])
+          if (paginatedContacts[0]) {
+            setSelectedContact(paginatedContacts[0])
             setShowContactDetail(true)
           }
           break
@@ -356,7 +374,26 @@ export default function AdminDashboard() {
     }, 160)
 
     return () => window.clearTimeout(timeout)
-  }, [activeTutorial, applications, contacts, currentTutorialItem, vacancies])
+  }, [activeTutorial, currentTutorialItem, paginatedApplications, paginatedContacts, paginatedVacancies])
+
+  useEffect(() => {
+    if (!activeTutorial || !currentTutorialItem) return
+
+    const target = currentTutorialItem.target
+
+    if (target !== 'vacancy-modal' && showCreateModal) {
+      setShowCreateModal(false)
+      setEditingVacancy(null)
+    }
+    if (target !== 'application-detail-modal' && showApplicationDetail) {
+      setShowApplicationDetail(false)
+      setSelectedApplication(null)
+    }
+    if (target !== 'contact-detail-modal' && showContactDetail) {
+      setShowContactDetail(false)
+      setSelectedContact(null)
+    }
+  }, [activeTutorial, currentTutorialItem, showApplicationDetail, showContactDetail, showCreateModal])
 
   useEffect(() => {
     let filtered = applications
@@ -639,6 +676,13 @@ export default function AdminDashboard() {
 
   const openDomainTutorial = (kind: TutorialKind, fromOnboarding: boolean) => {
     closeGuidedDialogs()
+    setCurrentVacancyPage(1)
+    setCurrentApplicationPage(1)
+    setCurrentContactPage(1)
+    setFilterStatus('all')
+    setFilterContactStatus('all')
+    setSearchApplications('')
+    setSearchContacts('')
     if (fromOnboarding) {
       setOnboardingReturnStep(onboardingStep)
     } else {
@@ -691,6 +735,7 @@ export default function AdminDashboard() {
     isGuidedMode && currentGuidedTarget === key
       ? 'relative z-[72] ring-4 ring-primary-300 ring-offset-2 shadow-2xl transition-all duration-300'
       : ''
+  const guidedModalZClass = isGuidedMode ? 'z-[73]' : 'z-50'
 
   const contactStatusLabels = {
     'PENDING': 'Pendiente',
@@ -1244,7 +1289,7 @@ const handleTestSentry = () => {
       {/* Contact Detail Modal */}
       {showContactDetail && selectedContact && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setShowContactDetail(false)
@@ -1368,7 +1413,7 @@ const handleTestSentry = () => {
       {/* Application Detail Modal */}
       {showApplicationDetail && selectedApplication && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setShowApplicationDetail(false)
@@ -1517,7 +1562,7 @@ const handleTestSentry = () => {
       {/* Create/Edit Modal */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               handleCloseModal()
