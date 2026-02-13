@@ -17,6 +17,10 @@ Create these alert rules in Sentry project `javascript-nextjs`:
 - Condition: repeated 401/403 or auth-related exceptions in short window
 - Filter: messages/tags containing auth, signin, session
 - Action: notify owner + create incident thread
+- Extra signals to watch:
+  - spikes of `AUTH_THROTTLED` in signin
+  - repeated temporary blocks in forgot/reset password
+  - sustained increase of 429 responses on auth endpoints
 
 3. `Upload/Turnstile integration failures`
 - Condition: repeated failures with tags/messages related to uploadthing/turnstile

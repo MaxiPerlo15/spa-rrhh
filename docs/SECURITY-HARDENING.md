@@ -138,6 +138,9 @@ Implemented baseline:
   - 10 fallos => 2 horas
 - Successful login clears lock state for that identity.
 - Forgot-password and reset-password now include additional temporary lock checks by identity, beyond standard per-IP rate limits.
+- Storage model:
+  - Uses shared distributed store via Upstash Redis when configured (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
+  - Falls back to in-memory store only when distributed store is unavailable.
 
 UX behavior:
 - Sign-in surface shows a user-friendly cooldown message when login is temporarily blocked.

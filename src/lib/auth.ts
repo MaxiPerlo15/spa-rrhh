@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
           : forwardedFor?.split(',')[0]?.trim() || 'unknown'
         const identity = `${normalizedEmail}:${ip}`
 
-        const lockState = getAttemptLock('login', identity)
+        const lockState = await getAttemptLock('login', identity)
         if (lockState.blocked) {
           throw new Error(`AUTH_THROTTLED:${lockState.retryAfterSeconds}`)
         }
@@ -40,7 +40,7 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user) {
-          const attemptState = recordAttemptFailure('login', identity)
+          const attemptState = await recordAttemptFailure('login', identity)
           if (attemptState.blocked) {
             throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
           }
@@ -53,14 +53,14 @@ export const authOptions: NextAuthOptions = {
         )
 
         if (!isValidPassword) {
-          const attemptState = recordAttemptFailure('login', identity)
+          const attemptState = await recordAttemptFailure('login', identity)
           if (attemptState.blocked) {
             throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
           }
           return null
         }
 
-        clearAttemptFailures('login', identity)
+        await clearAttemptFailures('login', identity)
 
         return {
           id: user.id,

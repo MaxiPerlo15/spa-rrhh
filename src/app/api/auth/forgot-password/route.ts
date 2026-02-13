@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const clientIp = getClientIp(request.headers)
     const identity = `${normalizedEmail}:${clientIp}`
-    const lockState = getAttemptLock('forgot-password', identity)
+    const lockState = await getAttemptLock('forgot-password', identity)
     if (lockState.blocked) {
       return NextResponse.json(
         { error: `Temporalmente bloqueado. Intenta nuevamente en ${lockState.retryAfterSeconds}s.` },
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (!emailResult.success) {
-        recordAttemptFailure('forgot-password', identity)
+        await recordAttemptFailure('forgot-password', identity)
         await prisma.passwordResetToken.delete({
           where: { tokenHash }
         }).catch(() => {
@@ -97,11 +97,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      clearAttemptFailures('forgot-password', identity)
+      await clearAttemptFailures('forgot-password', identity)
 
       logger.info('Solicitud de reset emitida', { userId: user.id, ip: clientIp })
     } else {
-      recordAttemptFailure('forgot-password', identity)
+      await recordAttemptFailure('forgot-password', identity)
       logger.info('Solicitud de reset ignorada por usuario inexistente/no-admin', { ip: clientIp })
     }
 
