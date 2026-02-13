@@ -12,6 +12,7 @@ import Empresas from '@/components/Empresas'
 import Footer from '@/components/Footer'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { getVacancies } from '@/lib/api/vacancies'
 
 interface Vacancy {
   id: string
@@ -29,6 +30,7 @@ export default function Home() {
   const [selectedVacancy, setSelectedVacancy] = useState<{ id: string; title: string } | null>(null)
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   
   // Refs para animaciones de scroll
   const { ref: nosotrosRef, isVisible: nosotrosVisible } = useScrollAnimation<HTMLElement>()
@@ -58,14 +60,25 @@ export default function Home() {
   }, [])
 
   const fetchVacancies = async () => {
+    setLoading(true)
+    setLoadError(null)
     try {
-      const response = await fetch('/api/vacancies')
-      if (response.ok) {
-        const data = await response.json()
-        setVacancies(data)
-      }
+      const data = await getVacancies()
+      const normalized = data.map((vacancy) => ({
+        id: vacancy.id,
+        title: vacancy.title,
+        description: vacancy.description ?? '',
+        location: vacancy.location,
+        workday: vacancy.workday as Vacancy['workday'],
+        modality: vacancy.modality as Vacancy['modality'],
+        salary: vacancy.salary,
+        requirements: vacancy.requirements,
+        benefits: vacancy.benefits
+      }))
+      setVacancies(normalized)
     } catch (error) {
       console.error('Error al cargar vacantes:', error)
+      setLoadError(error instanceof Error ? error.message : 'Ocurrió un error al cargar vacantes.')
     } finally {
       setLoading(false)
     }
@@ -211,6 +224,17 @@ export default function Home() {
                 <div className="text-center py-12">
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
                   <p className="text-gray-600 mt-4">Cargando vacantes...</p>
+                </div>
+              ) : loadError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-6 py-8 text-center">
+                  <p className="text-red-700 font-medium">Ocurrió un error al cargar vacantes.</p>
+                  <p className="text-red-600 text-sm mt-2">{loadError}</p>
+                  <button
+                    onClick={fetchVacancies}
+                    className="mt-4 px-5 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+                  >
+                    Reintentar
+                  </button>
                 </div>
               ) : vacancies.length > 0 ? (
                 <>

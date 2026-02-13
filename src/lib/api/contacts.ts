@@ -2,6 +2,7 @@
  * Contacts API Service
  * Centraliza todas las llamadas a la API relacionadas con contactos
  */
+import { apiFetch } from './http'
 
 export interface Contact {
   id: string
@@ -42,7 +43,7 @@ async function getApiErrorMessage(response: Response, fallbackMessage: string): 
  * Obtiene todos los contactos
  */
 export async function getContacts(): Promise<Contact[]> {
-  const response = await fetch('/api/contacts')
+  const response = await apiFetch('/api/contacts')
   if (!response.ok) {
     throw new Error('Error al obtener contactos')
   }
@@ -53,7 +54,7 @@ export async function getContacts(): Promise<Contact[]> {
  * Obtiene un contacto por ID
  */
 export async function getContactById(id: string): Promise<Contact> {
-  const response = await fetch(`/api/contacts/${id}`)
+  const response = await apiFetch(`/api/contacts/${id}`)
   if (!response.ok) {
     throw new Error('Error al obtener el contacto')
   }
@@ -64,7 +65,7 @@ export async function getContactById(id: string): Promise<Contact> {
  * Crea un nuevo contacto
  */
 export async function createContact(data: CreateContactData): Promise<Contact> {
-  const response = await fetch('/api/contacts', {
+  const response = await apiFetch('/api/contacts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -84,7 +85,7 @@ export async function updateContactStatus(
   id: string,
   status: Contact['status']
 ): Promise<Contact> {
-  const response = await fetch(`/api/contacts/${id}`, {
+  const response = await apiFetch(`/api/contacts/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
@@ -101,7 +102,7 @@ export async function updateContactStatus(
  * Elimina un contacto
  */
 export async function deleteContact(id: string): Promise<void> {
-  const response = await fetch(`/api/contacts/${id}`, {
+  const response = await apiFetch(`/api/contacts/${id}`, {
     method: 'DELETE'
   })
   

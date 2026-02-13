@@ -2,6 +2,7 @@
  * Applications API Service
  * Centraliza todas las llamadas a la API relacionadas con postulaciones
  */
+import { apiFetch } from './http'
 
 export interface Application {
   id: string
@@ -51,7 +52,7 @@ async function getApiErrorMessage(response: Response, fallbackMessage: string): 
  * Obtiene todas las postulaciones
  */
 export async function getApplications(): Promise<Application[]> {
-  const response = await fetch('/api/applications')
+  const response = await apiFetch('/api/applications')
   if (!response.ok) {
     throw new Error('Error al obtener postulaciones')
   }
@@ -62,7 +63,7 @@ export async function getApplications(): Promise<Application[]> {
  * Obtiene una postulación por ID
  */
 export async function getApplicationById(id: string): Promise<Application> {
-  const response = await fetch(`/api/applications/${id}`)
+  const response = await apiFetch(`/api/applications/${id}`)
   if (!response.ok) {
     throw new Error('Error al obtener la postulación')
   }
@@ -73,7 +74,7 @@ export async function getApplicationById(id: string): Promise<Application> {
  * Crea una nueva postulación
  */
 export async function createApplication(data: CreateApplicationData): Promise<Application> {
-  const response = await fetch('/api/applications', {
+  const response = await apiFetch('/api/applications', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -93,7 +94,7 @@ export async function updateApplicationStatus(
   id: string, 
   status: Application['status']
 ): Promise<Application> {
-  const response = await fetch(`/api/applications/${id}`, {
+  const response = await apiFetch(`/api/applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
@@ -110,7 +111,7 @@ export async function updateApplicationStatus(
  * Elimina una postulación
  */
 export async function deleteApplication(id: string): Promise<void> {
-  const response = await fetch(`/api/applications/${id}`, {
+  const response = await apiFetch(`/api/applications/${id}`, {
     method: 'DELETE'
   })
   

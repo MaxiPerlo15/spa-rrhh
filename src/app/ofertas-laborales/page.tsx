@@ -5,6 +5,7 @@ import NavBar from '@/components/NavBar'
 import Footer from '@/components/Footer'
 import VacancyCard from '@/components/VacancyCard'
 import PostularForm from '@/components/PostularForm'
+import { getVacancies } from '@/lib/api/vacancies'
 
 interface Vacancy {
   id: string
@@ -23,6 +24,7 @@ export default function VacantesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [filteredVacancies, setFilteredVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isFiltering, setIsFiltering] = useState(false)
   const [selectedVacancy, setSelectedVacancy] = useState<{ id: string; title: string } | null>(null)
   
@@ -77,15 +79,27 @@ export default function VacantesPage() {
   }, [searchTerm, filterWorkday, filterModality, filterLocation, vacancies])
 
   const fetchVacancies = async () => {
+    setLoading(true)
+    setLoadError(null)
     try {
-      const response = await fetch('/api/vacancies')
-      if (response.ok) {
-        const data = await response.json()
-        setVacancies(data)
-        setFilteredVacancies(data)
-      }
+      const data = await getVacancies()
+      const normalized = data.map((vacancy) => ({
+        id: vacancy.id,
+        title: vacancy.title,
+        description: vacancy.description ?? '',
+        location: vacancy.location,
+        workday: vacancy.workday as Vacancy['workday'],
+        modality: vacancy.modality as Vacancy['modality'],
+        salary: vacancy.salary,
+        requirements: vacancy.requirements,
+        benefits: vacancy.benefits,
+        createdAt: vacancy.createdAt
+      }))
+      setVacancies(normalized)
+      setFilteredVacancies(normalized)
     } catch (error) {
       console.error('Error al cargar vacantes:', error)
+      setLoadError(error instanceof Error ? error.message : 'Ocurrió un error al cargar vacantes.')
     } finally {
       setLoading(false)
     }
@@ -243,6 +257,19 @@ export default function VacantesPage() {
                   </div>
                 ))}
               </>
+            ) : loadError ? (
+              <div className="text-center py-12 bg-red-50 border border-red-200 rounded-lg shadow-sm">
+                <h3 className="text-xl font-semibold text-red-800 mb-2">
+                  Ocurrió un error al cargar vacantes
+                </h3>
+                <p className="text-red-700 mb-4">{loadError}</p>
+                <button
+                  onClick={fetchVacancies}
+                  className="btn-motion px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+                >
+                  Reintentar
+                </button>
+              </div>
             ) : filteredVacancies.length > 0 ? (
               <>
                 {filteredVacancies.map((vacancy, index) => (

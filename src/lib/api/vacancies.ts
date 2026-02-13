@@ -2,6 +2,7 @@
  * Vacancies API Service
  * Centraliza todas las llamadas a la API relacionadas con vacantes
  */
+import { apiFetch } from './http'
 
 export interface Vacancy {
   id: string
@@ -47,7 +48,7 @@ export interface UpdateVacancyData extends Partial<CreateVacancyData> {
  */
 export async function getVacancies(options?: { includeAll?: boolean }): Promise<Vacancy[]> {
   const query = options?.includeAll ? '?all=1' : ''
-  const response = await fetch(`/api/vacancies${query}`)
+  const response = await apiFetch(`/api/vacancies${query}`)
   if (!response.ok) {
     throw new Error('Error al obtener vacantes')
   }
@@ -59,7 +60,7 @@ export async function getVacancies(options?: { includeAll?: boolean }): Promise<
  * Obtiene una vacante por ID
  */
 export async function getVacancyById(id: string): Promise<Vacancy> {
-  const response = await fetch(`/api/vacancies/${id}`)
+  const response = await apiFetch(`/api/vacancies/${id}`)
   if (!response.ok) {
     throw new Error('Error al obtener la vacante')
   }
@@ -71,7 +72,7 @@ export async function getVacancyById(id: string): Promise<Vacancy> {
  * Crea una nueva vacante
  */
 export async function createVacancy(data: CreateVacancyData): Promise<Vacancy> {
-  const response = await fetch('/api/vacancies', {
+  const response = await apiFetch('/api/vacancies', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -90,7 +91,7 @@ export async function createVacancy(data: CreateVacancyData): Promise<Vacancy> {
  * Actualiza una vacante existente
  */
 export async function updateVacancy(id: string, data: UpdateVacancyData): Promise<Vacancy> {
-  const response = await fetch(`/api/vacancies/${id}`, {
+  const response = await apiFetch(`/api/vacancies/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -109,7 +110,7 @@ export async function updateVacancy(id: string, data: UpdateVacancyData): Promis
  * Elimina una vacante
  */
 export async function deleteVacancy(id: string): Promise<void> {
-  const response = await fetch(`/api/vacancies/${id}`, {
+  const response = await apiFetch(`/api/vacancies/${id}`, {
     method: 'DELETE'
   })
   

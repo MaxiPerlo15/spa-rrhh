@@ -169,6 +169,8 @@ export default function AdminDashboard() {
     contacts,
     stats,
     isLoading,
+    error,
+    fetchDashboardData,
     createVacancy: createVacancyApi,
     updateVacancy: updateVacancyApi,
     deleteVacancy: deleteVacancyApi,
@@ -888,6 +890,23 @@ const handleTestSentry = () => {
           totalApplications={stats.totalApplications}
           pendingContacts={stats.pendingContacts}
         />
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-red-800">Ocurrió un error al cargar datos del panel</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+              <button
+                onClick={() => void fetchDashboardData()}
+                className="w-full sm:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+              >
+                Reintentar carga
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Botón de Test de Sentry - Solo en desarrollo */}
         {process.env.NODE_ENV === 'development' && (

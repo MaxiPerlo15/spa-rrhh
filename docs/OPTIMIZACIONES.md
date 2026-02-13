@@ -110,6 +110,34 @@ Ya implementado en:
 - **CLS (Cumulative Layout Shift)**: < 0.1
 - **Paginación**: Reduce renderizado de DOM en 90% con +100 registros
 
+## 🛡️ Resiliencia de APIs (MIS-100)
+
+Se incorporó una capa de cliente HTTP compartida para el frontend en:
+- `src/lib/api/http.ts`
+
+### Qué agrega:
+1. **Timeout por request** (12s por defecto) para evitar cargas infinitas.
+2. **Retry automático para GET** (1 reintento con backoff) en fallos transitorios:
+   - Status `408`, `429` y `5xx`
+   - Errores de red
+3. **Errores normalizados y amigables** para mostrar al usuario.
+
+### Integración:
+- APIs de frontend:
+  - `src/lib/api/vacancies.ts`
+  - `src/lib/api/applications.ts`
+  - `src/lib/api/contacts.ts`
+- UI con fallback + botón **Reintentar**:
+  - Landing `/` en bloque de vacantes
+  - `/ofertas-laborales` en listado principal
+  - `/admin` en carga del dashboard
+
+### Validación:
+- Test unitario nuevo: `src/lib/__tests__/http.test.ts`
+  - Retry en GET con `500`
+  - Sin retry en `POST` por error de red
+  - Timeout con mensaje esperado
+
 ### Lighthouse Score Objetivos:
 - Performance: 90+
 - Accessibility: 95+
@@ -172,4 +200,4 @@ npm run build -- --analyze
 
 ---
 
-**Última actualización**: 13 de diciembre de 2025
+**Última actualización**: 13 de febrero de 2026
