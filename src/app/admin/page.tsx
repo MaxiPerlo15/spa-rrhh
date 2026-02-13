@@ -11,7 +11,6 @@ import AdminHeader from '@/components/admin/AdminHeader'
 import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs'
 import DashboardStats from '@/components/admin/DashboardStats'
 import AdminOnboardingDialog from '@/components/admin/AdminOnboardingDialog'
-import AdminContextHelp from '@/components/admin/AdminContextHelp'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
@@ -50,6 +49,13 @@ const ONBOARDING_AREAS: Array<{
   title: string
   body: string
 }> = [
+  {
+    kind: 'vacancies',
+    target: 'tabs',
+    tab: 'vacancies',
+    title: 'Bienvenida',
+    body: 'Este panel te permite gestionar vacantes, postulaciones y contactos desde un único lugar.'
+  },
   {
     kind: 'vacancies',
     target: 'create-vacancy',
@@ -330,6 +336,26 @@ export default function AdminDashboard() {
   const currentGuidedTarget = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
   const isGuidedMode = showOnboarding || activeTutorial !== null
 
+  const getGuideDialogPosition = (targetElement: Element): CSSProperties => {
+    const targetRect = targetElement.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const dialogWidth = Math.min(420, viewportWidth - 32)
+    const dialogHeight = 280
+    const margin = 16
+
+    const targetCenterX = targetRect.left + targetRect.width / 2
+    const targetCenterY = targetRect.top + targetRect.height / 2
+
+    const placeRight = targetCenterX < viewportWidth / 2
+    const placeBottom = targetCenterY < viewportHeight / 2
+
+    const left = placeRight ? viewportWidth - dialogWidth - margin : margin
+    const top = placeBottom ? viewportHeight - dialogHeight - margin : margin
+
+    return { left: Math.max(margin, left), top: Math.max(margin, top) }
+  }
+
   useEffect(() => {
     if (!isGuidedMode) return
 
@@ -338,6 +364,11 @@ export default function AdminDashboard() {
     if (!targetTab || !targetSelector) return
 
     setActiveTab(targetTab)
+    const targetElement = document.querySelector(`[data-tour="${targetSelector}"]`)
+    if (targetElement) {
+      setGuideDialogPosition(getGuideDialogPosition(targetElement))
+    }
+
     const timeout = window.setTimeout(() => {
       const targetElement = document.querySelector(`[data-tour="${targetSelector}"]`)
       if (!targetElement) {
@@ -346,24 +377,10 @@ export default function AdminDashboard() {
       }
 
       targetElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-      const targetRect = targetElement.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-      const dialogWidth = Math.min(420, viewportWidth - 32)
-      const dialogHeight = 280
-      const margin = 16
-
-      const targetCenterX = targetRect.left + targetRect.width / 2
-      const targetCenterY = targetRect.top + targetRect.height / 2
-
-      const placeRight = targetCenterX < viewportWidth / 2
-      const placeBottom = targetCenterY < viewportHeight / 2
-
-      const left = placeRight ? viewportWidth - dialogWidth - margin : margin
-      const top = placeBottom ? viewportHeight - dialogHeight - margin : margin
-
-      setGuideDialogPosition({ left: Math.max(margin, left), top: Math.max(margin, top) })
+      const recalculatedTarget = document.querySelector(`[data-tour="${targetSelector}"]`)
+      if (recalculatedTarget) {
+        setGuideDialogPosition(getGuideDialogPosition(recalculatedTarget))
+      }
     }, 120)
 
     return () => window.clearTimeout(timeout)
@@ -651,6 +668,12 @@ export default function AdminDashboard() {
     setSelectedContact(null)
   }
 
+  const blockGuidedDialogInteractions = (event: React.SyntheticEvent) => {
+    if (!isGuidedMode) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
   const openConfirmDialog = (config: typeof confirmDialog) => {
     setConfirmDialog(config)
   }
@@ -677,6 +700,10 @@ export default function AdminDashboard() {
     setTutorialStep(0)
     setOnboardingReturnStep(null)
     setShowOnboarding(true)
+  }
+
+  const handleOpenSectionTutorial = () => {
+    openDomainTutorial(activeTab, false)
   }
 
   const handleCompleteOnboarding = () => {
@@ -838,15 +865,14 @@ const handleTestSentry = () => {
       <AdminHeader 
         userEmail={session.user?.email ?? undefined}
         onSignOut={handleSignOut}
-        onHelp={handleOpenHelp}
+        onOpenFullTutorial={handleOpenHelp}
+        onOpenSectionTutorial={handleOpenSectionTutorial}
       />
 
       {isGuidedMode && (
         <div className="pointer-events-none fixed inset-0 z-[71] bg-gray-900/35 backdrop-blur-[2px]" />
       )}
-      {isGuidedMode && <div aria-hidden className="fixed inset-0 z-[74]" />}
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${isGuidedMode ? 'pointer-events-none' : ''}`}>
         <DashboardStats
           totalVacancies={stats.totalVacancies}
           activeVacancies={stats.activeVacancies}
@@ -887,8 +913,6 @@ const handleTestSentry = () => {
             pendingContacts: stats.pendingContacts
           }}
         />
-
-        <AdminContextHelp activeTab={activeTab} onOpenTutorial={() => openDomainTutorial(activeTab, false)} />
 
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
@@ -1328,7 +1352,7 @@ const handleTestSentry = () => {
         <div
           className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
-            if (event.target === event.currentTarget) {
+            if (!isGuidedMode && event.target === event.currentTarget) {
               setShowContactDetail(false)
             }
           }}
@@ -1336,6 +1360,8 @@ const handleTestSentry = () => {
           <div
             data-tour="contact-detail-modal"
             className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('contact-detail-modal')}`}
+            onClickCapture={blockGuidedDialogInteractions}
+            onChangeCapture={blockGuidedDialogInteractions}
           >
             <div className="p-6">
               {/* Header */}
@@ -1452,7 +1478,7 @@ const handleTestSentry = () => {
         <div
           className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
-            if (event.target === event.currentTarget) {
+            if (!isGuidedMode && event.target === event.currentTarget) {
               setShowApplicationDetail(false)
             }
           }}
@@ -1460,6 +1486,8 @@ const handleTestSentry = () => {
           <div
             data-tour="application-detail-modal"
             className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('application-detail-modal')}`}
+            onClickCapture={blockGuidedDialogInteractions}
+            onChangeCapture={blockGuidedDialogInteractions}
           >
             <div className="p-6">
               {/* Header */}
@@ -1601,7 +1629,7 @@ const handleTestSentry = () => {
         <div
           className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
           onClick={(event) => {
-            if (event.target === event.currentTarget) {
+            if (!isGuidedMode && event.target === event.currentTarget) {
               handleCloseModal()
             }
           }}
@@ -1609,8 +1637,19 @@ const handleTestSentry = () => {
           <div
             data-tour="vacancy-modal"
             className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl ${getTourClass('vacancy-modal')}`}
+            onClickCapture={blockGuidedDialogInteractions}
+            onChangeCapture={blockGuidedDialogInteractions}
           >
-            <form onSubmit={handleSubmitVacancy} className="p-4 sm:p-6">
+            <form
+              onSubmit={(event) => {
+                if (isGuidedMode) {
+                  event.preventDefault()
+                  return
+                }
+                handleSubmitVacancy(event)
+              }}
+              className="p-4 sm:p-6"
+            >
               <div className="flex justify-between items-start mb-6">
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                   {editingVacancy ? 'Editar Vacante' : 'Nueva Vacante'}
