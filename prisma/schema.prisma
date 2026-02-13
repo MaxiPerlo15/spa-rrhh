@@ -31,6 +31,25 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model AdminAuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String?
+  actorEmail   String?
+  action       String
+  resourceType String
+  resourceId   String?
+  outcome      AuditOutcome
+  ip           String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, createdAt])
+  @@index([actorEmail, createdAt])
+}
+
 model Vacancy {
   id           String          @id @default(cuid())
   title        String
@@ -117,4 +136,10 @@ enum ContactStatus {
   PENDING
   RESPONDED
   ARCHIVED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  ERROR
 }

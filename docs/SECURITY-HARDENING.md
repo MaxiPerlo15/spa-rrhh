@@ -158,3 +158,33 @@ Observability hooks:
   - `auth.forgot_password.unknown_identity`
   - `auth.reset_password.throttled`
   - `auth.reset_password.invalid_token`
+
+## MIS-98: Auditoría de acciones críticas del panel admin
+
+Implementado:
+- Nuevo registro persistente de auditoría en base de datos:
+  - modelo Prisma `AdminAuditLog`
+  - enum `AuditOutcome` (`SUCCESS`, `DENIED`, `ERROR`)
+- Migración:
+  - `prisma/migrations/20260213193000_add_admin_audit_log/migration.sql`
+- Helper central:
+  - `src/lib/adminAudit.ts` (`auditAdminAction`)
+
+Acciones auditadas:
+- Vacantes:
+  - `vacancy.create`
+  - `vacancy.update` (incluye cambios de estado cerrar/activar)
+  - `vacancy.delete`
+- Postulaciones:
+  - `application.update_status`
+  - `application.delete`
+- Contactos:
+  - `contact.update_status`
+  - `contact.delete`
+
+Metadata registrada (según acción):
+- actor (`userId`, `email`)
+- `action`, `resourceType`, `resourceId`
+- `outcome` (`SUCCESS`, `DENIED`, `ERROR`)
+- IP y user-agent
+- campos de contexto operacional (por ejemplo estado previo/nuevo)

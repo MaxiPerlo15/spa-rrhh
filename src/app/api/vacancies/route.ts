@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { auditAdminAction } from '@/lib/adminAudit'
 import { normalizeLocation } from '@/lib/utils'
 import {
   createVacancySchema,
@@ -55,10 +56,21 @@ export async function GET(request: NextRequest) {
 
 // POST /api/vacancies - Crear nueva vacante (admin)
 export async function POST(request: NextRequest) {
+  let session = null as Awaited<ReturnType<typeof auth>>
   try {
     // Verificar autenticación
-    const session = await auth()
+    session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'vacancy.create',
+        resourceType: 'vacancy',
+        outcome: 'DENIED'
+      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
@@ -86,8 +98,37 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session.user?.id,
+        email: session.user?.email
+      },
+      action: 'vacancy.create',
+      resourceType: 'vacancy',
+      resourceId: vacancy.id,
+      outcome: 'SUCCESS',
+      metadata: {
+        title: vacancy.title,
+        status: vacancy.status
+      }
+    })
+
     return NextResponse.json(toVacancyDto(vacancy), { status: 201 })
   } catch (error) {
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session?.user?.id,
+        email: session?.user?.email
+      },
+      action: 'vacancy.create',
+      resourceType: 'vacancy',
+      outcome: 'ERROR',
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
+    })
     logger.error('Error al crear vacante', error)
     return NextResponse.json(
       { error: 'Error al crear vacante' },

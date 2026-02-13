@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { auditAdminAction } from '@/lib/adminAudit'
 import {
   formatValidationError,
   routeIdSchema,
@@ -79,10 +80,22 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let session = null as Awaited<ReturnType<typeof auth>>
+  let resourceId: string | undefined
   try {
     // Verificar autenticación
-    const session = await auth()
+    session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'application.update_status',
+        resourceType: 'application',
+        outcome: 'DENIED'
+      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
@@ -94,6 +107,7 @@ export async function PATCH(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
+    resourceId = id
 
     const body = await request.json()
     const bodyValidation = updateApplicationStatusSchema.safeParse(body)
@@ -101,6 +115,13 @@ export async function PATCH(
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
     const { status } = bodyValidation.data
+    const previous = await prisma.application.findUnique({
+      where: { id },
+      select: {
+        status: true,
+        candidateName: true
+      }
+    })
 
     const application = await prisma.application.update({
       where: { id },
@@ -125,8 +146,39 @@ export async function PATCH(
       }
     })
 
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session.user?.id,
+        email: session.user?.email
+      },
+      action: 'application.update_status',
+      resourceType: 'application',
+      resourceId: id,
+      outcome: 'SUCCESS',
+      metadata: {
+        previousStatus: previous?.status,
+        newStatus: status,
+        candidateName: previous?.candidateName
+      }
+    })
+
     return NextResponse.json(toApplicationAdminDto(application))
   } catch (error) {
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session?.user?.id,
+        email: session?.user?.email
+      },
+      action: 'application.update_status',
+      resourceType: 'application',
+      resourceId,
+      outcome: 'ERROR',
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
+    })
     logger.error('Error al actualizar postulación', error)
     return NextResponse.json(
       { error: 'Error al actualizar postulación' },
@@ -140,10 +192,22 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let session = null as Awaited<ReturnType<typeof auth>>
+  let resourceId: string | undefined
   try {
     // Verificar autenticación
-    const session = await auth()
+    session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'application.delete',
+        resourceType: 'application',
+        outcome: 'DENIED'
+      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
@@ -155,13 +219,54 @@ export async function DELETE(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
+    resourceId = id
+
+    const existing = await prisma.application.findUnique({
+      where: { id },
+      select: {
+        candidateName: true,
+        status: true,
+        email: true
+      }
+    })
 
     await prisma.application.delete({
       where: { id }
     })
 
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session.user?.id,
+        email: session.user?.email
+      },
+      action: 'application.delete',
+      resourceType: 'application',
+      resourceId: id,
+      outcome: 'SUCCESS',
+      metadata: {
+        candidateName: existing?.candidateName,
+        previousStatus: existing?.status,
+        candidateEmail: existing?.email
+      }
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session?.user?.id,
+        email: session?.user?.email
+      },
+      action: 'application.delete',
+      resourceType: 'application',
+      resourceId,
+      outcome: 'ERROR',
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
+    })
     logger.error('Error al eliminar postulación', error)
     return NextResponse.json(
       { error: 'Error al eliminar postulación' },
