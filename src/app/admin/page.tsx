@@ -335,6 +335,10 @@ export default function AdminDashboard() {
   const currentTutorialItem = currentTutorialSteps?.[tutorialStep]
   const currentGuidedTarget = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
   const isGuidedMode = showOnboarding || activeTutorial !== null
+  const onboardingDialogPosition: CSSProperties | undefined =
+    showOnboarding && onboardingStep === 0
+      ? { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+      : guideDialogPosition
 
   const getGuideDialogPosition = (targetElement: Element): CSSProperties => {
     const targetRect = targetElement.getBoundingClientRect()
@@ -1847,7 +1851,7 @@ const handleTestSentry = () => {
         onPrev={handlePrevOnboardingStep}
         onSkip={handleSkipOnboarding}
         onFinish={handleCompleteOnboarding}
-        positionStyle={guideDialogPosition}
+        positionStyle={onboardingDialogPosition}
       />
 
       <AdminOnboardingDialog
