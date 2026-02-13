@@ -413,12 +413,12 @@ export async function sendPasswordResetEmail(data: {
 }) {
   try {
     if (!resend) {
-      logger.info('Email de reset no enviado (modo simulado)', {
+      logger.error('Email de reset no enviado (proveedor no configurado)', {
         to: data.toEmail,
         subject: 'Restablece tu contraseña',
         resetLink: data.resetLink
       })
-      return { success: true, message: 'Email simulado (dev mode)' }
+      return { success: false, error: 'EMAIL_PROVIDER_NOT_CONFIGURED' }
     }
 
     const { data: emailData, error } = await resend.emails.send({
@@ -435,7 +435,7 @@ export async function sendPasswordResetEmail(data: {
       logger.error('Error enviando email de reset', error, {
         resetEmail: data.toEmail
       })
-      return { success: false, error }
+      return { success: false, error: 'EMAIL_SEND_FAILED' }
     }
 
     logger.info('Email de reset enviado', { emailData })

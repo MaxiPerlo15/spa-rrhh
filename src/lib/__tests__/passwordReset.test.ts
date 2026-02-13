@@ -3,6 +3,7 @@ import {
   buildPasswordResetLink,
   generateRawResetToken,
   getPasswordResetTokenTtlMinutes,
+  getPasswordStrength,
   hashResetToken,
   validateNewPassword
 } from '../passwordReset'
@@ -41,5 +42,11 @@ describe('passwordReset helpers', () => {
     expect(validateNewPassword('ChangeMe123!')).toBeUndefined()
     expect(validateNewPassword('short1A')).toContain('al menos')
     expect(validateNewPassword('onlylowercase123')).toContain('mayúsculas')
+  })
+
+  it('calcula fortaleza de contraseña', () => {
+    expect(getPasswordStrength('abc').level).toBe('very-weak')
+    expect(getPasswordStrength('Password123').level).toBe('strong')
+    expect(getPasswordStrength('Password123!').level).toBe('very-strong')
   })
 })

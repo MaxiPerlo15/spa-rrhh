@@ -110,9 +110,15 @@ Implemented baseline:
   - stored hashed (`sha256`) in database
   - token expiration (`PASSWORD_RESET_TOKEN_TTL_MINUTES`)
   - invalidated after successful password change
+- Real delivery requirement:
+  - forgot-password now returns error when reset email cannot be sent
+  - reset token is removed if delivery fails (no dangling usable token)
 - Anti-abuse controls:
   - rate limiting in forgot/reset endpoints
   - generic response in forgot endpoint to avoid user enumeration.
+- Reset UX hardening:
+  - password strength thermometer on `/admin/reset-password`
+  - live checklist of password requirements for safer credential setup.
 
 ## MIS-72: Sentry Alerting + Runbook
 

@@ -3,6 +3,14 @@ import { createHash, randomBytes } from 'crypto'
 const DEFAULT_RESET_TOKEN_TTL_MINUTES = 30
 const MIN_RESET_PASSWORD_LENGTH = 10
 
+export type PasswordStrengthLevel = 'very-weak' | 'weak' | 'medium' | 'strong' | 'very-strong'
+
+export type PasswordStrengthResult = {
+  score: number
+  level: PasswordStrengthLevel
+  label: string
+}
+
 function getTokenSecret() {
   return process.env.NEXTAUTH_SECRET || 'fallback-secret'
 }
@@ -46,4 +54,29 @@ export function validateNewPassword(password: string) {
   }
 
   return undefined
+}
+
+export function getPasswordStrength(password: string): PasswordStrengthResult {
+  const trimmed = password.trim()
+
+  let score = 0
+  if (trimmed.length >= MIN_RESET_PASSWORD_LENGTH) score += 1
+  if (/[A-Z]/.test(trimmed)) score += 1
+  if (/[a-z]/.test(trimmed)) score += 1
+  if (/[0-9]/.test(trimmed)) score += 1
+  if (/[^A-Za-z0-9]/.test(trimmed)) score += 1
+
+  if (score <= 1) {
+    return { score, level: 'very-weak', label: 'Muy débil' }
+  }
+  if (score === 2) {
+    return { score, level: 'weak', label: 'Débil' }
+  }
+  if (score === 3) {
+    return { score, level: 'medium', label: 'Media' }
+  }
+  if (score === 4) {
+    return { score, level: 'strong', label: 'Fuerte' }
+  }
+  return { score, level: 'very-strong', label: 'Muy fuerte' }
 }

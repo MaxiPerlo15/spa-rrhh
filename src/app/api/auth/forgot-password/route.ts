@@ -60,11 +60,31 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      await sendPasswordResetEmail({
+      const emailResult = await sendPasswordResetEmail({
         toEmail: user.email,
         resetLink: buildPasswordResetLink(rawToken),
         expiresMinutes
       })
+
+      if (!emailResult.success) {
+        await prisma.passwordResetToken.delete({
+          where: { tokenHash }
+        }).catch(() => {
+          logger.warn('No se pudo limpiar token de reset tras fallo de envío', {
+            userId: user.id
+          })
+        })
+
+        logger.error('No se pudo enviar email de recuperación', {
+          userId: user.id,
+          ip: clientIp
+        })
+
+        return NextResponse.json(
+          { error: 'No pudimos enviar el email de recuperación. Intenta nuevamente.' },
+          { status: 503 }
+        )
+      }
 
       logger.info('Solicitud de reset emitida', { userId: user.id, ip: clientIp })
     } else {

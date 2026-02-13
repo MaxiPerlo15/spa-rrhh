@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { getPasswordStrength } from '@/lib/passwordReset'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -14,6 +15,21 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { showSuccess, showError } = useToast()
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
+  const canSubmit = Boolean(token) && !isLoading
+  const hasMinLength = password.trim().length >= 10
+  const hasUpper = /[A-Z]/.test(password)
+  const hasLower = /[a-z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  const hasSpecial = /[^A-Za-z0-9]/.test(password)
+
+  const strengthColorMap = {
+    'very-weak': 'bg-red-500',
+    weak: 'bg-orange-500',
+    medium: 'bg-yellow-500',
+    strong: 'bg-blue-500',
+    'very-strong': 'bg-green-500'
+  } as const
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -99,6 +115,25 @@ export default function ResetPasswordPage() {
                 <p className="mt-2 text-xs text-gray-500">
                   Debe incluir mayúsculas, minúsculas y números.
                 </p>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                    <span>Seguridad</span>
+                    <span className="font-semibold">{passwordStrength.label}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className={`h-full transition-all duration-300 ${strengthColorMap[passwordStrength.level]}`}
+                      style={{ width: `${Math.max((passwordStrength.score / 5) * 100, 5)}%` }}
+                    />
+                  </div>
+                  <ul className="mt-2 grid grid-cols-1 gap-1 text-xs text-gray-600">
+                    <li className={hasMinLength ? 'text-green-700' : ''}>• Al menos 10 caracteres</li>
+                    <li className={hasUpper ? 'text-green-700' : ''}>• Al menos una mayúscula</li>
+                    <li className={hasLower ? 'text-green-700' : ''}>• Al menos una minúscula</li>
+                    <li className={hasNumber ? 'text-green-700' : ''}>• Al menos un número</li>
+                    <li className={hasSpecial ? 'text-green-700' : ''}>• Símbolo especial recomendado</li>
+                  </ul>
+                </div>
               </div>
 
               <div>
@@ -131,7 +166,7 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={!canSubmit}
                 className="w-full bg-primary-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Actualizando contraseña...' : 'Guardar nueva contraseña'}
