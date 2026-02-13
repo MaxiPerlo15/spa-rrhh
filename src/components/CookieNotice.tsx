@@ -39,12 +39,12 @@ export default function CookieNotice() {
   return (
     <aside
       aria-live="polite"
-      className="fixed bottom-4 left-4 right-4 z-[70] rounded-xl border border-gray-200 bg-white/95 p-4 shadow-xl backdrop-blur md:left-auto md:max-w-md"
+      className="pointer-events-none fixed bottom-4 left-4 right-4 z-[70] rounded-xl border border-gray-200 bg-white/95 p-4 shadow-xl backdrop-blur md:left-auto md:max-w-md"
     >
       <p className="text-sm text-gray-700">
         Usamos cookies esenciales para seguridad y sesión del panel admin. No utilizamos cookies de marketing.
       </p>
-      <div className="mt-3 flex items-center gap-3">
+      <div className="pointer-events-auto mt-3 flex items-center gap-3">
         <button
           type="button"
           onClick={acknowledge}
