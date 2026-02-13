@@ -333,7 +333,12 @@ export default function AdminDashboard() {
   const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
   const currentTutorialSteps = activeTutorial ? tutorialStepsByKind[activeTutorial] : null
   const currentTutorialItem = currentTutorialSteps?.[tutorialStep]
-  const currentGuidedTarget = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
+  const currentGuidedTarget =
+    showOnboarding && onboardingStep === 0
+      ? undefined
+      : activeTutorial
+        ? currentTutorialItem?.target
+        : currentOnboardingArea?.target
   const isGuidedMode = showOnboarding || activeTutorial !== null
   const onboardingDialogPosition: CSSProperties | undefined =
     showOnboarding && onboardingStep === 0
