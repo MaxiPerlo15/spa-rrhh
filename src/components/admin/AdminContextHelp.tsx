@@ -41,7 +41,7 @@ export default function AdminContextHelp({ activeTab, onOpenTutorial }: AdminCon
           onClick={onOpenTutorial}
           className="w-full rounded-lg border border-primary-300 bg-white px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-100 sm:w-auto"
         >
-          Ver tutorial
+          Ver tutorial de esta sección
         </button>
       </div>
     </section>

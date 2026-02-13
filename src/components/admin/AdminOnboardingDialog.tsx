@@ -6,6 +6,13 @@ interface AdminOnboardingDialogProps {
   totalSteps: number
   title: string
   body: string
+  modeLabel?: string
+  primaryLabel?: string
+  skipLabel?: string
+  secondaryActionLabel?: string
+  onSecondaryAction?: () => void
+  backActionLabel?: string
+  onBackAction?: () => void
   onNext: () => void
   onPrev: () => void
   onSkip: () => void
@@ -18,6 +25,13 @@ export default function AdminOnboardingDialog({
   totalSteps,
   title,
   body,
+  modeLabel = 'Tour guiado',
+  primaryLabel,
+  skipLabel = 'Saltar',
+  secondaryActionLabel,
+  onSecondaryAction,
+  backActionLabel,
+  onBackAction,
   onNext,
   onPrev,
   onSkip,
@@ -33,7 +47,7 @@ export default function AdminOnboardingDialog({
     <div className="pointer-events-none fixed bottom-4 right-4 z-[75] w-[calc(100%-2rem)] max-w-md">
       <div className="pointer-events-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-600">
-          Tour guiado ({stepIndex + 1}/{totalSteps})
+          {modeLabel} ({stepIndex + 1}/{totalSteps})
         </p>
         <h2 className="text-xl font-bold text-gray-900">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-gray-700">{body}</p>
@@ -46,14 +60,34 @@ export default function AdminOnboardingDialog({
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onSkip}
-            className="text-sm font-medium text-gray-600 hover:text-gray-800"
-          >
-            Saltar tutorial
-          </button>
+          <div className="flex items-center gap-3">
+            {onBackAction && backActionLabel && (
+              <button
+                type="button"
+                onClick={onBackAction}
+                className="text-sm font-medium text-primary-700 hover:text-primary-800"
+              >
+                {backActionLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onSkip}
+              className="text-sm font-medium text-gray-600 hover:text-gray-800"
+            >
+              {skipLabel}
+            </button>
+          </div>
           <div className="flex gap-2">
+            {onSecondaryAction && secondaryActionLabel && (
+              <button
+                type="button"
+                onClick={onSecondaryAction}
+                className="rounded-lg border border-primary-300 px-4 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+              >
+                {secondaryActionLabel}
+              </button>
+            )}
             {!isFirst && (
               <button
                 type="button"
@@ -74,7 +108,7 @@ export default function AdminOnboardingDialog({
               }}
               className="rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600"
             >
-              {isLast ? 'Finalizar tutorial' : 'Siguiente'}
+              {primaryLabel || (isLast ? 'Finalizar tutorial' : 'Siguiente')}
             </button>
           </div>
         </div>

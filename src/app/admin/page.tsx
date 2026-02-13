@@ -19,37 +19,88 @@ import type { Contact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 
 const ONBOARDING_STORAGE_KEY = 'admin_onboarding_completed_v1'
-const TOUR_STEPS: Array<{
-  target: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+type TourTarget = 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+type TutorialKind = 'vacancies' | 'applications' | 'contacts'
+
+const ONBOARDING_AREAS: Array<{
+  kind: TutorialKind
+  target: TourTarget
   tab: AdminTab
   title: string
   body: string
 }> = [
   {
-    target: 'tabs',
-    tab: 'vacancies',
-    title: 'Navegación principal del panel',
-    body: 'Estas pestañas dividen el trabajo en vacantes, postulaciones y contactos.'
-  },
-  {
+    kind: 'vacancies',
     target: 'create-vacancy',
     tab: 'vacancies',
-    title: 'Creación de vacantes',
-    body: 'Desde este botón publicas nuevas búsquedas y gestionas su estado operativo.'
+    title: 'Módulo de Vacantes',
+    body: 'Desde "+ Nueva Vacante" se abre un panel modal para crear una búsqueda laboral completa y publicarla.'
   },
   {
+    kind: 'applications',
     target: 'applications-filters',
     tab: 'applications',
-    title: 'Filtros de postulaciones',
-    body: 'Aquí aplicas búsqueda y filtros por estado para revisar candidatos más rápido.'
+    title: 'Módulo de Postulaciones',
+    body: 'En esta sección usas filtros y buscador para priorizar revisión de candidatos por estado y vacante.'
   },
   {
+    kind: 'contacts',
     target: 'contacts-table',
     tab: 'contacts',
-    title: 'Bandeja de contactos',
-    body: 'Gestiona consultas entrantes, cambia estado y mantén trazabilidad del seguimiento.'
+    title: 'Módulo de Contactos',
+    body: 'Aquí gestionas la bandeja de consultas. Al abrir un contacto puedes ver detalle y responder por email.'
   }
 ]
+
+const DOMAIN_TUTORIALS: Record<TutorialKind, Array<{
+  target: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+  tab: AdminTab
+  title: string
+  body: string
+}>> = {
+  vacancies: [
+    {
+      target: 'tabs',
+      tab: 'vacancies',
+      title: 'Navegación principal',
+      body: 'Puedes volver a esta pestaña desde cualquier módulo usando la barra superior.'
+    },
+    {
+      target: 'create-vacancy',
+      tab: 'vacancies',
+      title: 'Botón Nueva Vacante',
+      body: 'Al seleccionarlo se abre el panel modal de alta para definir título, modalidad, requisitos y beneficios.'
+    }
+  ],
+  applications: [
+    {
+      target: 'tabs',
+      tab: 'applications',
+      title: 'Acceso a postulaciones',
+      body: 'Esta pestaña centraliza todo el flujo de revisión de candidatos.'
+    },
+    {
+      target: 'applications-filters',
+      tab: 'applications',
+      title: 'Filtros y búsqueda',
+      body: 'Estos controles te permiten segmentar por estado y encontrar rápido por nombre, email o vacante.'
+    }
+  ],
+  contacts: [
+    {
+      target: 'tabs',
+      tab: 'contacts',
+      title: 'Acceso a contactos',
+      body: 'Desde aquí administras consultas entrantes desde la web pública.'
+    },
+    {
+      target: 'contacts-table',
+      tab: 'contacts',
+      title: 'Bandeja y acciones',
+      body: 'En la tabla puedes abrir detalle, responder y actualizar el estado operativo del contacto.'
+    }
+  ]
+}
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -117,6 +168,9 @@ export default function AdminDashboard() {
   const [isSaving, setIsSaving] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(0)
+  const [activeTutorial, setActiveTutorial] = useState<TutorialKind | null>(null)
+  const [tutorialStep, setTutorialStep] = useState(0)
+  const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -141,20 +195,27 @@ export default function AdminDashboard() {
     }
   }, [status, showInfo])
 
+  const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
+  const currentTutorialSteps = activeTutorial ? DOMAIN_TUTORIALS[activeTutorial] : null
+  const currentTutorialItem = currentTutorialSteps?.[tutorialStep]
+  const currentGuidedTarget = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
+  const isGuidedMode = showOnboarding || activeTutorial !== null
+
   useEffect(() => {
-    if (!showOnboarding) return
+    if (!isGuidedMode) return
 
-    const step = TOUR_STEPS[onboardingStep]
-    if (!step) return
+    const targetTab = activeTutorial ? currentTutorialItem?.tab : currentOnboardingArea?.tab
+    const targetSelector = activeTutorial ? currentTutorialItem?.target : currentOnboardingArea?.target
+    if (!targetTab || !targetSelector) return
 
-    setActiveTab(step.tab)
+    setActiveTab(targetTab)
     const timeout = window.setTimeout(() => {
-      const targetElement = document.querySelector(`[data-tour="${step.target}"]`)
+      const targetElement = document.querySelector(`[data-tour="${targetSelector}"]`)
       targetElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 120)
 
     return () => window.clearTimeout(timeout)
-  }, [showOnboarding, onboardingStep])
+  }, [isGuidedMode, activeTutorial, tutorialStep, onboardingStep, currentTutorialItem, currentOnboardingArea])
 
   useEffect(() => {
     let filtered = applications
@@ -390,7 +451,10 @@ export default function AdminDashboard() {
   }
 
   const handleOpenHelp = () => {
+    setActiveTutorial(null)
     setOnboardingStep(0)
+    setTutorialStep(0)
+    setOnboardingReturnStep(null)
     setShowOnboarding(true)
   }
 
@@ -400,28 +464,75 @@ export default function AdminDashboard() {
     } catch {
       // No-op if storage is unavailable.
     }
+    setActiveTutorial(null)
     setShowOnboarding(false)
     showSuccess('Tutorial completado. Puedes reabrirlo desde "Ayuda".')
   }
 
   const handleSkipOnboarding = () => {
+    setActiveTutorial(null)
     setShowOnboarding(false)
+    setOnboardingReturnStep(null)
     showInfo('Tutorial cerrado. Puedes retomarlo desde "Ayuda".')
   }
 
   const handleNextOnboardingStep = () => {
-    setOnboardingStep((prev) => Math.min(prev + 1, TOUR_STEPS.length - 1))
+    setOnboardingStep((prev) => Math.min(prev + 1, ONBOARDING_AREAS.length - 1))
   }
 
   const handlePrevOnboardingStep = () => {
     setOnboardingStep((prev) => Math.max(prev - 1, 0))
   }
 
-  const currentTourStep = TOUR_STEPS[onboardingStep]
+  const openDomainTutorial = (kind: TutorialKind, fromOnboarding: boolean) => {
+    if (fromOnboarding) {
+      setOnboardingReturnStep(onboardingStep)
+    } else {
+      setOnboardingReturnStep(null)
+    }
+    setShowOnboarding(false)
+    setActiveTutorial(kind)
+    setTutorialStep(0)
+  }
+
+  const handleNextTutorialStep = () => {
+    if (!currentTutorialSteps) return
+    setTutorialStep((prev) => Math.min(prev + 1, currentTutorialSteps.length - 1))
+  }
+
+  const handlePrevTutorialStep = () => {
+    setTutorialStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const handleFinishTutorial = () => {
+    if (onboardingReturnStep !== null) {
+      setOnboardingStep(onboardingReturnStep)
+      setActiveTutorial(null)
+      setTutorialStep(0)
+      setOnboardingReturnStep(null)
+      setShowOnboarding(true)
+      showInfo('Volviste al onboarding para continuar con la siguiente sección.')
+      return
+    }
+
+    setActiveTutorial(null)
+    setTutorialStep(0)
+    showSuccess('Tutorial de sección completado.')
+  }
+
+  const handleBackToOnboarding = () => {
+    if (onboardingReturnStep === null) return
+    setOnboardingStep(onboardingReturnStep)
+    setActiveTutorial(null)
+    setTutorialStep(0)
+    setOnboardingReturnStep(null)
+    setShowOnboarding(true)
+  }
+
   const getTourClass = (
-    key: 'tabs' | 'create-vacancy' | 'applications-filters' | 'contacts-table'
+    key: TourTarget
   ) =>
-    showOnboarding && currentTourStep?.target === key
+    isGuidedMode && currentGuidedTarget === key
       ? 'relative z-[72] ring-4 ring-primary-300 ring-offset-2 shadow-2xl transition-all duration-300'
       : ''
 
@@ -493,6 +604,10 @@ const handleTestSentry = () => {
         onHelp={handleOpenHelp}
       />
 
+      {isGuidedMode && (
+        <div className="pointer-events-none fixed inset-0 z-[71] bg-gray-900/35 backdrop-blur-[2px]" />
+      )}
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <DashboardStats
           totalVacancies={stats.totalVacancies}
@@ -535,7 +650,7 @@ const handleTestSentry = () => {
           }}
         />
 
-        <AdminContextHelp activeTab={activeTab} onOpenTutorial={handleOpenHelp} />
+        <AdminContextHelp activeTab={activeTab} onOpenTutorial={() => openDomainTutorial(activeTab, false)} />
 
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
@@ -1428,13 +1543,41 @@ const handleTestSentry = () => {
       <AdminOnboardingDialog
         isOpen={showOnboarding}
         stepIndex={onboardingStep}
-        totalSteps={TOUR_STEPS.length}
-        title={currentTourStep?.title || 'Tutorial'}
-        body={currentTourStep?.body || ''}
+        totalSteps={ONBOARDING_AREAS.length}
+        modeLabel="Onboarding"
+        title={currentOnboardingArea?.title || 'Onboarding'}
+        body={currentOnboardingArea?.body || ''}
+        secondaryActionLabel={currentOnboardingArea ? `Ver tutorial de ${currentOnboardingArea.kind === 'vacancies' ? 'Vacantes' : currentOnboardingArea.kind === 'applications' ? 'Postulaciones' : 'Contactos'}` : undefined}
+        onSecondaryAction={currentOnboardingArea ? () => openDomainTutorial(currentOnboardingArea.kind, true) : undefined}
+        primaryLabel={onboardingStep === ONBOARDING_AREAS.length - 1 ? 'Finalizar onboarding' : 'Siguiente módulo'}
+        skipLabel="Cerrar onboarding"
         onNext={handleNextOnboardingStep}
         onPrev={handlePrevOnboardingStep}
         onSkip={handleSkipOnboarding}
         onFinish={handleCompleteOnboarding}
+      />
+
+      <AdminOnboardingDialog
+        isOpen={activeTutorial !== null}
+        stepIndex={tutorialStep}
+        totalSteps={currentTutorialSteps?.length || 1}
+        modeLabel={`Tutorial ${activeTutorial === 'vacancies' ? 'Vacantes' : activeTutorial === 'applications' ? 'Postulaciones' : 'Contactos'}`}
+        title={currentTutorialItem?.title || 'Tutorial'}
+        body={currentTutorialItem?.body || ''}
+        backActionLabel={onboardingReturnStep !== null ? 'Volver al onboarding' : undefined}
+        onBackAction={onboardingReturnStep !== null ? handleBackToOnboarding : undefined}
+        skipLabel="Cerrar tutorial"
+        primaryLabel={
+          currentTutorialSteps && tutorialStep === currentTutorialSteps.length - 1 ? 'Finalizar tutorial' : 'Siguiente'
+        }
+        onNext={handleNextTutorialStep}
+        onPrev={handlePrevTutorialStep}
+        onSkip={() => {
+          setActiveTutorial(null)
+          setTutorialStep(0)
+          setOnboardingReturnStep(null)
+        }}
+        onFinish={handleFinishTutorial}
       />
     </div>
   )
