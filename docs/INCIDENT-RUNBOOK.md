@@ -22,6 +22,17 @@ Create these alert rules in Sentry project `javascript-nextjs`:
   - repeated temporary blocks in forgot/reset password
   - sustained increase of 429 responses on auth endpoints
 
+Recommended query-oriented rules:
+- `SECURITY auth.login.throttled spike`
+  - Filter: `message:"SECURITY:auth.login.throttled"` and `tags.category:security`
+  - Threshold: `>= 10 events / 5 min`
+- `SECURITY forgot/reset abuse`
+  - Filter: `message:"SECURITY:auth.forgot_password.throttled" OR message:"SECURITY:auth.reset_password.throttled"`
+  - Threshold: `>= 8 events / 5 min`
+- `SECURITY invalid reset token burst`
+  - Filter: `message:"SECURITY:auth.reset_password.invalid_token"`
+  - Threshold: `>= 20 events / 10 min`
+
 3. `Upload/Turnstile integration failures`
 - Condition: repeated failures with tags/messages related to uploadthing/turnstile
 - Action: notify owner and annotate incident issue

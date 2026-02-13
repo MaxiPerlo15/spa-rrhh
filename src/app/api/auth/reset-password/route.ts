@@ -23,6 +23,10 @@ export async function POST(request: NextRequest) {
     const identity = `${tokenHash}:${clientIp}`
     const lockState = await getAttemptLock('reset-password', identity)
     if (lockState.blocked) {
+      logger.security('auth.reset_password.throttled', {
+        ip: clientIp,
+        retryAfterSeconds: lockState.retryAfterSeconds
+      })
       return NextResponse.json(
         { error: `Temporalmente bloqueado. Intenta nuevamente en ${lockState.retryAfterSeconds}s.` },
         { status: 429 }
@@ -53,7 +57,12 @@ export async function POST(request: NextRequest) {
     })
 
     if (!passwordResetToken || passwordResetToken.usedAt || passwordResetToken.expiresAt < now) {
-      await recordAttemptFailure('reset-password', identity)
+      const attemptState = await recordAttemptFailure('reset-password', identity)
+      logger.security('auth.reset_password.invalid_token', {
+        ip: clientIp,
+        failures: attemptState.failures,
+        blocked: attemptState.blocked
+      })
       return NextResponse.json(
         { error: 'El enlace de recuperación es inválido o expiró' },
         { status: 400 }

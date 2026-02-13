@@ -145,3 +145,16 @@ Implemented baseline:
 UX behavior:
 - Sign-in surface shows a user-friendly cooldown message when login is temporarily blocked.
 - Error messages remain generic enough to avoid user enumeration.
+
+Observability hooks:
+- Security events are emitted with `logger.security(...)` and sent to Sentry in production with:
+  - `tags.category = security`
+  - `tags.security_event = <event_name>`
+- Current events:
+  - `auth.login.failed`
+  - `auth.login.throttled`
+  - `auth.forgot_password.throttled`
+  - `auth.forgot_password.delivery_failed`
+  - `auth.forgot_password.unknown_identity`
+  - `auth.reset_password.throttled`
+  - `auth.reset_password.invalid_token`

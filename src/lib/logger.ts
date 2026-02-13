@@ -53,6 +53,29 @@ export const logger = {
   },
 
   /**
+   * Registra un evento de seguridad con contexto estructurado.
+   * Se envía a Sentry en producción para habilitar alertas operativas.
+   */
+  security: (event: string, context?: Record<string, unknown>) => {
+    const safeContext = context ? (redactSensitiveData(context) as Record<string, unknown>) : undefined
+    console.warn(`[SECURITY] ${event}`, safeContext || '')
+
+    if (process.env.NODE_ENV !== 'development') {
+      Sentry.captureMessage(`SECURITY:${event}`, {
+        level: 'warning',
+        tags: {
+          log_level: 'warning',
+          category: 'security',
+          security_event: event
+        },
+        extra: {
+          ...safeContext
+        }
+      })
+    }
+  },
+
+  /**
    * Registra información de debug
    * Solo en desarrollo
    */

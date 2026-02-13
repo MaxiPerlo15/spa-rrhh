@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcrypt"
 import { prisma } from '@/lib/prisma'
 import { clearAttemptFailures, getAttemptLock, recordAttemptFailure } from '@/lib/authAttemptGuard'
+import { logger } from '@/lib/logger'
 
 const defaultSecureCookies = process.env.NODE_ENV === 'production'
 const secureCookiesEnabled = process.env.SESSION_COOKIE_SECURE
@@ -32,6 +33,11 @@ export const authOptions: NextAuthOptions = {
 
         const lockState = await getAttemptLock('login', identity)
         if (lockState.blocked) {
+          logger.security('auth.login.throttled', {
+            email: normalizedEmail,
+            ip,
+            retryAfterSeconds: lockState.retryAfterSeconds
+          })
           throw new Error(`AUTH_THROTTLED:${lockState.retryAfterSeconds}`)
         }
 
@@ -41,6 +47,12 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) {
           const attemptState = await recordAttemptFailure('login', identity)
+          logger.security('auth.login.failed', {
+            email: normalizedEmail,
+            ip,
+            failures: attemptState.failures,
+            blocked: attemptState.blocked
+          })
           if (attemptState.blocked) {
             throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
           }
@@ -54,6 +66,12 @@ export const authOptions: NextAuthOptions = {
 
         if (!isValidPassword) {
           const attemptState = await recordAttemptFailure('login', identity)
+          logger.security('auth.login.failed', {
+            email: normalizedEmail,
+            ip,
+            failures: attemptState.failures,
+            blocked: attemptState.blocked
+          })
           if (attemptState.blocked) {
             throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
           }
@@ -61,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         await clearAttemptFailures('login', identity)
+        logger.info('Login exitoso', { email: normalizedEmail, ip })
 
         return {
           id: user.id,
