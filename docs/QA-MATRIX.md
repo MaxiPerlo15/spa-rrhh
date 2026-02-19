@@ -1,8 +1,8 @@
-# QA Matrix (MIS-78)
+# QA Matrix (MIS-99)
 
 ## Objetivo
 
-Validar flujos críticos en navegadores desktop y mobile con una matriz reproducible basada en Playwright.
+Validar flujos críticos de navegación pública + autenticación/recuperación en navegadores desktop y mobile con una matriz reproducible basada en Playwright.
 
 ## Cobertura de smoke tests
 
@@ -10,6 +10,15 @@ Validar flujos críticos en navegadores desktop y mobile con una matriz reproduc
 - Ofertas laborales: filtros y render de listado.
 - Navegación hash desde footer (`/ofertas-laborales` -> `/#empresas`, `/#contacto`).
 - Pantallas de autenticación admin (`/admin/signin`, `/admin/forgot-password`).
+- Login con credenciales inválidas.
+- Forgot password: feedback de éxito controlado.
+- Reset password: validación de token faltante.
+
+## Validación manual complementaria (auth hardening)
+
+- Throttling por intentos fallidos en login (5+ intentos).
+- Forgot/reset con límite de requests por IP y mensajes de bloqueo temporal.
+- Evidencia: captura + timestamp + navegador/dispositivo.
 
 ## Matriz objetivo
 
@@ -25,9 +34,24 @@ Validar flujos críticos en navegadores desktop y mobile con una matriz reproduc
 npm run test:e2e:matrix
 ```
 
+## Criterios de salida
+
+- `PASS` en los 5 proyectos (`chromium`, `firefox`, `webkit`, `mobile-chrome`, `mobile-safari`).
+- Cero fallos en flujos auth críticos:
+  - invalid credentials
+  - pantalla forgot password
+  - pantalla reset password
+- Validación manual documentada para:
+  - bloqueo temporal por intentos
+  - límites de abuse/rate-limit en forgot/reset
+- Si falla un navegador, registrar issue en Linear con:
+  - navegador/dispositivo
+  - test fallido
+  - evidencia (`playwright-report` / screenshot / trace)
+
 ## Resultado (última ejecución)
 
-Pendiente de completar en cada corrida con:
+Completar en cada corrida con:
 
 - Fecha/hora
 - Proyectos ejecutados

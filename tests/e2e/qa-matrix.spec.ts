@@ -61,4 +61,38 @@ test.describe('QA Matrix Smoke', () => {
     await expect(page).toHaveURL('/admin/forgot-password')
     await expect(page.locator('h1:has-text("Recuperar contraseña")')).toBeVisible()
   })
+
+  test('signin shows invalid credentials feedback', async ({ page }) => {
+    await page.goto('/admin/signin')
+    await page.fill('input[name="email"]', `qa-${Date.now()}@example.com`)
+    await page.fill('input[name="password"]', 'invalid-password')
+    await page.click('button[type="submit"]')
+
+    await expect(page.locator('div.bg-red-50.border-red-200').first()).toBeVisible()
+    await expect(page).toHaveURL(/\/admin\/signin/)
+  })
+
+  test('forgot-password UI handles success response', async ({ page }) => {
+    await page.route('**/api/auth/forgot-password', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message:
+            'Si existe una cuenta con ese email, enviamos un enlace para restablecer la contraseña.'
+        })
+      })
+    })
+
+    await page.goto('/admin/forgot-password')
+    await page.fill('input[name="email"]', 'admin@sparrhh.com')
+    await page.click('button[type="submit"]')
+
+    await expect(page.locator('div.bg-green-50.border-green-200').first()).toBeVisible()
+  })
+
+  test('reset-password page validates missing token state', async ({ page }) => {
+    await page.goto('/admin/reset-password')
+    await expect(page.locator('text=El enlace de recuperación es inválido o no contiene token.')).toBeVisible()
+  })
 })
