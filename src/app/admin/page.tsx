@@ -33,6 +33,16 @@ type TourTarget =
   | 'contact-view-btn'
   | 'contact-detail-modal'
 type TutorialKind = 'vacancies' | 'applications' | 'contacts'
+type NotificationLevel = 'info' | 'success' | 'warning'
+
+interface AdminNotification {
+  id: string
+  title: string
+  message: string
+  level: NotificationLevel
+  createdAt: string
+  isRead: boolean
+}
 
 type DomainStep = {
   target: TourTarget
@@ -229,6 +239,35 @@ export default function AdminDashboard() {
   const [tutorialStep, setTutorialStep] = useState(0)
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
   const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [lastObservedStats, setLastObservedStats] = useState<{
+    totalApplications: number
+    pendingContacts: number
+  } | null>(null)
+  const unreadNotifications = useMemo(
+    () => notifications.filter((notification) => !notification.isRead).length,
+    [notifications]
+  )
+
+  const addNotification = (
+    title: string,
+    message: string,
+    level: NotificationLevel = 'info'
+  ) => {
+    const nextNotification: AdminNotification = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      message,
+      level,
+      createdAt: new Date().toISOString(),
+      isRead: false
+    }
+    setNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
+  }
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
+  }
 
   const paginatedVacancies = useMemo(
     () => vacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
@@ -331,6 +370,41 @@ export default function AdminDashboard() {
       showInfo('Bienvenido al panel. Te mostramos un tutorial rápido.')
     }
   }, [status, showInfo])
+
+  useEffect(() => {
+    if (isLoading) return
+
+    if (!lastObservedStats) {
+      setLastObservedStats({
+        totalApplications: stats.totalApplications,
+        pendingContacts: stats.pendingContacts
+      })
+      return
+    }
+
+    if (stats.totalApplications > lastObservedStats.totalApplications) {
+      const diff = stats.totalApplications - lastObservedStats.totalApplications
+      addNotification(
+        'Nuevas postulaciones',
+        `Ingresaron ${diff} nueva(s) postulación(es) desde tu última revisión.`,
+        'success'
+      )
+    }
+
+    if (stats.pendingContacts > lastObservedStats.pendingContacts) {
+      const diff = stats.pendingContacts - lastObservedStats.pendingContacts
+      addNotification(
+        'Nuevos contactos pendientes',
+        `Se detectaron ${diff} nuevo(s) contacto(s) pendiente(s).`,
+        'warning'
+      )
+    }
+
+    setLastObservedStats({
+      totalApplications: stats.totalApplications,
+      pendingContacts: stats.pendingContacts
+    })
+  }, [isLoading, lastObservedStats, stats.pendingContacts, stats.totalApplications])
 
   const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
   const currentTutorialSteps = activeTutorial ? tutorialStepsByKind[activeTutorial] : null
@@ -518,6 +592,7 @@ export default function AdminDashboard() {
         try {
           await deleteVacancyApi(id)
           showSuccess('Vacante eliminada exitosamente')
+          addNotification('Vacante eliminada', `Se eliminó la vacante "${title}".`, 'warning')
         } catch (error) {
           console.error('Error deleting vacancy:', error)
           showError('Error al eliminar la vacante')
@@ -532,6 +607,11 @@ export default function AdminDashboard() {
     try {
       await toggleVacancyStatus(vacancy)
       showSuccess(`Vacante ${vacancy.status === 'active' ? 'cerrada' : 'activada'} exitosamente`)
+      addNotification(
+        'Estado de vacante actualizado',
+        `La vacante "${vacancy.title}" fue ${vacancy.status === 'active' ? 'cerrada' : 'activada'}.`,
+        'info'
+      )
     } catch (error) {
       console.error('Error toggling status:', error)
       showError('Error al cambiar el estado de la vacante')
@@ -591,9 +671,11 @@ export default function AdminDashboard() {
       if (editingVacancy) {
         await updateVacancyApi(editingVacancy.id, formData)
         showSuccess('Vacante actualizada exitosamente')
+        addNotification('Vacante actualizada', `Se actualizó "${formData.title}".`, 'success')
       } else {
         await createVacancyApi(formData)
         showSuccess('Vacante creada exitosamente')
+        addNotification('Nueva vacante', `Se creó la vacante "${formData.title}".`, 'success')
       }
       handleCloseModal()
     } catch (error) {
@@ -608,6 +690,7 @@ export default function AdminDashboard() {
     try {
       await updateApplicationStatus(applicationId, newStatus)
       showSuccess('Estado actualizado exitosamente')
+      addNotification('Postulación actualizada', `Se cambió el estado a ${statusLabels[newStatus]}.`, 'info')
     } catch (error) {
       console.error('Error updating application status:', error)
       showError('Error al actualizar el estado')
@@ -638,6 +721,11 @@ export default function AdminDashboard() {
     try {
       await updateContactStatus(contactId, newStatus)
       showSuccess('Estado del contacto actualizado')
+      addNotification(
+        'Contacto actualizado',
+        `Se cambió el estado del contacto a ${contactStatusLabels[newStatus]}.`,
+        'info'
+      )
     } catch (error) {
       console.error('Error al actualizar estado del contacto:', error)
       showError('Error al actualizar el estado del contacto')
@@ -660,6 +748,7 @@ export default function AdminDashboard() {
         try {
           await deleteContactApi(contactId)
           showSuccess('Contacto eliminado exitosamente')
+          addNotification('Contacto eliminado', `Se eliminó el contacto de "${contactName}".`, 'warning')
         } catch (error) {
           console.error('Error al eliminar contacto:', error)
           showError('Error al eliminar el contacto')
@@ -714,7 +803,17 @@ export default function AdminDashboard() {
   }
 
   const handleOpenSectionTutorial = () => {
-    openDomainTutorial(activeTab, false)
+    const tutorialByTab: Record<AdminTab, TutorialKind> = {
+      vacancies: 'vacancies',
+      applications: 'applications',
+      contacts: 'contacts',
+      settings: 'vacancies'
+    }
+    openDomainTutorial(tutorialByTab[activeTab], false)
+  }
+
+  const handleOpenNotifications = () => {
+    setActiveTab('settings')
   }
 
   const handleCompleteOnboarding = () => {
@@ -878,6 +977,8 @@ const handleTestSentry = () => {
         onSignOut={handleSignOut}
         onOpenFullTutorial={handleOpenHelp}
         onOpenSectionTutorial={handleOpenSectionTutorial}
+        onOpenNotifications={handleOpenNotifications}
+        unreadNotifications={unreadNotifications}
       />
 
       {isGuidedMode && (
@@ -938,7 +1039,8 @@ const handleTestSentry = () => {
           stats={{
             activeVacancies: stats.activeVacancies,
             pendingApplications: applications.filter(a => a.status === 'PENDING').length,
-            pendingContacts: stats.pendingContacts
+            pendingContacts: stats.pendingContacts,
+            unreadNotifications
           }}
         />
 
@@ -1372,6 +1474,82 @@ const handleTestSentry = () => {
               />
             </div>
           </>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow border border-gray-200">
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900">Configuración de cuenta</h2>
+              </div>
+              <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</p>
+                  <p className="text-sm font-medium text-gray-900">{session.user?.email ?? 'No disponible'}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Rol</p>
+                  <p className="text-sm font-medium text-gray-900">{session.user?.role ?? 'ADMIN'}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>
+                  <p className="text-sm text-gray-700">
+                    Gestiona el cambio de contraseña desde el flujo seguro de recuperación.
+                  </p>
+                  <a
+                    href="/admin/forgot-password"
+                    className="inline-flex mt-3 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+                  >
+                    Cambiar contraseña
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div id="admin-notifications-panel" className="bg-white rounded-lg shadow border border-gray-200">
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Notificaciones del panel</h3>
+                  <p className="text-sm text-gray-600">Eventos operativos recientes y alertas de gestión.</p>
+                </div>
+                {unreadNotifications > 0 && (
+                  <button
+                    onClick={markAllNotificationsAsRead}
+                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Marcar leídas ({unreadNotifications})
+                  </button>
+                )}
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-3">
+                {notifications.length === 0 ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                    Aún no hay notificaciones registradas en esta sesión.
+                  </div>
+                ) : (
+                  notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`rounded-lg border px-4 py-3 ${
+                        notification.isRead ? 'border-gray-200 bg-white' : 'border-primary-200 bg-primary-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{notification.title}</p>
+                          <p className="text-sm text-gray-700 mt-1">{notification.message}</p>
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(notification.createdAt).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </main>
 

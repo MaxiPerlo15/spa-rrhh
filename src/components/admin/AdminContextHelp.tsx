@@ -22,6 +22,11 @@ const TAB_HELP: Record<AdminTab, { title: string; tip: string; action: string }>
     title: 'Ayuda: Contactos',
     tip: 'Marca como respondidos los mensajes atendidos para mantener trazabilidad operativa.',
     action: 'Archivar consultas cerradas'
+  },
+  settings: {
+    title: 'Ayuda: Configuración',
+    tip: 'Centraliza alertas y datos de cuenta para revisar el estado operativo del panel.',
+    action: 'Revisar notificaciones al iniciar sesión'
   }
 }
 

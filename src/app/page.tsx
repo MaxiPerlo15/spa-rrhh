@@ -45,6 +45,27 @@ export default function Home() {
   // Manejar scroll a sección cuando se carga la página con hash
   useEffect(() => {
     const hash = window.location.hash
+    let referrerUrl: URL | null = null
+    try {
+      if (document.referrer) {
+        referrerUrl = new URL(document.referrer)
+      }
+    } catch {
+      referrerUrl = null
+    }
+    const cameFromInternalDifferentPage =
+      Boolean(referrerUrl) &&
+      referrerUrl?.origin === window.location.origin &&
+      referrerUrl?.pathname !== window.location.pathname
+
+    // MIS-101: en cargas de landing con hash, normalizar a "/" excepto cuando
+    // venimos de otra página interna (ej. /ofertas-laborales -> /#contacto).
+    if (hash && !cameFromInternalDifferentPage) {
+      window.history.replaceState(null, '', '/')
+      window.scrollTo({ top: 0, behavior: 'auto' })
+      return
+    }
+
     if (hash) {
       requestAnimationFrame(() => {
         scrollToHashWithOffset(hash, 'auto')

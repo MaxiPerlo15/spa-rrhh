@@ -5,7 +5,7 @@
 
 'use client'
 
-export type AdminTab = 'vacancies' | 'applications' | 'contacts'
+export type AdminTab = 'vacancies' | 'applications' | 'contacts' | 'settings'
 
 interface TabButtonProps {
   isActive: boolean
@@ -46,6 +46,7 @@ interface AdminTabsProps {
     activeVacancies?: number
     pendingApplications?: number
     pendingContacts?: number
+    unreadNotifications?: number
   }
 }
 
@@ -73,6 +74,13 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           icon="📧"
           label="Contactos"
           badge={stats.pendingContacts}
+        />
+        <TabButton
+          isActive={activeTab === 'settings'}
+          onClick={() => onTabChange('settings')}
+          icon="⚙️"
+          label="Configuración"
+          badge={stats.unreadNotifications}
         />
       </div>
     </div>

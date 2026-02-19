@@ -12,13 +12,17 @@ interface AdminHeaderProps {
   onSignOut: () => void
   onOpenFullTutorial: () => void
   onOpenSectionTutorial: () => void
+  onOpenNotifications: () => void
+  unreadNotifications?: number
 }
 
 export default function AdminHeader({
   userEmail,
   onSignOut,
   onOpenFullTutorial,
-  onOpenSectionTutorial
+  onOpenSectionTutorial,
+  onOpenNotifications,
+  unreadNotifications = 0
 }: AdminHeaderProps) {
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -54,6 +58,17 @@ export default function AdminHeader({
             )}
             
             <div className="flex w-full gap-2 sm:w-auto">
+              <button
+                onClick={onOpenNotifications}
+                className="relative w-full sm:w-auto px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors font-medium text-sm"
+              >
+                Notificaciones
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-primary-900">
+                    {unreadNotifications}
+                  </span>
+                )}
+              </button>
               <div className="relative w-full sm:w-auto" ref={menuRef}>
                 <button
                   onClick={() => setIsHelpMenuOpen((prev) => !prev)}

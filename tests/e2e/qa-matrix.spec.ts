@@ -52,6 +52,14 @@ test.describe('QA Matrix Smoke', () => {
       .toBeLessThan(180)
   })
 
+  test('landing reload normalizes hash route to root', async ({ page }) => {
+    await page.goto('/#contacto')
+    await expect(page).toHaveURL('/')
+
+    await page.reload()
+    await expect(page).toHaveURL('/')
+  })
+
   test('admin auth screens are reachable', async ({ page }) => {
     await page.goto('/admin/signin')
     await expect(page.locator('h1')).toContainText('Panel Administrativo')

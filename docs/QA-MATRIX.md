@@ -9,6 +9,7 @@ Validar flujos críticos de navegación pública + autenticación/recuperación 
 - Home: navbar, hero, CTAs y footer.
 - Ofertas laborales: filtros y render de listado.
 - Navegación hash desde footer (`/ofertas-laborales` -> `/#empresas`, `/#contacto`).
+- Refresh de landing con hash (`/#seccion`) normaliza a `/`.
 - Pantallas de autenticación admin (`/admin/signin`, `/admin/forgot-password`).
 - Login con credenciales inválidas.
 - Forgot password: feedback de éxito controlado.
