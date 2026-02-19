@@ -172,6 +172,24 @@ export const resetPasswordSchema = z
     path: ['confirmPassword']
   })
 
+const notificationLevelSchema = z.enum(['INFO', 'SUCCESS', 'WARNING'])
+
+export const adminNotificationsListQuerySchema = z.object({
+  view: z.enum(['all', 'unread', 'read']).optional().default('all'),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20)
+})
+
+export const createAdminNotificationSchema = z.object({
+  title: nonEmptyString.max(120, 'Título demasiado largo'),
+  message: nonEmptyString.max(500, 'Mensaje demasiado largo'),
+  level: notificationLevelSchema.optional().default('INFO')
+})
+
+export const updateAdminNotificationSchema = z.object({
+  isRead: z.boolean()
+})
+
 export function formatValidationError(error: z.ZodError) {
   return {
     error: 'Datos inválidos',

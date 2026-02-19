@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
@@ -34,6 +34,7 @@ type TourTarget =
   | 'contact-detail-modal'
 type TutorialKind = 'vacancies' | 'applications' | 'contacts'
 type NotificationLevel = 'info' | 'success' | 'warning'
+type NotificationLevelApi = 'INFO' | 'SUCCESS' | 'WARNING'
 
 interface AdminNotification {
   id: string
@@ -43,6 +44,8 @@ interface AdminNotification {
   createdAt: string
   isRead: boolean
 }
+
+const NOTIFICATIONS_PAGE_LIMIT = 50
 
 type DomainStep = {
   target: TourTarget
@@ -240,7 +243,7 @@ export default function AdminDashboard() {
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
   const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
-  const [lastObservedStats, setLastObservedStats] = useState<{
+  const lastObservedStatsRef = useRef<{
     totalApplications: number
     pendingContacts: number
   } | null>(null)
@@ -248,25 +251,169 @@ export default function AdminDashboard() {
     () => notifications.filter((notification) => !notification.isRead).length,
     [notifications]
   )
+  const orderedNotifications = useMemo(
+    () => [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [notifications]
+  )
 
-  const addNotification = (
+  const reloadNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/notifications?view=all&page=1&limit=${NOTIFICATIONS_PAGE_LIMIT}`,
+        {
+          cache: 'no-store'
+        }
+      )
+      if (!response.ok) {
+        throw new Error('No se pudieron obtener notificaciones')
+      }
+
+      const data = (await response.json()) as { items?: AdminNotification[] }
+      setNotifications(Array.isArray(data.items) ? data.items : [])
+    } catch (error) {
+      console.error('No se pudieron recargar notificaciones admin', error)
+      showError('No se pudieron cargar notificaciones del panel.')
+    }
+  }, [showError])
+
+  const createNotification = useCallback(
+    async (title: string, message: string, level: NotificationLevel) => {
+      const levelMap: Record<NotificationLevel, NotificationLevelApi> = {
+        info: 'INFO',
+        success: 'SUCCESS',
+        warning: 'WARNING'
+      }
+
+      const response = await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          message,
+          level: levelMap[level]
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('No se pudo crear la notificación')
+      }
+
+      return (await response.json()) as AdminNotification
+    },
+    []
+  )
+
+  const addNotification = useCallback((
     title: string,
     message: string,
     level: NotificationLevel = 'info'
   ) => {
-    const nextNotification: AdminNotification = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title,
-      message,
-      level,
-      createdAt: new Date().toISOString(),
-      isRead: false
-    }
-    setNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
-  }
+    void (async () => {
+      try {
+        const created = await createNotification(title, message, level)
+        setNotifications((prev) => [created, ...prev.filter((item) => item.id !== created.id)].slice(0, NOTIFICATIONS_PAGE_LIMIT))
+      } catch (error) {
+        console.error('No se pudo persistir notificación admin', error)
+      }
+    })()
+  }, [createNotification])
 
   const markAllNotificationsAsRead = () => {
+    const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id)
+    if (unreadIds.length === 0) return
+
     setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
+    void (async () => {
+      try {
+        await Promise.all(
+          unreadIds.map((notificationId) =>
+            fetch(`/api/admin/notifications/${notificationId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isRead: true })
+            })
+          )
+        )
+      } catch (error) {
+        console.error('Error al marcar todas las notificaciones como leídas', error)
+        showError('No se pudieron actualizar todas las notificaciones.')
+        await reloadNotifications()
+      }
+    })()
+  }
+
+  const clearReadNotifications = () => {
+    const readIds = notifications.filter((notification) => notification.isRead).map((notification) => notification.id)
+    if (readIds.length === 0) return
+
+    setNotifications((prev) => prev.filter((notification) => !notification.isRead))
+    showSuccess('Notificaciones leidas limpiadas.')
+    void (async () => {
+      try {
+        await Promise.all(
+          readIds.map((notificationId) =>
+            fetch(`/api/admin/notifications/${notificationId}`, {
+              method: 'DELETE'
+            })
+          )
+        )
+      } catch (error) {
+        console.error('Error al limpiar notificaciones leídas', error)
+        showError('No se pudieron limpiar todas las notificaciones leídas.')
+        await reloadNotifications()
+      }
+    })()
+  }
+
+  const toggleNotificationRead = (notificationId: string) => {
+    const target = notifications.find((notification) => notification.id === notificationId)
+    if (!target) return
+    const nextIsRead = !target.isRead
+
+    let changedToRead = false
+    setNotifications((prev) =>
+      prev.map((notification) => {
+        if (notification.id !== notificationId) return notification
+        changedToRead = !notification.isRead
+        return { ...notification, isRead: !notification.isRead }
+      })
+    )
+    showSuccess(changedToRead ? 'Notificacion marcada como leida.' : 'Notificacion marcada como no leida.')
+    void (async () => {
+      try {
+        const response = await fetch(`/api/admin/notifications/${notificationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: nextIsRead })
+        })
+        if (!response.ok) {
+          throw new Error('No se pudo actualizar la notificación')
+        }
+      } catch (error) {
+        console.error('Error al actualizar estado de notificación', error)
+        showError('No se pudo actualizar la notificación.')
+        await reloadNotifications()
+      }
+    })()
+  }
+
+  const handleDeleteNotification = (notificationId: string) => {
+    setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId))
+    showSuccess('Notificación eliminada.')
+    void (async () => {
+      try {
+        const response = await fetch(`/api/admin/notifications/${notificationId}`, {
+          method: 'DELETE'
+        })
+        if (!response.ok) {
+          throw new Error('No se pudo eliminar la notificación')
+        }
+      } catch (error) {
+        console.error('Error al eliminar notificación', error)
+        showError('No se pudo eliminar la notificación.')
+        await reloadNotifications()
+      }
+    })()
   }
 
   const paginatedVacancies = useMemo(
@@ -372,13 +519,19 @@ export default function AdminDashboard() {
   }, [status, showInfo])
 
   useEffect(() => {
+    if (status !== 'authenticated') return
+    void reloadNotifications()
+  }, [status, reloadNotifications])
+
+  useEffect(() => {
     if (isLoading) return
 
+    const lastObservedStats = lastObservedStatsRef.current
     if (!lastObservedStats) {
-      setLastObservedStats({
+      lastObservedStatsRef.current = {
         totalApplications: stats.totalApplications,
         pendingContacts: stats.pendingContacts
-      })
+      }
       return
     }
 
@@ -400,11 +553,11 @@ export default function AdminDashboard() {
       )
     }
 
-    setLastObservedStats({
+    lastObservedStatsRef.current = {
       totalApplications: stats.totalApplications,
       pendingContacts: stats.pendingContacts
-    })
-  }, [isLoading, lastObservedStats, stats.pendingContacts, stats.totalApplications])
+    }
+  }, [addNotification, isLoading, stats.pendingContacts, stats.totalApplications])
 
   const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
   const currentTutorialSteps = activeTutorial ? tutorialStepsByKind[activeTutorial] : null
@@ -813,6 +966,10 @@ export default function AdminDashboard() {
   }
 
   const handleOpenNotifications = () => {
+    void reloadNotifications()
+  }
+
+  const handleOpenSettings = () => {
     setActiveTab('settings')
   }
 
@@ -978,6 +1135,12 @@ const handleTestSentry = () => {
         onOpenFullTutorial={handleOpenHelp}
         onOpenSectionTutorial={handleOpenSectionTutorial}
         onOpenNotifications={handleOpenNotifications}
+        onOpenSettings={handleOpenSettings}
+        notifications={orderedNotifications}
+        onDeleteNotification={handleDeleteNotification}
+        onToggleNotificationRead={toggleNotificationRead}
+        onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
+        onClearReadNotifications={clearReadNotifications}
         unreadNotifications={unreadNotifications}
       />
 
@@ -1039,8 +1202,7 @@ const handleTestSentry = () => {
           stats={{
             activeVacancies: stats.activeVacancies,
             pendingApplications: applications.filter(a => a.status === 'PENDING').length,
-            pendingContacts: stats.pendingContacts,
-            unreadNotifications
+            pendingContacts: stats.pendingContacts
           }}
         />
 
@@ -1503,50 +1665,6 @@ const handleTestSentry = () => {
                     Cambiar contraseña
                   </a>
                 </div>
-              </div>
-            </div>
-
-            <div id="admin-notifications-panel" className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Notificaciones del panel</h3>
-                  <p className="text-sm text-gray-600">Eventos operativos recientes y alertas de gestión.</p>
-                </div>
-                {unreadNotifications > 0 && (
-                  <button
-                    onClick={markAllNotificationsAsRead}
-                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    Marcar leídas ({unreadNotifications})
-                  </button>
-                )}
-              </div>
-
-              <div className="p-4 sm:p-6 space-y-3">
-                {notifications.length === 0 ? (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-600">
-                    Aún no hay notificaciones registradas en esta sesión.
-                  </div>
-                ) : (
-                  notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`rounded-lg border px-4 py-3 ${
-                        notification.isRead ? 'border-gray-200 bg-white' : 'border-primary-200 bg-primary-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{notification.title}</p>
-                          <p className="text-sm text-gray-700 mt-1">{notification.message}</p>
-                        </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(notification.createdAt).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           </div>

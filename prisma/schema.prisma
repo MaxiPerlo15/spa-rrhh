@@ -50,6 +50,19 @@ model AdminAuditLog {
   @@index([actorEmail, createdAt])
 }
 
+model AdminNotification {
+  id        String            @id @default(cuid())
+  title     String
+  message   String
+  level     NotificationLevel @default(INFO)
+  isRead    Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([createdAt])
+  @@index([isRead, createdAt])
+}
+
 model Vacancy {
   id           String          @id @default(cuid())
   title        String
@@ -142,4 +155,10 @@ enum AuditOutcome {
   SUCCESS
   DENIED
   ERROR
+}
+
+enum NotificationLevel {
+  INFO
+  SUCCESS
+  WARNING
 }
