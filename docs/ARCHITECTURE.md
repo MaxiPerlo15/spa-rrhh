@@ -507,7 +507,15 @@ Ubicación: `tests/e2e/`
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Playwright](https://playwright.dev/docs/intro)
 
+## Actualización Sprint 2 (Febrero 2026)
+
+- Se agregó `GET/PATCH /api/admin/settings` para configuración operativa de cuenta en el panel admin.
+- `AdminNotification` ahora soporta acción contextual (`label`, `type`, `resourceId`) para deep-links.
+- El inbox del header permite CTA directa hacia vacantes/postulaciones/contactos.
+- Las tablas de admin incorporan filtros combinables + ordenamiento + persistencia de estado en `localStorage`.
+- Se añadió el modelo `AdminSettings` para persistir preferencias de notificaciones.
+
 ---
 
-**Última actualización**: Diciembre 2025
+**Última actualización**: Febrero 2026
 **Versión**: 0.2.1

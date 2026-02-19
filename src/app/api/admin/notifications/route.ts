@@ -76,7 +76,10 @@ export async function POST(request: NextRequest) {
       data: {
         title: bodyValidation.data.title,
         message: bodyValidation.data.message,
-        level: bodyValidation.data.level
+        level: bodyValidation.data.level,
+        actionLabel: bodyValidation.data.action?.label,
+        actionType: bodyValidation.data.action?.type,
+        actionResourceId: bodyValidation.data.action?.resourceId
       }
     })
 

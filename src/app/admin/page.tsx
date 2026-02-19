@@ -43,9 +43,36 @@ interface AdminNotification {
   level: NotificationLevel
   createdAt: string
   isRead: boolean
+  action?: {
+    label: string
+    type: 'VACANCY' | 'APPLICATION' | 'CONTACT'
+    resourceId: string
+  }
 }
 
 const NOTIFICATIONS_PAGE_LIMIT = 50
+const ADMIN_TABLE_STATE_STORAGE_KEY = 'admin_dashboard_table_state_v1'
+
+type VacancySortKey = 'createdAt' | 'title' | 'location' | 'status'
+type ApplicationSortKey = 'submittedAt' | 'candidateName' | 'status'
+type ContactSortKey = 'createdAt' | 'name' | 'status'
+type SortDirection = 'asc' | 'desc'
+
+type AdminSettingsResponse = {
+  profile: {
+    id: string
+    email: string
+    name: string
+    role: string
+  }
+  preferences: {
+    notificationsEnabled: boolean
+    notifyNewApplications: boolean
+    notifyNewContacts: boolean
+    notifySecurityAlerts: boolean
+  }
+  updatedAt: string
+}
 
 type DomainStep = {
   target: TourTarget
@@ -194,12 +221,21 @@ export default function AdminDashboard() {
   } = useAdminDashboard()
   
   const [activeTab, setActiveTab] = useState<AdminTab>('vacancies')
-  const [filteredApplications, setFilteredApplications] = useState<Application[]>([])
+  const [searchVacancies, setSearchVacancies] = useState<string>('')
+  const [filterVacancyStatus, setFilterVacancyStatus] = useState<'all' | 'active' | 'closed'>('all')
+  const [sortVacanciesBy, setSortVacanciesBy] = useState<VacancySortKey>('createdAt')
+  const [sortVacanciesDirection, setSortVacanciesDirection] = useState<SortDirection>('desc')
+
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([])
+  const [filterApplicationsVacancyId, setFilterApplicationsVacancyId] = useState<string>('all')
+  const [sortApplicationsBy, setSortApplicationsBy] = useState<ApplicationSortKey>('submittedAt')
+  const [sortApplicationsDirection, setSortApplicationsDirection] = useState<SortDirection>('desc')
+
   const [filterContactStatus, setFilterContactStatus] = useState<string>('all')
   const [searchApplications, setSearchApplications] = useState<string>('')
   const [searchContacts, setSearchContacts] = useState<string>('')
+  const [sortContactsBy, setSortContactsBy] = useState<ContactSortKey>('createdAt')
+  const [sortContactsDirection, setSortContactsDirection] = useState<SortDirection>('desc')
   const [currentVacancyPage, setCurrentVacancyPage] = useState(1)
   const [currentApplicationPage, setCurrentApplicationPage] = useState(1)
   const [currentContactPage, setCurrentContactPage] = useState(1)
@@ -243,6 +279,15 @@ export default function AdminDashboard() {
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
   const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [settingsForm, setSettingsForm] = useState({
+    name: '',
+    notificationsEnabled: true,
+    notifyNewApplications: true,
+    notifyNewContacts: true,
+    notifySecurityAlerts: true
+  })
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [settingsSaving, setSettingsSaving] = useState(false)
   const lastObservedStatsRef = useRef<{
     totalApplications: number
     pendingContacts: number
@@ -277,7 +322,12 @@ export default function AdminDashboard() {
   }, [showError])
 
   const createNotification = useCallback(
-    async (title: string, message: string, level: NotificationLevel) => {
+    async (
+      title: string,
+      message: string,
+      level: NotificationLevel,
+      action?: AdminNotification['action']
+    ) => {
       const levelMap: Record<NotificationLevel, NotificationLevelApi> = {
         info: 'INFO',
         success: 'SUCCESS',
@@ -290,7 +340,8 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           title,
           message,
-          level: levelMap[level]
+          level: levelMap[level],
+          action
         })
       })
 
@@ -306,17 +357,19 @@ export default function AdminDashboard() {
   const addNotification = useCallback((
     title: string,
     message: string,
-    level: NotificationLevel = 'info'
+    level: NotificationLevel = 'info',
+    action?: AdminNotification['action']
   ) => {
+    if (!settingsForm.notificationsEnabled) return
     void (async () => {
       try {
-        const created = await createNotification(title, message, level)
+        const created = await createNotification(title, message, level, action)
         setNotifications((prev) => [created, ...prev.filter((item) => item.id !== created.id)].slice(0, NOTIFICATIONS_PAGE_LIMIT))
       } catch (error) {
         console.error('No se pudo persistir notificación admin', error)
       }
     })()
-  }, [createNotification])
+  }, [createNotification, settingsForm.notificationsEnabled])
 
   const markAllNotificationsAsRead = () => {
     const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id)
@@ -416,9 +469,107 @@ export default function AdminDashboard() {
     })()
   }
 
+  const filteredVacancies = useMemo(() => {
+    let next = [...vacancies]
+
+    if (filterVacancyStatus !== 'all') {
+      next = next.filter((vacancy) => vacancy.status === filterVacancyStatus)
+    }
+
+    if (searchVacancies.trim()) {
+      const search = searchVacancies.toLowerCase()
+      next = next.filter((vacancy) =>
+        vacancy.title.toLowerCase().includes(search) || vacancy.location.toLowerCase().includes(search)
+      )
+    }
+
+    next.sort((a, b) => {
+      const factor = sortVacanciesDirection === 'asc' ? 1 : -1
+      if (sortVacanciesBy === 'createdAt') {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * factor
+      }
+      if (sortVacanciesBy === 'status') {
+        return a.status.localeCompare(b.status) * factor
+      }
+      return a[sortVacanciesBy].localeCompare(b[sortVacanciesBy], 'es', { sensitivity: 'base' }) * factor
+    })
+
+    return next
+  }, [filterVacancyStatus, searchVacancies, sortVacanciesBy, sortVacanciesDirection, vacancies])
+
+  const filteredApplications = useMemo(() => {
+    let next = [...applications]
+
+    if (filterStatus !== 'all') {
+      next = next.filter((app) => app.status === filterStatus)
+    }
+    if (filterApplicationsVacancyId !== 'all') {
+      next = next.filter((app) => app.vacancy.id === filterApplicationsVacancyId)
+    }
+    if (searchApplications.trim()) {
+      const search = searchApplications.toLowerCase()
+      next = next.filter(
+        (app) =>
+          app.candidateName.toLowerCase().includes(search) ||
+          app.email.toLowerCase().includes(search) ||
+          app.vacancy.title.toLowerCase().includes(search)
+      )
+    }
+
+    next.sort((a, b) => {
+      const factor = sortApplicationsDirection === 'asc' ? 1 : -1
+      if (sortApplicationsBy === 'submittedAt') {
+        return (new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()) * factor
+      }
+      if (sortApplicationsBy === 'status') {
+        return a.status.localeCompare(b.status) * factor
+      }
+      return a.candidateName.localeCompare(b.candidateName, 'es', { sensitivity: 'base' }) * factor
+    })
+
+    return next
+  }, [
+    applications,
+    filterStatus,
+    filterApplicationsVacancyId,
+    searchApplications,
+    sortApplicationsBy,
+    sortApplicationsDirection
+  ])
+
+  const filteredContacts = useMemo(() => {
+    let next = [...contacts]
+
+    if (filterContactStatus !== 'all') {
+      next = next.filter((contact) => contact.status === filterContactStatus)
+    }
+    if (searchContacts.trim()) {
+      const search = searchContacts.toLowerCase()
+      next = next.filter(
+        (contact) =>
+          contact.name.toLowerCase().includes(search) ||
+          contact.email.toLowerCase().includes(search) ||
+          contact.subject.toLowerCase().includes(search)
+      )
+    }
+
+    next.sort((a, b) => {
+      const factor = sortContactsDirection === 'asc' ? 1 : -1
+      if (sortContactsBy === 'createdAt') {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * factor
+      }
+      if (sortContactsBy === 'status') {
+        return a.status.localeCompare(b.status) * factor
+      }
+      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }) * factor
+    })
+
+    return next
+  }, [contacts, filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection])
+
   const paginatedVacancies = useMemo(
-    () => vacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
-    [currentVacancyPage, itemsPerPage, vacancies]
+    () => filteredVacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
+    [currentVacancyPage, filteredVacancies, itemsPerPage]
   )
   const paginatedApplications = useMemo(
     () => filteredApplications.slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage),
@@ -524,6 +675,131 @@ export default function AdminDashboard() {
   }, [status, reloadNotifications])
 
   useEffect(() => {
+    if (status !== 'authenticated') return
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/admin/settings', { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error('No se pudo cargar la configuración')
+        }
+
+        const data = (await response.json()) as AdminSettingsResponse
+        setSettingsForm({
+          name: data.profile.name ?? '',
+          notificationsEnabled: data.preferences.notificationsEnabled,
+          notifyNewApplications: data.preferences.notifyNewApplications,
+          notifyNewContacts: data.preferences.notifyNewContacts,
+          notifySecurityAlerts: data.preferences.notifySecurityAlerts
+        })
+        setSettingsLoaded(true)
+      } catch (error) {
+        console.error('Error al cargar configuración admin', error)
+        showError('No se pudo cargar la configuración del panel.')
+      }
+    })()
+  }, [showError, status])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    try {
+      const raw = window.localStorage.getItem(ADMIN_TABLE_STATE_STORAGE_KEY)
+      if (!raw) return
+
+      const parsed = JSON.parse(raw) as {
+        vacancies?: {
+          search?: string
+          status?: 'all' | 'active' | 'closed'
+          sortBy?: VacancySortKey
+          sortDirection?: SortDirection
+        }
+        applications?: {
+          search?: string
+          status?: string
+          vacancyId?: string
+          sortBy?: ApplicationSortKey
+          sortDirection?: SortDirection
+        }
+        contacts?: {
+          search?: string
+          status?: string
+          sortBy?: ContactSortKey
+          sortDirection?: SortDirection
+        }
+      }
+
+      if (parsed.vacancies) {
+        setSearchVacancies(parsed.vacancies.search ?? '')
+        setFilterVacancyStatus(parsed.vacancies.status ?? 'all')
+        setSortVacanciesBy(parsed.vacancies.sortBy ?? 'createdAt')
+        setSortVacanciesDirection(parsed.vacancies.sortDirection ?? 'desc')
+      }
+      if (parsed.applications) {
+        setSearchApplications(parsed.applications.search ?? '')
+        setFilterStatus(parsed.applications.status ?? 'all')
+        setFilterApplicationsVacancyId(parsed.applications.vacancyId ?? 'all')
+        setSortApplicationsBy(parsed.applications.sortBy ?? 'submittedAt')
+        setSortApplicationsDirection(parsed.applications.sortDirection ?? 'desc')
+      }
+      if (parsed.contacts) {
+        setSearchContacts(parsed.contacts.search ?? '')
+        setFilterContactStatus(parsed.contacts.status ?? 'all')
+        setSortContactsBy(parsed.contacts.sortBy ?? 'createdAt')
+        setSortContactsDirection(parsed.contacts.sortDirection ?? 'desc')
+      }
+    } catch {
+      // ignore invalid persisted state
+    }
+  }, [status])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    try {
+      window.localStorage.setItem(
+        ADMIN_TABLE_STATE_STORAGE_KEY,
+        JSON.stringify({
+          vacancies: {
+            search: searchVacancies,
+            status: filterVacancyStatus,
+            sortBy: sortVacanciesBy,
+            sortDirection: sortVacanciesDirection
+          },
+          applications: {
+            search: searchApplications,
+            status: filterStatus,
+            vacancyId: filterApplicationsVacancyId,
+            sortBy: sortApplicationsBy,
+            sortDirection: sortApplicationsDirection
+          },
+          contacts: {
+            search: searchContacts,
+            status: filterContactStatus,
+            sortBy: sortContactsBy,
+            sortDirection: sortContactsDirection
+          }
+        })
+      )
+    } catch {
+      // ignore storage failures
+    }
+  }, [
+    filterApplicationsVacancyId,
+    filterContactStatus,
+    filterStatus,
+    filterVacancyStatus,
+    searchApplications,
+    searchContacts,
+    searchVacancies,
+    sortApplicationsBy,
+    sortApplicationsDirection,
+    sortContactsBy,
+    sortContactsDirection,
+    sortVacanciesBy,
+    sortVacanciesDirection,
+    status
+  ])
+
+  useEffect(() => {
     if (isLoading) return
 
     const lastObservedStats = lastObservedStatsRef.current
@@ -535,21 +811,43 @@ export default function AdminDashboard() {
       return
     }
 
-    if (stats.totalApplications > lastObservedStats.totalApplications) {
+    if (
+      settingsForm.notificationsEnabled &&
+      settingsForm.notifyNewApplications &&
+      stats.totalApplications > lastObservedStats.totalApplications
+    ) {
       const diff = stats.totalApplications - lastObservedStats.totalApplications
       addNotification(
         'Nuevas postulaciones',
         `Ingresaron ${diff} nueva(s) postulación(es) desde tu última revisión.`,
-        'success'
+        'success',
+        applications[0]
+          ? {
+              label: 'Ver postulaciones',
+              type: 'APPLICATION',
+              resourceId: applications[0].id
+            }
+          : undefined
       )
     }
 
-    if (stats.pendingContacts > lastObservedStats.pendingContacts) {
+    if (
+      settingsForm.notificationsEnabled &&
+      settingsForm.notifyNewContacts &&
+      stats.pendingContacts > lastObservedStats.pendingContacts
+    ) {
       const diff = stats.pendingContacts - lastObservedStats.pendingContacts
       addNotification(
         'Nuevos contactos pendientes',
         `Se detectaron ${diff} nuevo(s) contacto(s) pendiente(s).`,
-        'warning'
+        'warning',
+        contacts[0]
+          ? {
+              label: 'Ver contactos',
+              type: 'CONTACT',
+              resourceId: contacts[0].id
+            }
+          : undefined
       )
     }
 
@@ -557,7 +855,17 @@ export default function AdminDashboard() {
       totalApplications: stats.totalApplications,
       pendingContacts: stats.pendingContacts
     }
-  }, [addNotification, isLoading, stats.pendingContacts, stats.totalApplications])
+  }, [
+    addNotification,
+    applications,
+    contacts,
+    isLoading,
+    settingsForm.notificationsEnabled,
+    settingsForm.notifyNewApplications,
+    settingsForm.notifyNewContacts,
+    stats.pendingContacts,
+    stats.totalApplications
+  ])
 
   const currentOnboardingArea = ONBOARDING_AREAS[onboardingStep]
   const currentTutorialSteps = activeTutorial ? tutorialStepsByKind[activeTutorial] : null
@@ -683,56 +991,18 @@ export default function AdminDashboard() {
     }
   }, [isGuidedMode, tutorialStep, onboardingStep])
 
-  useEffect(() => {
-    let filtered = applications
-
-    // Filtro por estado
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(app => app.status === filterStatus)
-    }
-
-    // Filtro por búsqueda
-    if (searchApplications.trim()) {
-      const search = searchApplications.toLowerCase()
-      filtered = filtered.filter(app =>
-        app.candidateName.toLowerCase().includes(search) ||
-        app.email.toLowerCase().includes(search) ||
-        app.vacancy.title.toLowerCase().includes(search)
-      )
-    }
-
-    setFilteredApplications(filtered)
-  }, [filterStatus, searchApplications, applications])
-
-  useEffect(() => {
-    let filtered = contacts
-
-    // Filtro por estado
-    if (filterContactStatus !== 'all') {
-      filtered = filtered.filter(contact => contact.status === filterContactStatus)
-    }
-
-    // Filtro por búsqueda
-    if (searchContacts.trim()) {
-      const search = searchContacts.toLowerCase()
-      filtered = filtered.filter(contact =>
-        contact.name.toLowerCase().includes(search) ||
-        contact.email.toLowerCase().includes(search) ||
-        contact.subject.toLowerCase().includes(search)
-      )
-    }
-
-    setFilteredContacts(filtered)
-  }, [filterContactStatus, searchContacts, contacts])
-
   // Resetear páginas cuando cambian los filtros
   useEffect(() => {
+    setCurrentVacancyPage(1)
+  }, [searchVacancies, filterVacancyStatus, sortVacanciesBy, sortVacanciesDirection])
+
+  useEffect(() => {
     setCurrentApplicationPage(1)
-  }, [filterStatus, searchApplications])
+  }, [filterStatus, filterApplicationsVacancyId, searchApplications, sortApplicationsBy, sortApplicationsDirection])
 
   useEffect(() => {
     setCurrentContactPage(1)
-  }, [filterContactStatus, searchContacts])
+  }, [filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection])
 
   const handleDeleteVacancy = async (id: string, title: string) => {
     openConfirmDialog({
@@ -763,7 +1033,12 @@ export default function AdminDashboard() {
       addNotification(
         'Estado de vacante actualizado',
         `La vacante "${vacancy.title}" fue ${vacancy.status === 'active' ? 'cerrada' : 'activada'}.`,
-        'info'
+        'info',
+        {
+          label: 'Ver vacantes',
+          type: 'VACANCY',
+          resourceId: vacancy.id
+        }
       )
     } catch (error) {
       console.error('Error toggling status:', error)
@@ -824,11 +1099,19 @@ export default function AdminDashboard() {
       if (editingVacancy) {
         await updateVacancyApi(editingVacancy.id, formData)
         showSuccess('Vacante actualizada exitosamente')
-        addNotification('Vacante actualizada', `Se actualizó "${formData.title}".`, 'success')
+        addNotification('Vacante actualizada', `Se actualizó "${formData.title}".`, 'success', {
+          label: 'Ver vacante',
+          type: 'VACANCY',
+          resourceId: editingVacancy.id
+        })
       } else {
-        await createVacancyApi(formData)
+        const createdVacancy = await createVacancyApi(formData)
         showSuccess('Vacante creada exitosamente')
-        addNotification('Nueva vacante', `Se creó la vacante "${formData.title}".`, 'success')
+        addNotification('Nueva vacante', `Se creó la vacante "${formData.title}".`, 'success', {
+          label: 'Ver vacante',
+          type: 'VACANCY',
+          resourceId: createdVacancy.id
+        })
       }
       handleCloseModal()
     } catch (error) {
@@ -843,7 +1126,11 @@ export default function AdminDashboard() {
     try {
       await updateApplicationStatus(applicationId, newStatus)
       showSuccess('Estado actualizado exitosamente')
-      addNotification('Postulación actualizada', `Se cambió el estado a ${statusLabels[newStatus]}.`, 'info')
+      addNotification('Postulación actualizada', `Se cambió el estado a ${statusLabels[newStatus]}.`, 'info', {
+        label: 'Ver postulación',
+        type: 'APPLICATION',
+        resourceId: applicationId
+      })
     } catch (error) {
       console.error('Error updating application status:', error)
       showError('Error al actualizar el estado')
@@ -877,7 +1164,12 @@ export default function AdminDashboard() {
       addNotification(
         'Contacto actualizado',
         `Se cambió el estado del contacto a ${contactStatusLabels[newStatus]}.`,
-        'info'
+        'info',
+        {
+          label: 'Ver contacto',
+          type: 'CONTACT',
+          resourceId: contactId
+        }
       )
     } catch (error) {
       console.error('Error al actualizar estado del contacto:', error)
@@ -973,6 +1265,82 @@ export default function AdminDashboard() {
     setActiveTab('settings')
   }
 
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true)
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settingsForm)
+      })
+
+      if (!response.ok) {
+        throw new Error('No se pudo guardar la configuración')
+      }
+
+      const data = (await response.json()) as AdminSettingsResponse
+      setSettingsForm({
+        name: data.profile.name ?? '',
+        notificationsEnabled: data.preferences.notificationsEnabled,
+        notifyNewApplications: data.preferences.notifyNewApplications,
+        notifyNewContacts: data.preferences.notifyNewContacts,
+        notifySecurityAlerts: data.preferences.notifySecurityAlerts
+      })
+      showSuccess('Configuración guardada correctamente.')
+    } catch (error) {
+      console.error('Error al guardar configuración admin', error)
+      showError('No se pudo guardar la configuración.')
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
+  const handleNotificationAction = (notification: AdminNotification) => {
+    if (!notification.action) return
+
+    const action = notification.action
+
+    if (action.type === 'VACANCY') {
+      setActiveTab('vacancies')
+      const totalPages = Math.max(1, Math.ceil(filteredVacancies.length / itemsPerPage))
+      const foundIndex = filteredVacancies.findIndex((vacancy) => vacancy.id === action.resourceId)
+      if (foundIndex >= 0) {
+        setCurrentVacancyPage(Math.floor(foundIndex / itemsPerPage) + 1)
+      } else {
+        setCurrentVacancyPage(totalPages)
+      }
+      showInfo('Te llevamos al módulo de vacantes.')
+    }
+
+    if (action.type === 'APPLICATION') {
+      setActiveTab('applications')
+      const foundIndex = filteredApplications.findIndex((application) => application.id === action.resourceId)
+      if (foundIndex >= 0) {
+        setCurrentApplicationPage(Math.floor(foundIndex / itemsPerPage) + 1)
+        const targetApplication = filteredApplications[foundIndex]
+        setSelectedApplication(targetApplication)
+        setShowApplicationDetail(true)
+      }
+      showInfo('Te llevamos al módulo de postulaciones.')
+    }
+
+    if (action.type === 'CONTACT') {
+      setActiveTab('contacts')
+      const foundIndex = filteredContacts.findIndex((contact) => contact.id === action.resourceId)
+      if (foundIndex >= 0) {
+        setCurrentContactPage(Math.floor(foundIndex / itemsPerPage) + 1)
+        const targetContact = filteredContacts[foundIndex]
+        setSelectedContact(targetContact)
+        setShowContactDetail(true)
+      }
+      showInfo('Te llevamos al módulo de contactos.')
+    }
+
+    if (!notification.isRead) {
+      toggleNotificationRead(notification.id)
+    }
+  }
+
   const handleCompleteOnboarding = () => {
     try {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
@@ -1008,10 +1376,19 @@ export default function AdminDashboard() {
     setCurrentVacancyPage(1)
     setCurrentApplicationPage(1)
     setCurrentContactPage(1)
+    setSearchVacancies('')
+    setFilterVacancyStatus('all')
+    setSortVacanciesBy('createdAt')
+    setSortVacanciesDirection('desc')
     setFilterStatus('all')
+    setFilterApplicationsVacancyId('all')
+    setSortApplicationsBy('submittedAt')
+    setSortApplicationsDirection('desc')
     setFilterContactStatus('all')
     setSearchApplications('')
     setSearchContacts('')
+    setSortContactsBy('createdAt')
+    setSortContactsDirection('desc')
     if (fromOnboarding) {
       setOnboardingReturnStep(onboardingStep)
     } else {
@@ -1141,6 +1518,7 @@ const handleTestSentry = () => {
         onToggleNotificationRead={toggleNotificationRead}
         onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
         onClearReadNotifications={clearReadNotifications}
+        onNotificationAction={handleNotificationAction}
         unreadNotifications={unreadNotifications}
       />
 
@@ -1219,6 +1597,44 @@ const handleTestSentry = () => {
               + Nueva Vacante
             </button>
           </div>
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Buscar por título o ubicación"
+                value={searchVacancies}
+                onChange={(event) => setSearchVacancies(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+              />
+              <select
+                value={filterVacancyStatus}
+                onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'closed')}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="active">Activas</option>
+                <option value="closed">Cerradas</option>
+              </select>
+              <select
+                value={sortVacanciesBy}
+                onChange={(event) => setSortVacanciesBy(event.target.value as VacancySortKey)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
+                <option value="createdAt">Ordenar por fecha</option>
+                <option value="title">Ordenar por título</option>
+                <option value="location">Ordenar por ubicación</option>
+                <option value="status">Ordenar por estado</option>
+              </select>
+              <select
+                value={sortVacanciesDirection}
+                onChange={(event) => setSortVacanciesDirection(event.target.value as SortDirection)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+              >
+                <option value="desc">Más recientes primero</option>
+                <option value="asc">Más antiguos primero</option>
+              </select>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px]">
@@ -1234,9 +1650,7 @@ const handleTestSentry = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {vacancies
-                  .slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage)
-                  .map((vacancy, index) => {
+                {paginatedVacancies.map((vacancy, index) => {
                   const workdayLabels = {
                     'FULL_TIME': 'Jornada Completa',
                     'PART_TIME': 'Media Jornada',
@@ -1310,7 +1724,7 @@ const handleTestSentry = () => {
           {/* Paginación */}
           <Pagination
             currentPage={currentVacancyPage}
-            totalItems={vacancies.length}
+            totalItems={filteredVacancies.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentVacancyPage}
           />
@@ -1394,6 +1808,35 @@ const handleTestSentry = () => {
                     <option value="ACCEPTED">Aceptados</option>
                     <option value="REJECTED">Rechazados</option>
                   </select>
+                  <select
+                    value={filterApplicationsVacancyId}
+                    onChange={(event) => setFilterApplicationsVacancyId(event.target.value)}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="all">Todas las vacantes</option>
+                    {vacancies.map((vacancy) => (
+                      <option key={vacancy.id} value={vacancy.id}>
+                        {vacancy.title}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={sortApplicationsBy}
+                    onChange={(event) => setSortApplicationsBy(event.target.value as ApplicationSortKey)}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="submittedAt">Ordenar por fecha</option>
+                    <option value="candidateName">Ordenar por candidato</option>
+                    <option value="status">Ordenar por estado</option>
+                  </select>
+                  <select
+                    value={sortApplicationsDirection}
+                    onChange={(event) => setSortApplicationsDirection(event.target.value as SortDirection)}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="desc">Descendente</option>
+                    <option value="asc">Ascendente</option>
+                  </select>
                   <span className="text-sm text-gray-600 text-center sm:text-left">
                     {filteredApplications.length} postulaciones
                   </span>
@@ -1423,9 +1866,7 @@ const handleTestSentry = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredApplications
-                        .slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage)
-                        .map((application) => (
+                      paginatedApplications.map((application) => (
                         <tr key={application.id} className="hover:bg-gray-50">
                           <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
                             {application.candidateName}
@@ -1546,6 +1987,23 @@ const handleTestSentry = () => {
                     <option value="RESPONDED">Respondidos</option>
                     <option value="ARCHIVED">Archivados</option>
                   </select>
+                  <select
+                    value={sortContactsBy}
+                    onChange={(event) => setSortContactsBy(event.target.value as ContactSortKey)}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="createdAt">Ordenar por fecha</option>
+                    <option value="name">Ordenar por nombre</option>
+                    <option value="status">Ordenar por estado</option>
+                  </select>
+                  <select
+                    value={sortContactsDirection}
+                    onChange={(event) => setSortContactsDirection(event.target.value as SortDirection)}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="desc">Descendente</option>
+                    <option value="asc">Ascendente</option>
+                  </select>
                   <span className="text-sm text-gray-600 text-center sm:text-left">
                     {filteredContacts.length} contactos
                   </span>
@@ -1578,9 +2036,7 @@ const handleTestSentry = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredContacts
-                        .slice((currentContactPage - 1) * itemsPerPage, currentContactPage * itemsPerPage)
-                        .map((contact) => (
+                      paginatedContacts.map((contact) => (
                         <tr key={contact.id} className="hover:bg-gray-50">
                           <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
                             {contact.name}
@@ -1654,16 +2110,88 @@ const handleTestSentry = () => {
                   <p className="text-sm font-medium text-gray-900">{session.user?.role ?? 'ADMIN'}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
+                  <label htmlFor="adminName" className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
+                    Nombre visible
+                  </label>
+                  <input
+                    id="adminName"
+                    type="text"
+                    value={settingsForm.name}
+                    onChange={(event) => setSettingsForm((prev) => ({ ...prev, name: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                    placeholder="Administrador"
+                  />
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>
                   <p className="text-sm text-gray-700">
                     Gestiona el cambio de contraseña desde el flujo seguro de recuperación.
                   </p>
-                  <a
-                    href="/admin/forgot-password"
-                    className="inline-flex mt-3 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
-                  >
-                    Cambiar contraseña
-                  </a>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <a
+                      href="/admin/forgot-password"
+                      className="inline-flex px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+                    >
+                      Cambiar contraseña
+                    </a>
+                    <span className="text-xs text-gray-500">Sesión activa por JWT (8h) y cookies seguras.</span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2 space-y-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">Preferencias de notificaciones</p>
+                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                    <span>Habilitar notificaciones del panel</span>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.notificationsEnabled}
+                      onChange={(event) =>
+                        setSettingsForm((prev) => ({ ...prev, notificationsEnabled: event.target.checked }))
+                      }
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                    <span>Nuevas postulaciones</span>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.notifyNewApplications}
+                      onChange={(event) =>
+                        setSettingsForm((prev) => ({ ...prev, notifyNewApplications: event.target.checked }))
+                      }
+                      disabled={!settingsForm.notificationsEnabled}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                    <span>Nuevos contactos</span>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.notifyNewContacts}
+                      onChange={(event) =>
+                        setSettingsForm((prev) => ({ ...prev, notifyNewContacts: event.target.checked }))
+                      }
+                      disabled={!settingsForm.notificationsEnabled}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                    <span>Alertas de seguridad</span>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.notifySecurityAlerts}
+                      onChange={(event) =>
+                        setSettingsForm((prev) => ({ ...prev, notifySecurityAlerts: event.target.checked }))
+                      }
+                      disabled={!settingsForm.notificationsEnabled}
+                    />
+                  </label>
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveSettings()}
+                      disabled={settingsSaving || !settingsLoaded}
+                      className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                    >
+                      {settingsSaving ? 'Guardando...' : 'Guardar configuración'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -14,6 +14,11 @@ interface HeaderNotification {
   level: 'info' | 'success' | 'warning'
   createdAt: string
   isRead: boolean
+  action?: {
+    label: string
+    type: 'VACANCY' | 'APPLICATION' | 'CONTACT'
+    resourceId: string
+  }
 }
 
 interface AdminHeaderProps {
@@ -28,6 +33,7 @@ interface AdminHeaderProps {
   onToggleNotificationRead: (notificationId: string) => void
   onMarkAllNotificationsAsRead: () => void
   onClearReadNotifications: () => void
+  onNotificationAction: (notification: HeaderNotification) => void
   unreadNotifications?: number
 }
 
@@ -45,6 +51,7 @@ export default function AdminHeader({
   onToggleNotificationRead,
   onMarkAllNotificationsAsRead,
   onClearReadNotifications,
+  onNotificationAction,
   unreadNotifications = 0
 }: AdminHeaderProps) {
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false)
@@ -291,6 +298,14 @@ export default function AdminHeader({
                                 >
                                   {notification.isRead ? 'Marcar como no leida' : 'Marcar como leida'}
                                 </button>
+                                {notification.action && (
+                                  <button
+                                    onClick={() => onNotificationAction(notification)}
+                                    className="mt-1.5 ml-2 text-xs font-semibold text-primary-700 hover:text-primary-800 transition-colors"
+                                  >
+                                    {notification.action.label}
+                                  </button>
+                                )}
                               </div>
                               <button
                                 onClick={() => onDeleteNotification(notification.id)}

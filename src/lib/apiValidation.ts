@@ -173,6 +173,7 @@ export const resetPasswordSchema = z
   })
 
 const notificationLevelSchema = z.enum(['INFO', 'SUCCESS', 'WARNING'])
+const adminNotificationActionTypeSchema = z.enum(['VACANCY', 'APPLICATION', 'CONTACT'])
 
 export const adminNotificationsListQuerySchema = z.object({
   view: z.enum(['all', 'unread', 'read']).optional().default('all'),
@@ -183,11 +184,28 @@ export const adminNotificationsListQuerySchema = z.object({
 export const createAdminNotificationSchema = z.object({
   title: nonEmptyString.max(120, 'Título demasiado largo'),
   message: nonEmptyString.max(500, 'Mensaje demasiado largo'),
-  level: notificationLevelSchema.optional().default('INFO')
+  level: notificationLevelSchema.optional().default('INFO'),
+  action: z
+    .object({
+      label: nonEmptyString.max(40, 'Texto de acción demasiado largo'),
+      type: adminNotificationActionTypeSchema,
+      resourceId: z.string().cuid('ID de recurso inválido')
+    })
+    .optional()
 })
 
 export const updateAdminNotificationSchema = z.object({
   isRead: z.boolean()
+})
+
+export const updateAdminSettingsSchema = z.object({
+  name: z.string().trim().min(1, 'Nombre requerido').max(80, 'Nombre demasiado largo').optional(),
+  notificationsEnabled: z.boolean().optional(),
+  notifyNewApplications: z.boolean().optional(),
+  notifyNewContacts: z.boolean().optional(),
+  notifySecurityAlerts: z.boolean().optional()
+}).refine((value) => Object.keys(value).length > 0, {
+  message: 'Debes enviar al menos un campo para actualizar'
 })
 
 export function formatValidationError(error: z.ZodError) {
