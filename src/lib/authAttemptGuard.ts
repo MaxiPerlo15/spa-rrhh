@@ -17,7 +17,7 @@ const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
 const isDevBypassEnabled =
-  process.env.NODE_ENV !== 'production' && process.env.AUTH_ATTEMPT_GUARD_DEV_BYPASS !== 'false'
+  process.env.NODE_ENV === 'development' && process.env.AUTH_ATTEMPT_GUARD_DEV_BYPASS !== 'false'
 
 const globalForAttemptGuard = globalThis as unknown as {
   authAttemptStore?: Map<string, AttemptState>
