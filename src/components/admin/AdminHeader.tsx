@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface HeaderNotification {
   id: string
@@ -29,6 +29,7 @@ interface AdminHeaderProps {
   onOpenNotifications: () => void
   onOpenSettings: () => void
   notifications: HeaderNotification[]
+  pendingNotificationDeleteIds?: string[]
   onDeleteNotification: (notificationId: string) => void
   onToggleNotificationRead: (notificationId: string) => void
   onMarkAllNotificationsAsRead: () => void
@@ -47,6 +48,7 @@ export default function AdminHeader({
   onOpenNotifications,
   onOpenSettings,
   notifications,
+  pendingNotificationDeleteIds = [],
   onDeleteNotification,
   onToggleNotificationRead,
   onMarkAllNotificationsAsRead,
@@ -68,6 +70,7 @@ export default function AdminHeader({
   const visibleNotifications = notifications.filter((notification) =>
     notificationsView === 'unread' ? !notification.isRead : notification.isRead
   )
+  const pendingDeleteSet = useMemo(() => new Set(pendingNotificationDeleteIds), [pendingNotificationDeleteIds])
 
   const levelStyles: Record<HeaderNotification['level'], { accent: string; dot: string }> = {
     info: {
@@ -160,7 +163,7 @@ export default function AdminHeader({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Panel Administrativo</h1>
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-white">Panel Administrativo</h1>
             <p className="text-sm text-gray-300 mt-1">Meinardi&Perlo RRHH</p>
           </div>
 
@@ -309,7 +312,8 @@ export default function AdminHeader({
                               </div>
                               <button
                                 onClick={() => onDeleteNotification(notification.id)}
-                                className="shrink-0 rounded-md px-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors text-lg leading-none"
+                                disabled={pendingDeleteSet.has(notification.id)}
+                                className="shrink-0 rounded-md px-1 text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg leading-none"
                                 aria-label="Eliminar notificacion"
                               >
                                 x

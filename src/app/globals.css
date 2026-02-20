@@ -20,12 +20,29 @@
   --color-warning: #ffc107;
   --color-error: #dc3545;
   --color-info: #17a2b8;
+
+  /* Tipografía */
+  --font-body: var(--font-manrope);
+  --font-display: var(--font-sora);
+
+  /* Escala de espaciado */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
   
   /* Sombras */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-primary: 0 4px 15px -3px rgba(0, 85, 164, 0.2);
+  --shadow-elevation-1: 0 2px 10px -6px rgba(2, 22, 58, 0.28);
+  --shadow-elevation-2: 0 12px 36px -20px rgba(2, 22, 58, 0.35);
 
   /* Motion tokens */
   --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -38,7 +55,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-manrope);
+  --font-heading: var(--font-sora);
   --font-mono: var(--font-geist-mono);
   
   /* Colores personalizados para Tailwind v4 */
@@ -78,7 +96,7 @@ body {
   background: linear-gradient(to bottom, #99c2ff 0%, #ffffff 20%, #ffffff 80%, #1a1a1a 100%);
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
   min-height: 100vh;
 }
 
@@ -91,9 +109,24 @@ body {
   .container-custom {
     @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
   }
+
+  .font-display {
+    font-family: var(--font-display), var(--font-body), sans-serif;
+    letter-spacing: -0.02em;
+  }
   
   .section-padding {
     @apply py-16 sm:py-20 lg:py-24;
+  }
+
+  .ds-surface {
+    @apply rounded-2xl border border-gray-200 bg-white;
+    box-shadow: var(--shadow-elevation-1);
+  }
+
+  .ds-surface-strong {
+    @apply rounded-2xl border border-gray-200 bg-white;
+    box-shadow: var(--shadow-elevation-2);
   }
 
   /* Animaciones de scroll reveal */

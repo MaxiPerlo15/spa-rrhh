@@ -103,6 +103,7 @@ model Application {
   candidateName  String
   email          String
   phone          String
+  personKey      String?
   resumeFileName String?
   coverLetter    String?
   status         ApplicationStatus @default(PENDING)
@@ -114,6 +115,8 @@ model Application {
 
   @@index([vacancyId, status])
   @@index([email])
+  @@index([vacancyId, personKey])
+  @@index([personKey, submittedAt])
 }
 
 model Contact {
@@ -121,12 +124,14 @@ model Contact {
   name      String
   email     String
   phone     String
+  personKey String?
   subject   String
   message   String
   status    ContactStatus @default(PENDING)
   createdAt DateTime      @default(now())
 
   @@index([status, createdAt])
+  @@index([personKey, createdAt])
 }
 
 enum Role {

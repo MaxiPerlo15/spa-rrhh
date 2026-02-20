@@ -220,10 +220,10 @@ spa-rrhh/
 │   ├── seed.ts            # Datos de prueba
 │   └── migrations/        # Historial de migraciones
 ├── public/
-│   ├── hero-bg.jpg        # Assets principales
-│   ├── servicio1-4.png    # Imágenes de servicios
-│   ├── logorrhh.png       # Logo consultora
-│   └── logo-tbeh.png      # Logo empresa asociada
+│   ├── hero-bg.webp       # Assets principales optimizados
+│   ├── servicio1-4.webp   # Imágenes de servicios optimizadas
+│   ├── logorrhh.webp      # Logo consultora optimizado
+│   └── logo-tbeh.webp     # Logo empresa asociada optimizado
 ├── scripts/
 │   └── normalize-locations.ts  # Script de normalización
 ├── src/

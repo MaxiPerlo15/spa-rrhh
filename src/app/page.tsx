@@ -12,6 +12,7 @@ import Empresas from '@/components/Empresas'
 import Footer from '@/components/Footer'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { consumeInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
 import { getVacancies } from '@/lib/api/vacancies'
 
 interface Vacancy {
@@ -45,22 +46,11 @@ export default function Home() {
   // Manejar scroll a sección cuando se carga la página con hash
   useEffect(() => {
     const hash = window.location.hash
-    let referrerUrl: URL | null = null
-    try {
-      if (document.referrer) {
-        referrerUrl = new URL(document.referrer)
-      }
-    } catch {
-      referrerUrl = null
-    }
-    const cameFromInternalDifferentPage =
-      Boolean(referrerUrl) &&
-      referrerUrl?.origin === window.location.origin &&
-      referrerUrl?.pathname !== window.location.pathname
+    const hasInternalNavigationIntent = consumeInternalHashNavigationIntent()
 
     // MIS-101: en cargas de landing con hash, normalizar a "/" excepto cuando
     // venimos de otra página interna (ej. /ofertas-laborales -> /#contacto).
-    if (hash && !cameFromInternalDifferentPage) {
+    if (hash && !hasInternalNavigationIntent) {
       window.history.replaceState(null, '', '/')
       window.scrollTo({ top: 0, behavior: 'auto' })
       return

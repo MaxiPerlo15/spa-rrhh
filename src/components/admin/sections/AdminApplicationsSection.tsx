@@ -26,7 +26,9 @@ interface AdminApplicationsSectionProps {
   onStatusChange: (applicationId: string, newStatus: Application['status']) => void
   onViewDetails: (application: Application) => void
   onDownloadCv: (application: Application) => void
+  onDeleteApplication: (applicationId: string, candidateName: string) => void
   pendingApplicationStatusId: string | null
+  pendingDeleteApplicationId: string | null
 }
 
 export default function AdminApplicationsSection({
@@ -53,7 +55,9 @@ export default function AdminApplicationsSection({
   onStatusChange,
   onViewDetails,
   onDownloadCv,
-  pendingApplicationStatusId
+  onDeleteApplication,
+  pendingApplicationStatusId,
+  pendingDeleteApplicationId
 }: AdminApplicationsSectionProps) {
   const statusColors = {
     PENDING: 'bg-yellow-100 text-yellow-800',
@@ -103,9 +107,9 @@ export default function AdminApplicationsSection({
             </svg>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+            <label className="text-sm font-medium text-gray-700 sm:shrink-0">Filtrar por estado:</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>
               <option value="PENDING">Pendientes</option>
               <option value="REVIEWING">En Revisión</option>
@@ -113,22 +117,22 @@ export default function AdminApplicationsSection({
               <option value="ACCEPTED">Aceptados</option>
               <option value="REJECTED">Rechazados</option>
             </select>
-            <select value={filterApplicationsVacancyId} onChange={(event) => setFilterApplicationsVacancyId(event.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select value={filterApplicationsVacancyId} onChange={(event) => setFilterApplicationsVacancyId(event.target.value)} className="w-full sm:w-auto sm:min-w-[190px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todas las vacantes</option>
               {vacancies.map((vacancy) => (
                 <option key={vacancy.id} value={vacancy.id}>{vacancy.title}</option>
               ))}
             </select>
-            <select value={sortApplicationsBy} onChange={(event) => setSortApplicationsBy(event.target.value as 'submittedAt' | 'candidateName' | 'status')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select value={sortApplicationsBy} onChange={(event) => setSortApplicationsBy(event.target.value as 'submittedAt' | 'candidateName' | 'status')} className="w-full sm:w-auto sm:min-w-[180px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="submittedAt">Ordenar por fecha</option>
               <option value="candidateName">Ordenar por candidato</option>
               <option value="status">Ordenar por estado</option>
             </select>
-            <select value={sortApplicationsDirection} onChange={(event) => setSortApplicationsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select value={sortApplicationsDirection} onChange={(event) => setSortApplicationsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto sm:min-w-[160px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>
-            <span className="text-sm text-gray-600 text-center sm:text-left">{filteredApplications.length} postulaciones</span>
+            <span className="text-sm text-gray-600 text-center whitespace-nowrap sm:basis-full sm:text-left md:basis-auto md:ml-auto">{filteredApplications.length} postulaciones</span>
           </div>
         </div>
       </div>
@@ -156,13 +160,15 @@ export default function AdminApplicationsSection({
               ) : (
                 paginatedApplications.map((application) => {
                   const isStatusUpdating = pendingApplicationStatusId === application.id
+                  const isDeleting = pendingDeleteApplicationId === application.id
+                  const isRowBusy = isStatusUpdating || isDeleting
                   return (
                   <tr key={application.id} className="hover:bg-gray-50">
                     <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{application.candidateName}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{application.email}</td>
                     <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm">
-                      <select disabled={isStatusUpdating} value={application.status} onChange={(e) => onStatusChange(application.id, e.target.value as Application['status'])} className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${statusColors[application.status]}`}>
+                      <select disabled={isRowBusy} value={application.status} onChange={(e) => onStatusChange(application.id, e.target.value as Application['status'])} className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${statusColors[application.status]}`}>
                         <option value="PENDING">Pendiente</option>
                         <option value="REVIEWING">En Revisión</option>
                         <option value="INTERVIEWED">Entrevistado</option>
@@ -173,14 +179,21 @@ export default function AdminApplicationsSection({
                     <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{new Date(application.submittedAt).toLocaleDateString()}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-right">
                       <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                        <button disabled={isStatusUpdating} data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined} onClick={() => onViewDetails(application)} className={`text-blue-600 hover:text-blue-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}>
+                        <button disabled={isRowBusy} data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined} onClick={() => onViewDetails(application)} className={`text-blue-600 hover:text-blue-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}>
                           👁️ Ver
                         </button>
                         {application.resumeUrl && (
-                          <button disabled={isStatusUpdating} data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined} onClick={() => onDownloadCv(application)} className={`text-green-600 hover:text-green-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`}>
+                          <button disabled={isRowBusy} data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined} onClick={() => onDownloadCv(application)} className={`text-green-600 hover:text-green-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`}>
                             📄 CV
                           </button>
                         )}
+                        <button
+                          disabled={isRowBusy}
+                          onClick={() => onDeleteApplication(application.id, application.candidateName)}
+                          className="text-red-600 hover:text-red-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {isDeleting ? 'Eliminando...' : '🗑️ Eliminar'}
+                        </button>
                       </div>
                     </td>
                   </tr>

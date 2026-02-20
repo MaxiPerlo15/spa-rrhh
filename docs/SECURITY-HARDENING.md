@@ -34,7 +34,9 @@ Current CSP allowlists include only required external domains:
 - Secure cookie behavior:
   - `httpOnly: true`
   - `sameSite: 'lax'`
-  - `secure` is enabled by default in production, overridable with `SESSION_COOKIE_SECURE`
+  - `secure` forced in production
+  - optional local override only in desarrollo (`SESSION_COOKIE_SECURE=true`)
+  - `SESSION_COOKIE_SAME_SITE` soporta `lax|strict|none` (si `none` sin HTTPS, se fuerza `lax`)
 
 ## MIS-69: API Data Minimization and PII Redaction
 
@@ -89,6 +91,22 @@ Implemented baseline:
   - phone format and digit-length validation
 - Public forms (`ContactForm` and `PostularForm`) reuse the same policy for consistent UX.
 - API clients surface first backend validation detail to users when available.
+
+## MIS-110: Detección de duplicados sin usuario autenticado
+
+Implementado:
+- Huella de identidad `personKey` en backend (`sha256(email_normalizado|telefono_normalizado)`).
+- Persistencia en:
+  - `Application.personKey`
+  - `Contact.personKey`
+- Deduplicación temporal (24h):
+  - Postulación: misma vacante + mismo `personKey` => `409 DUPLICATE_SUBMISSION`
+  - Contacto: mismo asunto + mismo `personKey` => `409 DUPLICATE_SUBMISSION`
+- UX:
+  - formularios muestran feedback informativo cuando el envío es duplicado (no error genérico).
+
+Notas:
+- Si la migración de `personKey` aún no está aplicada, el backend degrada sin romper.
 
 Configuration:
 - `FORM_ALLOWED_EMAIL_DOMAINS`: comma-separated email domain allowlist.
@@ -188,3 +206,13 @@ Metadata registrada (según acción):
 - `outcome` (`SUCCESS`, `DENIED`, `ERROR`)
 - IP y user-agent
 - campos de contexto operacional (por ejemplo estado previo/nuevo)
+
+## Pre-Deploy Runtime Check
+
+Comandos recomendados antes de desplegar:
+
+```bash
+npm run env:check:prod
+npm run test:e2e:matrix
+npm run build
+```

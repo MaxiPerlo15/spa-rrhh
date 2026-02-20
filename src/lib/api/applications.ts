@@ -3,6 +3,7 @@
  * Centraliza todas las llamadas a la API relacionadas con postulaciones
  */
 import { apiFetch } from './http'
+import { ApiRequestError } from './errors'
 
 export interface Application {
   id: string
@@ -35,16 +36,23 @@ export interface CreateApplicationData {
 
 type ApiValidationError = {
   error?: string
+  code?: string
   details?: Array<{ field?: string; message?: string }>
 }
 
-async function getApiErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
+async function getApiErrorPayload(
+  response: Response,
+  fallbackMessage: string
+): Promise<{ message: string; code?: string }> {
   try {
     const error = (await response.json()) as ApiValidationError
     const firstDetail = error.details?.find((detail) => detail.message)?.message
-    return firstDetail || error.error || fallbackMessage
+    return {
+      message: firstDetail || error.error || fallbackMessage,
+      code: error.code
+    }
   } catch {
-    return fallbackMessage
+    return { message: fallbackMessage }
   }
 }
 
@@ -81,7 +89,8 @@ export async function createApplication(data: CreateApplicationData): Promise<Ap
   })
   
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Error al crear la postulación'))
+    const payload = await getApiErrorPayload(response, 'Error al crear la postulación')
+    throw new ApiRequestError(payload.message, response.status, payload.code)
   }
   
   return response.json()

@@ -37,9 +37,20 @@ function readAllowedOriginsFromEnv() {
 
 const allowedOrigins = readAllowedOriginsFromEnv()
 
+function isLocalDevelopmentOrigin(origin: string) {
+  if (process.env.NODE_ENV === 'production') return false
+
+  try {
+    const parsed = new URL(origin)
+    return parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+  } catch {
+    return false
+  }
+}
+
 export function isAllowedOrigin(origin: string | null) {
   if (!origin) return true
-  return allowedOrigins.has(origin)
+  return allowedOrigins.has(origin) || isLocalDevelopmentOrigin(origin)
 }
 
 export function applyCorsHeaders(headers: Headers, origin: string, requestedHeaders?: string | null) {

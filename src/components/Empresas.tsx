@@ -14,7 +14,7 @@ interface Company {
 
 // Empresas placeholder - podrás reemplazar con logos reales
 const companies: Company[] = [
-  { id: 1, name: 'TBEH', logoImage: '/logo-tbeh.png' },
+  { id: 1, name: 'TBEH', logoImage: '/logo-tbeh.webp' },
   { id: 2, name: 'InnovaSoft', logo: '💼' },
   { id: 3, name: 'DataSolutions', logo: '📊' },
   { id: 4, name: 'CloudServe', logo: '☁️' },
@@ -98,7 +98,7 @@ export default function Empresas() {
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="font-display text-4xl md:text-5xl font-bold text-white mb-4">
             Empresas que Confían en Nosotros
           </h2>
           <p className="text-lg text-gray-300 max-w-2xl mx-auto">

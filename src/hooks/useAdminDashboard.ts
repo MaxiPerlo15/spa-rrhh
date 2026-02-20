@@ -94,6 +94,11 @@ export function useAdminDashboard() {
     return updated
   }
 
+  const deleteApplication = async (id: string) => {
+    await applicationsApi.deleteApplication(id)
+    setApplications(prev => prev.filter(a => a.id !== id))
+  }
+
   // Métodos para contactos
   const updateContactStatus = async (id: string, status: Contact['status']) => {
     const updated = await contactsApi.updateContactStatus(id, status)
@@ -126,6 +131,7 @@ export function useAdminDashboard() {
     
     // Applications
     updateApplicationStatus,
+    deleteApplication,
     
     // Contacts
     updateContactStatus,

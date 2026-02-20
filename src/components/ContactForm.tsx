@@ -2,13 +2,14 @@
 import { useState, FormEvent } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { createContact } from '@/lib/api/contacts'
+import { isApiRequestError } from '@/lib/api/errors'
 import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
 
 
 export default function ContactForm() {
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showInfo } = useToast()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -104,6 +105,10 @@ export default function ContactForm() {
         setSubmitted(false)
       }, 5000)
     } catch (error) {
+      if (isApiRequestError(error) && error.status === 409 && error.code === 'DUPLICATE_SUBMISSION') {
+        showInfo(error.message)
+        return
+      }
       const message = error instanceof Error
         ? error.message
         : 'Error al enviar el mensaje. Por favor, intenta nuevamente.'

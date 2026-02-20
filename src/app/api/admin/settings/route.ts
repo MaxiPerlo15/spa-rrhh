@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatValidationError, updateAdminSettingsSchema } from '@/lib/apiValidation'
 import { logger } from '@/lib/logger'
+import { isMissingTableOrColumnError } from '@/lib/prismaError'
 
 function toAdminSettingsResponse(input: {
   user: { id: string; email: string; name: string | null; role: string }
@@ -47,18 +48,36 @@ export async function GET() {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
-    const settings = await prisma.adminSettings.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id },
-      select: {
+    let settings: {
+      notificationsEnabled: boolean
+      notifyNewApplications: boolean
+      notifyNewContacts: boolean
+      notifySecurityAlerts: boolean
+      updatedAt: Date
+    }
+    try {
+      settings = await prisma.adminSettings.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id },
+        select: {
+          notificationsEnabled: true,
+          notifyNewApplications: true,
+          notifyNewContacts: true,
+          notifySecurityAlerts: true,
+          updatedAt: true
+        }
+      })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      settings = {
         notificationsEnabled: true,
         notifyNewApplications: true,
         notifyNewContacts: true,
         notifySecurityAlerts: true,
-        updatedAt: true
+        updatedAt: new Date()
       }
-    })
+    }
 
     return NextResponse.json(toAdminSettingsResponse({ user, settings }))
   } catch (error) {
@@ -92,29 +111,47 @@ export async function PATCH(request: NextRequest) {
         select: { id: true, email: true, name: true, role: true }
       })
 
-      const settings = await tx.adminSettings.upsert({
-        where: { userId: user.id },
-        update: {
-          ...(notificationsEnabled !== undefined ? { notificationsEnabled } : {}),
-          ...(notifyNewApplications !== undefined ? { notifyNewApplications } : {}),
-          ...(notifyNewContacts !== undefined ? { notifyNewContacts } : {}),
-          ...(notifySecurityAlerts !== undefined ? { notifySecurityAlerts } : {})
-        },
-        create: {
-          userId: user.id,
+      let settings: {
+        notificationsEnabled: boolean
+        notifyNewApplications: boolean
+        notifyNewContacts: boolean
+        notifySecurityAlerts: boolean
+        updatedAt: Date
+      }
+      try {
+        settings = await tx.adminSettings.upsert({
+          where: { userId: user.id },
+          update: {
+            ...(notificationsEnabled !== undefined ? { notificationsEnabled } : {}),
+            ...(notifyNewApplications !== undefined ? { notifyNewApplications } : {}),
+            ...(notifyNewContacts !== undefined ? { notifyNewContacts } : {}),
+            ...(notifySecurityAlerts !== undefined ? { notifySecurityAlerts } : {})
+          },
+          create: {
+            userId: user.id,
+            notificationsEnabled: notificationsEnabled ?? true,
+            notifyNewApplications: notifyNewApplications ?? true,
+            notifyNewContacts: notifyNewContacts ?? true,
+            notifySecurityAlerts: notifySecurityAlerts ?? true
+          },
+          select: {
+            notificationsEnabled: true,
+            notifyNewApplications: true,
+            notifyNewContacts: true,
+            notifySecurityAlerts: true,
+            updatedAt: true
+          }
+        })
+      } catch (error) {
+        if (!isMissingTableOrColumnError(error)) throw error
+        settings = {
           notificationsEnabled: notificationsEnabled ?? true,
           notifyNewApplications: notifyNewApplications ?? true,
           notifyNewContacts: notifyNewContacts ?? true,
-          notifySecurityAlerts: notifySecurityAlerts ?? true
-        },
-        select: {
-          notificationsEnabled: true,
-          notifyNewApplications: true,
-          notifyNewContacts: true,
-          notifySecurityAlerts: true,
-          updatedAt: true
+          notifySecurityAlerts: notifySecurityAlerts ?? true,
+          updatedAt: new Date()
         }
-      })
+      }
 
       return { user, settings }
     })

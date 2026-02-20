@@ -12,6 +12,8 @@ import {
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
 import { verifyTurnstileToken } from '@/lib/botProtection'
 import { toContactAdminDto } from '@/lib/dto/contact'
+import { buildPersonKey } from '@/lib/personIdentity'
+import { isMissingTableOrColumnError } from '@/lib/prismaError'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
@@ -107,17 +109,58 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear contacto
-    const contact = await prisma.contact.create({
-      data: {
-        name,
-        email,
-        phone,
-        subject,
-        message,
-        status: 'PENDING'
+    const personKey = buildPersonKey(email, phone)
+    const duplicateWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    let personKeyColumnAvailable = true
+
+    try {
+      const recentDuplicate = await prisma.contact.findFirst({
+        where: {
+          personKey,
+          subject,
+          createdAt: {
+            gte: duplicateWindowStart
+          }
+        },
+        select: { id: true }
+      })
+
+      if (recentDuplicate) {
+        return NextResponse.json(
+          {
+            error: 'Ya recibimos un contacto reciente con el mismo asunto desde estos datos.',
+            code: 'DUPLICATE_SUBMISSION'
+          },
+          { status: 409 }
+        )
       }
-    })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      personKeyColumnAvailable = false
+      logger.warn('No se pudo validar deduplicación de contactos por personKey: columna no disponible')
+    }
+
+    // Crear contacto
+    const baseContactData = {
+      name,
+      email,
+      phone,
+      subject,
+      message,
+      status: 'PENDING' as const
+    }
+
+    let contact
+    try {
+      contact = await prisma.contact.create({
+        data: personKeyColumnAvailable ? { ...baseContactData, personKey } : baseContactData
+      })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      contact = await prisma.contact.create({
+        data: baseContactData
+      })
+    }
 
     // Enviar notificación al admin (no bloqueante)
     sendNewContactEmail({

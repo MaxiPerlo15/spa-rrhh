@@ -14,7 +14,16 @@ export interface AdminNotificationDto {
   createdAt: string
 }
 
-export function toAdminNotificationDto(notification: AdminNotification): AdminNotificationDto {
+export type AdminNotificationDtoSource = Pick<
+  AdminNotification,
+  'id' | 'title' | 'message' | 'level' | 'isRead' | 'createdAt'
+> & {
+  actionLabel?: string | null
+  actionType?: 'VACANCY' | 'APPLICATION' | 'CONTACT' | null
+  actionResourceId?: string | null
+}
+
+export function toAdminNotificationDto(notification: AdminNotificationDtoSource): AdminNotificationDto {
   return {
     id: notification.id,
     title: notification.title,

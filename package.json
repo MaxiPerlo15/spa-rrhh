@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint",
     "test": "playwright test",
     "test:unit": "vitest run",
@@ -20,6 +20,9 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:report": "playwright show-report",
+    "env:check": "dotenv -e .env -- tsx scripts/check-env.ts",
+    "env:check:prod": "dotenv -e .env -- tsx scripts/check-env.ts --prod",
+    "predeploy:check": "npm run env:check:prod && npm run test:e2e:matrix && npm run build",
     "db:seed": "dotenv -e .env -- tsx prisma/seed.ts",
     "db:reset": "dotenv -e .env -- npx prisma migrate reset --force",
     "db:verify": "dotenv -e .env -- tsx scripts/verify-admin.ts"
@@ -29,7 +32,7 @@
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
-    "@prisma/client": "^7.1.0",
+    "@prisma/client": "^7.4.0",
     "@sentry/nextjs": "^10.30.0",
     "@types/bcrypt": "^6.0.0",
     "@uploadthing/react": "^7.3.3",
@@ -37,7 +40,7 @@
     "next": "^16.1.6",
     "next-auth": "^4.24.13",
     "pg": "^8.16.3",
-    "prisma": "^7.1.0",
+    "prisma": "^7.4.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "resend": "^6.6.0",

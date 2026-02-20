@@ -95,7 +95,7 @@ export default function Hero() {
         style={{ 
           transform: `translateY(${scrollY * 0.3}px)`, 
           top: '-10%',
-          backgroundImage: 'url(/hero-bg.jpg)',
+          backgroundImage: 'url(/hero-bg.webp)',
           filter: 'blur(2px)'
         }}
       />
@@ -106,7 +106,7 @@ export default function Hero() {
       {/* Contenido superpuesto */}
       <div className="container-custom relative z-10 text-center px-4 pb-24 sm:pb-32">
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight drop-shadow-lg animate-fade-in">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold text-white leading-tight drop-shadow-lg animate-fade-in">
             Conectamos <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Talento</span> con{' '}
             <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Oportunidades</span>
           </h1>

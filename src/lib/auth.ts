@@ -6,10 +6,17 @@ import { prisma } from '@/lib/prisma'
 import { clearAttemptFailures, getAttemptLock, recordAttemptFailure } from '@/lib/authAttemptGuard'
 import { logger } from '@/lib/logger'
 
-const defaultSecureCookies = process.env.NODE_ENV === 'production'
-const secureCookiesEnabled = process.env.SESSION_COOKIE_SECURE
-  ? process.env.SESSION_COOKIE_SECURE === 'true'
-  : defaultSecureCookies
+const isProduction = process.env.NODE_ENV === 'production'
+const secureCookiesEnabled = isProduction
+  ? true
+  : process.env.SESSION_COOKIE_SECURE === 'true'
+
+const configuredSameSite = process.env.SESSION_COOKIE_SAME_SITE
+const sameSite =
+  configuredSameSite === 'strict' || configuredSameSite === 'lax' || configuredSameSite === 'none'
+    ? configuredSameSite
+    : 'lax'
+const cookieSameSite = sameSite === 'none' && !secureCookiesEnabled ? 'lax' : sameSite
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -24,7 +31,7 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const normalizedEmail = String(credentials.email).toLowerCase()
+        const normalizedEmail = String(credentials.email).trim().toLowerCase()
         const forwardedFor = req?.headers?.['x-forwarded-for']
         const ip = Array.isArray(forwardedFor)
           ? forwardedFor[0]?.split(',')[0]?.trim() || 'unknown'
@@ -123,7 +130,7 @@ export const authOptions: NextAuthOptions = {
       name: secureCookiesEnabled ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: cookieSameSite,
         path: '/',
         secure: secureCookiesEnabled
       }

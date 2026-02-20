@@ -7,7 +7,8 @@ import {
   routeIdSchema,
   updateAdminNotificationSchema
 } from '@/lib/apiValidation'
-import { toAdminNotificationDto } from '@/lib/dto/adminNotification'
+import { toAdminNotificationDto, type AdminNotificationDtoSource } from '@/lib/dto/adminNotification'
+import { isMissingTableOrColumnError } from '@/lib/prismaError'
 
 interface RouteParams {
   params: Promise<{
@@ -33,10 +34,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
 
-    const updated = await prisma.adminNotification.update({
-      where: { id: parsedParams.data.id },
-      data: { isRead: bodyValidation.data.isRead }
-    })
+    let updated: AdminNotificationDtoSource
+    try {
+      updated = await prisma.adminNotification.update({
+        where: { id: parsedParams.data.id },
+        data: { isRead: bodyValidation.data.isRead }
+      })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      updated = await prisma.adminNotification.update({
+        where: { id: parsedParams.data.id },
+        data: { isRead: bodyValidation.data.isRead },
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          level: true,
+          isRead: true,
+          createdAt: true
+        }
+      })
+    }
 
     return NextResponse.json(toAdminNotificationDto(updated))
   } catch (error) {
@@ -57,7 +75,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
 
-    await prisma.adminNotification.delete({
+    // Usamos deleteMany para evitar errores por registros inexistentes
+    // y para tolerar mejor esquemas parcialmente desalineados.
+    await prisma.adminNotification.deleteMany({
       where: { id: parsedParams.data.id }
     })
 

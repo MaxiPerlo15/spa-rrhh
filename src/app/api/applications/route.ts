@@ -12,6 +12,8 @@ import {
 import { getClientIp, rateLimit } from '@/lib/rateLimit'
 import { verifyTurnstileToken } from '@/lib/botProtection'
 import { toApplicationAdminDto } from '@/lib/dto/application'
+import { buildPersonKey } from '@/lib/personIdentity'
+import { isMissingTableOrColumnError } from '@/lib/prismaError'
 
 
 // GET /api/applications - Listar todas las aplicaciones (admin)
@@ -147,20 +149,61 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear aplicación
-    const application = await prisma.application.create({
-      data: {
-        vacancyId,
-        candidateName,
-        email,
-        phone,
-        resumeUrl,
-        resumeFileName,
-        resumeKey,
-        coverLetter,
-        status: 'PENDING'
+    const personKey = buildPersonKey(email, phone)
+    const duplicateWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    let personKeyColumnAvailable = true
+
+    try {
+      const recentDuplicate = await prisma.application.findFirst({
+        where: {
+          vacancyId,
+          personKey,
+          submittedAt: {
+            gte: duplicateWindowStart
+          }
+        },
+        select: { id: true }
+      })
+
+      if (recentDuplicate) {
+        return NextResponse.json(
+          {
+            error: 'Ya recibimos una postulación reciente para esta vacante con estos datos de contacto.',
+            code: 'DUPLICATE_SUBMISSION'
+          },
+          { status: 409 }
+        )
       }
-    })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      personKeyColumnAvailable = false
+      logger.warn('No se pudo validar deduplicación de postulaciones por personKey: columna no disponible')
+    }
+
+    // Crear aplicación
+    const baseApplicationData = {
+      vacancyId,
+      candidateName,
+      email,
+      phone,
+      resumeUrl,
+      resumeFileName,
+      resumeKey,
+      coverLetter,
+      status: 'PENDING' as const
+    }
+
+    let application
+    try {
+      application = await prisma.application.create({
+        data: personKeyColumnAvailable ? { ...baseApplicationData, personKey } : baseApplicationData
+      })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      application = await prisma.application.create({
+        data: baseApplicationData
+      })
+    }
 
     // Enviar notificación al admin (no bloqueante)
     sendNewApplicationEmail({

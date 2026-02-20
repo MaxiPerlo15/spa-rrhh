@@ -229,6 +229,7 @@ export default function AdminDashboard() {
     deleteVacancy: deleteVacancyApi,
     toggleVacancyStatus,
     updateApplicationStatus,
+    deleteApplication: deleteApplicationApi,
     updateContactStatus,
     deleteContact: deleteContactApi
   } = useAdminDashboard()
@@ -269,6 +270,7 @@ export default function AdminDashboard() {
   const [pendingToggleVacancyId, setPendingToggleVacancyId] = useState<string | null>(null)
   const [pendingDeleteVacancyId, setPendingDeleteVacancyId] = useState<string | null>(null)
   const [pendingApplicationStatusId, setPendingApplicationStatusId] = useState<string | null>(null)
+  const [pendingDeleteApplicationId, setPendingDeleteApplicationId] = useState<string | null>(null)
   const [pendingContactStatusId, setPendingContactStatusId] = useState<string | null>(null)
   const [pendingDeleteContactId, setPendingDeleteContactId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -289,8 +291,8 @@ export default function AdminDashboard() {
   const [onboardingReturnStep, setOnboardingReturnStep] = useState<number | null>(null)
   const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [pendingNotificationDeleteIds, setPendingNotificationDeleteIds] = useState<Set<string>>(new Set())
   const [settingsForm, setSettingsForm] = useState({
-    name: '',
     notificationsEnabled: true,
     notifyNewApplications: true,
     notifyNewContacts: true,
@@ -388,7 +390,7 @@ export default function AdminDashboard() {
     setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
     void (async () => {
       try {
-        await Promise.all(
+        const responses = await Promise.all(
           unreadIds.map((notificationId) =>
             fetch(`/api/admin/notifications/${notificationId}`, {
               method: 'PATCH',
@@ -397,6 +399,10 @@ export default function AdminDashboard() {
             })
           )
         )
+        const hasErrors = responses.some((response) => !response.ok)
+        if (hasErrors) {
+          throw new Error('No se pudieron marcar todas como leídas')
+        }
       } catch (error) {
         console.error('Error al marcar todas las notificaciones como leídas', error)
         showError('No se pudieron actualizar todas las notificaciones.')
@@ -413,13 +419,12 @@ export default function AdminDashboard() {
     showSuccess('Notificaciones leidas limpiadas.')
     void (async () => {
       try {
-        await Promise.all(
-          readIds.map((notificationId) =>
-            fetch(`/api/admin/notifications/${notificationId}`, {
-              method: 'DELETE'
-            })
-          )
-        )
+        const response = await fetch('/api/admin/notifications?view=read', {
+          method: 'DELETE'
+        })
+        if (!response.ok) {
+          throw new Error('No se pudieron limpiar todas las notificaciones leídas')
+        }
       } catch (error) {
         console.error('Error al limpiar notificaciones leídas', error)
         showError('No se pudieron limpiar todas las notificaciones leídas.')
@@ -461,6 +466,9 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteNotification = (notificationId: string) => {
+    if (pendingNotificationDeleteIds.has(notificationId)) return
+    const previousNotifications = notifications
+    setPendingNotificationDeleteIds((prev) => new Set(prev).add(notificationId))
     setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId))
     showSuccess('Notificación eliminada.')
     void (async () => {
@@ -474,7 +482,13 @@ export default function AdminDashboard() {
       } catch (error) {
         console.error('Error al eliminar notificación', error)
         showError('No se pudo eliminar la notificación.')
-        await reloadNotifications()
+        setNotifications(previousNotifications)
+      } finally {
+        setPendingNotificationDeleteIds((prev) => {
+          const next = new Set(prev)
+          next.delete(notificationId)
+          return next
+        })
       }
     })()
   }
@@ -696,7 +710,6 @@ export default function AdminDashboard() {
 
         const data = (await response.json()) as AdminSettingsResponse
         setSettingsForm({
-          name: data.profile.name ?? '',
           notificationsEnabled: data.preferences.notificationsEnabled,
           notifyNewApplications: data.preferences.notifyNewApplications,
           notifyNewContacts: data.preferences.notifyNewContacts,
@@ -1048,7 +1061,7 @@ export default function AdminDashboard() {
       message: isClosing
         ? `¿Deseas cerrar la vacante "${vacancy.title}"?\n\nAl cerrarla dejará de mostrarse en la página pública.`
         : `¿Deseas activar la vacante "${vacancy.title}"?\n\nAl activarla volverá a mostrarse en la página pública.`,
-      type: 'warning',
+      type: 'danger',
       confirmText: isClosing ? 'Sí, cerrar vacante' : 'Sí, activar vacante',
       onConfirm: async () => {
         setPendingToggleVacancyId(vacancy.id)
@@ -1171,6 +1184,35 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDeleteApplication = async (applicationId: string, candidateName: string) => {
+    if (pendingDeleteApplicationId) return
+    openConfirmDialog({
+      isOpen: true,
+      title: 'Eliminar postulación',
+      message: `¿Estás seguro de eliminar la postulación de "${candidateName}"?\n\nEsta acción no se puede deshacer.`,
+      type: 'danger',
+      confirmText: 'Eliminar postulación',
+      onConfirm: async () => {
+        setPendingDeleteApplicationId(applicationId)
+        try {
+          await deleteApplicationApi(applicationId)
+          showSuccess('Postulación eliminada exitosamente')
+          addNotification('Postulación eliminada', `Se eliminó la postulación de "${candidateName}".`, 'warning')
+          if (selectedApplication?.id === applicationId) {
+            setShowApplicationDetail(false)
+            setSelectedApplication(null)
+          }
+        } catch (error) {
+          console.error('Error deleting application:', error)
+          showError('Error al eliminar la postulación')
+        } finally {
+          setPendingDeleteApplicationId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      }
+    })
+  }
+
   const handleDownloadCV = (application: Application) => {
     if (!application.resumeUrl) {
       showError('No hay CV disponible para esta postulación')
@@ -1269,12 +1311,18 @@ export default function AdminDashboard() {
       isOpen: true,
       title: 'Cerrar sesión',
       message: '¿Deseas cerrar sesión del panel administrativo ahora?',
-      type: 'warning',
+      type: 'danger',
       confirmText: 'Sí, cerrar sesión',
       cancelText: 'Permanecer',
       closeOnBackdropClick: true,
-      onConfirm: () => {
-        signOut({ callbackUrl: '/' })
+      onConfirm: async () => {
+        const callbackUrl = `${window.location.origin}/admin/signin`
+        await signOut({
+          callbackUrl,
+          redirect: false
+        })
+        router.replace('/admin/signin')
+        router.refresh()
       }
     })
   }
@@ -1321,7 +1369,6 @@ export default function AdminDashboard() {
 
       const data = (await response.json()) as AdminSettingsResponse
       setSettingsForm({
-        name: data.profile.name ?? '',
         notificationsEnabled: data.preferences.notificationsEnabled,
         notifyNewApplications: data.preferences.notifyNewApplications,
         notifyNewContacts: data.preferences.notifyNewContacts,
@@ -1396,6 +1443,11 @@ export default function AdminDashboard() {
   }
 
   const handleSkipOnboarding = () => {
+    try {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
+    } catch {
+      // No-op if storage is unavailable.
+    }
     closeGuidedDialogs()
     setGuideDialogPosition(undefined)
     setActiveTutorial(null)
@@ -1555,6 +1607,7 @@ const handleTestSentry = () => {
         onOpenNotifications={handleOpenNotifications}
         onOpenSettings={handleOpenSettings}
         notifications={orderedNotifications}
+        pendingNotificationDeleteIds={[...pendingNotificationDeleteIds]}
         onDeleteNotification={handleDeleteNotification}
         onToggleNotificationRead={toggleNotificationRead}
         onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
@@ -1677,7 +1730,9 @@ const handleTestSentry = () => {
             onStatusChange={handleStatusChange}
             onViewDetails={handleViewApplicationDetails}
             onDownloadCv={handleDownloadCV}
+            onDeleteApplication={handleDeleteApplication}
             pendingApplicationStatusId={pendingApplicationStatusId}
+            pendingDeleteApplicationId={pendingDeleteApplicationId}
           />
         )}
 

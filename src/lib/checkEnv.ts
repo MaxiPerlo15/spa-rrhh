@@ -8,6 +8,16 @@ function requireVar(name: string, errors: string[]) {
   }
 }
 
+function validateUrlVar(name: string, errors: string[]) {
+  const value = process.env[name]
+  if (!value) return
+  try {
+    new URL(value)
+  } catch {
+    errors.push(`- ${name} debe ser una URL válida`)
+  }
+}
+
 export function validateRuntimeEnv() {
   const context: ValidationContext = {
     isProduction: process.env.NODE_ENV === 'production'
@@ -28,14 +38,19 @@ export function validateRuntimeEnv() {
     requireVar('TURNSTILE_SECRET_KEY', errors)
     requireVar('UPSTASH_REDIS_REST_URL', errors)
     requireVar('UPSTASH_REDIS_REST_TOKEN', errors)
+    requireVar('RESEND_API_KEY', errors)
+    requireVar('FROM_EMAIL', errors)
+    validateUrlVar('NEXTAUTH_URL', errors)
+    validateUrlVar('UPSTASH_REDIS_REST_URL', errors)
+    validateUrlVar('DATABASE_URL', errors)
   }
 
   // Integration-specific checks
-  if (process.env.RESEND_API_KEY && !process.env.FROM_EMAIL) {
+  if (!context.isProduction && process.env.RESEND_API_KEY && !process.env.FROM_EMAIL) {
     errors.push('- FROM_EMAIL (required when RESEND_API_KEY is configured)')
   }
 
-  if (!process.env.RESEND_API_KEY) {
+  if (!context.isProduction && !process.env.RESEND_API_KEY) {
     warnings.push('- RESEND_API_KEY no está configurada (emails en modo simulado)')
   }
 

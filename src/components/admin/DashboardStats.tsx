@@ -2,11 +2,12 @@
  * Dashboard Stats Component
  * Muestra las estadísticas principales del panel admin
  */
+import AppIcon from '@/components/ui/AppIcon'
 
 interface StatsCardProps {
   title: string
   value: number
-  icon: string
+  icon: Parameters<typeof AppIcon>[0]['name']
   bgColor: string
   textColor: string
 }
@@ -19,7 +20,9 @@ function StatsCard({ title, value, icon, bgColor, textColor }: StatsCardProps) {
           <p className={`text-sm font-medium ${textColor} mb-1`}>{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
         </div>
-        <div className="text-4xl">{icon}</div>
+        <div className={`rounded-xl p-2.5 ${bgColor} ${textColor}`}>
+          <AppIcon name={icon} className="h-6 w-6" />
+        </div>
       </div>
     </div>
   )
@@ -43,28 +46,28 @@ export default function DashboardStats({
       <StatsCard
         title="Total Vacantes"
         value={totalVacancies}
-        icon="💼"
+        icon="briefcase"
         bgColor="bg-blue-50"
         textColor="text-blue-700"
       />
       <StatsCard
         title="Vacantes Activas"
         value={activeVacancies}
-        icon="✅"
+        icon="check-circle"
         bgColor="bg-green-50"
         textColor="text-green-700"
       />
       <StatsCard
         title="Postulaciones"
         value={totalApplications}
-        icon="📝"
+        icon="file"
         bgColor="bg-purple-50"
         textColor="text-purple-700"
       />
       <StatsCard
         title="Contactos Pendientes"
         value={pendingContacts}
-        icon="📧"
+        icon="mail"
         bgColor="bg-yellow-50"
         textColor="text-yellow-700"
       />

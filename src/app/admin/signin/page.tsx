@@ -10,6 +10,7 @@ export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { showSuccess, showError } = useToast()
@@ -20,10 +21,13 @@ export default function SignInPage() {
     setIsLoading(true)
 
     try {
+      const normalizedEmail = email.trim().toLowerCase()
+      const callbackUrl = `${window.location.origin}/admin`
       const result = await signIn('credentials', {
-        email,
+        email: normalizedEmail,
         password,
-        redirect: false
+        redirect: false,
+        callbackUrl
       })
 
       if (result?.error) {
@@ -70,6 +74,7 @@ export default function SignInPage() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -82,16 +87,53 @@ export default function SignInPage() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Contraseña
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-gray-900"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-primary-700 transition-colors"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? (
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.6 10.7a3 3 0 0 0 2.7 2.7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.9 5.2A10.7 10.7 0 0 1 12 5c5 0 8.8 3 10 7-.4 1.2-1 2.3-1.8 3.2" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.2 6.3C4.3 7.6 2.8 9.5 2 12c1.2 4 5 7 10 7 1.8 0 3.4-.4 4.9-1.1" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (

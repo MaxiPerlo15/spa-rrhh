@@ -11,7 +11,7 @@ export default function Servicios() {
       <div className="container-custom">
         {/* Título y descripción */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className={`text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${isVisible ? 'is-visible' : ''}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${isVisible ? 'is-visible' : ''}`}>
             Nuestros <span className="text-primary-500 inline-block hover:scale-110 transition-transform duration-300">Servicios</span>
           </h2>
           <p className={`text-lg text-gray-600 leading-relaxed animate-on-scroll reveal-delay-2 ${isVisible ? 'is-visible' : ''}`}>

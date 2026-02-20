@@ -11,7 +11,9 @@ export type ContactAdminDto = {
   createdAt: string
 }
 
-export function toContactAdminDto(contact: Contact): ContactAdminDto {
+type ContactAdminDtoSource = Pick<Contact, 'id' | 'name' | 'email' | 'phone' | 'subject' | 'message' | 'status' | 'createdAt'>
+
+export function toContactAdminDto(contact: ContactAdminDtoSource): ContactAdminDto {
   return {
     id: contact.id,
     name: contact.name,

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { markInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
 
 export default function NavBar() {
   const pathname = usePathname()
@@ -41,6 +42,7 @@ export default function NavBar() {
     const normalizedHash = `#${sectionId}`
 
     if (pathname !== '/') {
+      markInternalHashNavigationIntent()
       window.location.assign(`/${normalizedHash}`)
       setMobileMenuOpen(false)
       return

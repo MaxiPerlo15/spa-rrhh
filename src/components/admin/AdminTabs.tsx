@@ -4,13 +4,14 @@
  */
 
 'use client'
+import AppIcon from '@/components/ui/AppIcon'
 
 export type AdminTab = 'vacancies' | 'applications' | 'contacts' | 'settings'
 
 interface TabButtonProps {
   isActive: boolean
   onClick: () => void
-  icon: string
+  icon: Parameters<typeof AppIcon>[0]['name']
   label: string
   badge?: number
 }
@@ -25,7 +26,9 @@ function TabButton({ isActive, onClick, icon, label, badge }: TabButtonProps) {
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
       }`}
     >
-      <span className="text-xl">{icon}</span>
+      <span className="text-xl">
+        <AppIcon name={icon} className="h-5 w-5" />
+      </span>
       <span>{label}</span>
       {badge !== undefined && badge > 0 && (
         <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
@@ -46,7 +49,6 @@ interface AdminTabsProps {
     activeVacancies?: number
     pendingApplications?: number
     pendingContacts?: number
-    unreadNotifications?: number
   }
 }
 
@@ -57,30 +59,23 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
         <TabButton
           isActive={activeTab === 'vacancies'}
           onClick={() => onTabChange('vacancies')}
-          icon="💼"
+          icon="briefcase"
           label="Vacantes"
           badge={stats.activeVacancies}
         />
         <TabButton
           isActive={activeTab === 'applications'}
           onClick={() => onTabChange('applications')}
-          icon="📝"
+          icon="file"
           label="Postulaciones"
           badge={stats.pendingApplications}
         />
         <TabButton
           isActive={activeTab === 'contacts'}
           onClick={() => onTabChange('contacts')}
-          icon="📧"
+          icon="mail"
           label="Contactos"
           badge={stats.pendingContacts}
-        />
-        <TabButton
-          isActive={activeTab === 'settings'}
-          onClick={() => onTabChange('settings')}
-          icon="⚙️"
-          label="Configuración"
-          badge={stats.unreadNotifications}
         />
       </div>
     </div>

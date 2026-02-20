@@ -1,7 +1,6 @@
 const NAVBAR_OFFSET_PX = 72
-const MAX_ATTEMPTS = 60
-const RETRY_DELAY_MS = 100
 const ALIGNMENT_TOLERANCE_PX = 16
+const RETRY_DELAYS_MS = [0, 100, 220, 420]
 let activeScrollSequence = 0
 
 function scrollToHashElement(hash: string, behavior: ScrollBehavior) {
@@ -31,17 +30,15 @@ export function scrollToHashWithOffset(hash: string, behavior: ScrollBehavior = 
   if (!hash.startsWith('#')) return
 
   const sequenceId = ++activeScrollSequence
-  let attempts = 0
-  const tryScroll = () => {
+  const tryScroll = (attemptIndex: number) => {
     if (sequenceId !== activeScrollSequence) return
 
-    attempts += 1
-    const attemptBehavior: ScrollBehavior = attempts > 1 ? 'auto' : behavior
+    const attemptBehavior: ScrollBehavior = attemptIndex > 0 ? 'auto' : behavior
     const didScroll = scrollToHashElement(hash, attemptBehavior)
-    if (!didScroll && attempts < MAX_ATTEMPTS) {
-      window.setTimeout(tryScroll, RETRY_DELAY_MS)
+    if (!didScroll && attemptIndex < RETRY_DELAYS_MS.length - 1) {
+      window.setTimeout(() => tryScroll(attemptIndex + 1), RETRY_DELAYS_MS[attemptIndex + 1])
     }
   }
 
-  tryScroll()
+  tryScroll(0)
 }

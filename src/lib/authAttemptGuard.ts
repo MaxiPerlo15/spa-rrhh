@@ -16,6 +16,8 @@ const LOCK_RULES: Array<{ minFailures: number; lockMs: number }> = [
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
+const isDevBypassEnabled =
+  process.env.NODE_ENV !== 'production' && process.env.AUTH_ATTEMPT_GUARD_DEV_BYPASS !== 'false'
 
 const globalForAttemptGuard = globalThis as unknown as {
   authAttemptStore?: Map<string, AttemptState>
@@ -60,6 +62,9 @@ async function executeUpstashCommand<T>(...command: (string | number)[]) {
 }
 
 function getLockMsByFailures(failures: number) {
+  if (isDevBypassEnabled) {
+    return 0
+  }
   const rule = LOCK_RULES.find((candidate) => failures >= candidate.minFailures)
   return rule?.lockMs ?? 0
 }
@@ -113,6 +118,13 @@ async function sharedGetAttemptLock(scope: string, identity: string) {
 }
 
 export async function getAttemptLock(scope: string, identity: string) {
+  if (isDevBypassEnabled) {
+    return {
+      blocked: false,
+      retryAfterSeconds: 0
+    }
+  }
+
   if (isSharedStoreEnabled) {
     try {
       return await sharedGetAttemptLock(scope, identity)

@@ -3,6 +3,7 @@ import { useState, FormEvent } from 'react'
 import { UploadButton } from '@/lib/uploadthing'
 import { useToast } from '@/contexts/ToastContext'
 import { createApplication } from '@/lib/api/applications'
+import { isApiRequestError } from '@/lib/api/errors'
 import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
@@ -18,7 +19,7 @@ interface PostularFormProps {
 }
 
 export default function PostularForm({ vacancyId, vacancyTitle, onClose }: PostularFormProps) {
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showInfo } = useToast()
   const [formData, setFormData] = useState({
     candidateName: '',
     email: '',
@@ -104,6 +105,10 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         closeWithAnimation()
       }, 2000)
     } catch (error) {
+      if (isApiRequestError(error) && error.status === 409 && error.code === 'DUPLICATE_SUBMISSION') {
+        showInfo(error.message)
+        return
+      }
       const message = error instanceof Error
         ? error.message
         : 'Error al enviar la postulación. Por favor, intenta nuevamente.'

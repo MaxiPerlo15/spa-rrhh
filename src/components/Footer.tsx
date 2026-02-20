@@ -1,19 +1,19 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import Link from 'next/link'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { markInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
 
 export default function Footer() {
   const currentYear = new Date().getFullYear()
   const pathname = usePathname()
   const isHomePage = pathname === '/'
 
-  const scrollToSection = (sectionId: string) => {
+  const handleSectionNavigation = (sectionId: string) => {
     const normalizedHash = `#${sectionId.replace('#', '')}`
 
-    // Si no estamos en home, navegar a home primero
     if (!isHomePage) {
+      markInternalHashNavigationIntent()
       window.location.assign(`/${normalizedHash}`)
       return
     }
@@ -59,7 +59,7 @@ export default function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => scrollToSection('inicio')}
+                  onClick={() => handleSectionNavigation('inicio')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                   aria-label="Ir a la sección Inicio"
                 >
@@ -68,7 +68,8 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('nosotros')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('nosotros')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Nosotros
@@ -76,7 +77,8 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('servicios')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('servicios')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Servicios
@@ -84,7 +86,8 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('empresas')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('empresas')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Empresas
@@ -92,19 +95,14 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('contacto')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('contacto')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Contacto
                 </button>
               </li>
               <li>
-                <Link
-                  href="/privacy"
-                  className="text-gray-400 hover:text-primary-400 transition-colors"
-                >
-                  Privacidad
-                </Link>
               </li>
             </ul>
           </div>
