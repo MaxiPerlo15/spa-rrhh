@@ -5,12 +5,14 @@ import { useEffect, useRef } from 'react'
 interface ConfirmDialogProps {
   title: string
   message: string
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   onCancel: () => void
   confirmText?: string
   cancelText?: string
   type?: 'danger' | 'warning' | 'info'
   closeOnBackdropClick?: boolean
+  isLoading?: boolean
+  loadingText?: string
 }
 
 export default function ConfirmDialog({
@@ -21,7 +23,9 @@ export default function ConfirmDialog({
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   type = 'warning',
-  closeOnBackdropClick = true
+  closeOnBackdropClick = true,
+  isLoading = false,
+  loadingText = 'Procesando...'
 }: ConfirmDialogProps) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -31,7 +35,7 @@ export default function ConfirmDialog({
     cancelButtonRef.current?.focus()
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !isLoading) {
         onCancel()
       }
     }
@@ -41,7 +45,7 @@ export default function ConfirmDialog({
       document.body.style.overflow = 'unset'
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [onCancel])
+  }, [isLoading, onCancel])
 
   const styles = {
     danger: {
@@ -65,7 +69,7 @@ export default function ConfirmDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm animate-fade-in p-4"
       onClick={(event) => {
-        if (closeOnBackdropClick && event.target === event.currentTarget) {
+        if (!isLoading && closeOnBackdropClick && event.target === event.currentTarget) {
           onCancel()
         }
       }}
@@ -92,15 +96,17 @@ export default function ConfirmDialog({
           <button
             ref={cancelButtonRef}
             onClick={onCancel}
+            disabled={isLoading}
             className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`flex-1 rounded-lg px-4 py-2 font-medium text-white transition-colors focus:outline-none focus:ring-2 ${styles[type].button}`}
+            disabled={isLoading}
+            className={`flex-1 rounded-lg px-4 py-2 font-medium text-white transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${styles[type].button}`}
           >
-            {confirmText}
+            {isLoading ? loadingText : confirmText}
           </button>
         </div>
       </div>

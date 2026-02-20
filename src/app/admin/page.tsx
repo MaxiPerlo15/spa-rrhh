@@ -4,13 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import Pagination from '@/components/Pagination'
 import { useToast } from '@/contexts/ToastContext'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import AdminHeader from '@/components/admin/AdminHeader'
 import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs'
 import DashboardStats from '@/components/admin/DashboardStats'
 import AdminOnboardingDialog from '@/components/admin/AdminOnboardingDialog'
+import AdminVacanciesSection from '@/components/admin/sections/AdminVacanciesSection'
+import AdminApplicationsSection from '@/components/admin/sections/AdminApplicationsSection'
+import AdminContactsSection from '@/components/admin/sections/AdminContactsSection'
+import AdminSettingsSection from '@/components/admin/sections/AdminSettingsSection'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
@@ -57,6 +60,16 @@ type VacancySortKey = 'createdAt' | 'title' | 'location' | 'status'
 type ApplicationSortKey = 'submittedAt' | 'candidateName' | 'status'
 type ContactSortKey = 'createdAt' | 'name' | 'status'
 type SortDirection = 'asc' | 'desc'
+type ConfirmDialogConfig = {
+  isOpen: boolean
+  title: string
+  message: string
+  onConfirm: () => void | Promise<void>
+  confirmText?: string
+  cancelText?: string
+  closeOnBackdropClick?: boolean
+  type?: 'danger' | 'warning' | 'info'
+}
 
 type AdminSettingsResponse = {
   profile: {
@@ -246,21 +259,18 @@ export default function AdminDashboard() {
   const [showApplicationDetail, setShowApplicationDetail] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [showContactDetail, setShowContactDetail] = useState(false)
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean
-    title: string
-    message: string
-    onConfirm: () => void
-    confirmText?: string
-    cancelText?: string
-    closeOnBackdropClick?: boolean
-    type?: 'danger' | 'warning' | 'info'
-  }>({
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogConfig>({
     isOpen: false,
     title: '',
     message: '',
     onConfirm: () => {},
   })
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false)
+  const [pendingToggleVacancyId, setPendingToggleVacancyId] = useState<string | null>(null)
+  const [pendingDeleteVacancyId, setPendingDeleteVacancyId] = useState<string | null>(null)
+  const [pendingApplicationStatusId, setPendingApplicationStatusId] = useState<string | null>(null)
+  const [pendingContactStatusId, setPendingContactStatusId] = useState<string | null>(null)
+  const [pendingDeleteContactId, setPendingDeleteContactId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -1012,6 +1022,7 @@ export default function AdminDashboard() {
       type: 'danger',
       confirmText: 'Eliminar vacante',
       onConfirm: async () => {
+        setPendingDeleteVacancyId(id)
         try {
           await deleteVacancyApi(id)
           showSuccess('Vacante eliminada exitosamente')
@@ -1020,30 +1031,49 @@ export default function AdminDashboard() {
           console.error('Error deleting vacancy:', error)
           showError('Error al eliminar la vacante')
         } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+          setPendingDeleteVacancyId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
         }
       }
     })
   }
 
   const handleStatusToggle = async (vacancy: Vacancy) => {
-    try {
-      await toggleVacancyStatus(vacancy)
-      showSuccess(`Vacante ${vacancy.status === 'active' ? 'cerrada' : 'activada'} exitosamente`)
-      addNotification(
-        'Estado de vacante actualizado',
-        `La vacante "${vacancy.title}" fue ${vacancy.status === 'active' ? 'cerrada' : 'activada'}.`,
-        'info',
-        {
-          label: 'Ver vacantes',
-          type: 'VACANCY',
-          resourceId: vacancy.id
+    if (pendingToggleVacancyId) return
+
+    const isClosing = vacancy.status === 'active'
+    openConfirmDialog({
+      isOpen: true,
+      title: isClosing ? 'Cerrar vacante' : 'Activar vacante',
+      message: isClosing
+        ? `¿Deseas cerrar la vacante "${vacancy.title}"?\n\nAl cerrarla dejará de mostrarse en la página pública.`
+        : `¿Deseas activar la vacante "${vacancy.title}"?\n\nAl activarla volverá a mostrarse en la página pública.`,
+      type: 'warning',
+      confirmText: isClosing ? 'Sí, cerrar vacante' : 'Sí, activar vacante',
+      onConfirm: async () => {
+        setPendingToggleVacancyId(vacancy.id)
+        try {
+          await toggleVacancyStatus(vacancy)
+          showSuccess(`Vacante ${isClosing ? 'cerrada' : 'activada'} exitosamente`)
+          addNotification(
+            'Estado de vacante actualizado',
+            `La vacante "${vacancy.title}" fue ${isClosing ? 'cerrada' : 'activada'}.`,
+            'info',
+            {
+              label: 'Ver vacantes',
+              type: 'VACANCY',
+              resourceId: vacancy.id
+            }
+          )
+        } catch (error) {
+          console.error('Error toggling status:', error)
+          showError('Error al cambiar el estado de la vacante')
+        } finally {
+          setPendingToggleVacancyId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
         }
-      )
-    } catch (error) {
-      console.error('Error toggling status:', error)
-      showError('Error al cambiar el estado de la vacante')
-    }
+      }
+    })
   }
 
   const handleOpenCreateModal = () => {
@@ -1123,6 +1153,8 @@ export default function AdminDashboard() {
   }
 
   const handleStatusChange = async (applicationId: string, newStatus: Application['status']) => {
+    if (pendingApplicationStatusId) return
+    setPendingApplicationStatusId(applicationId)
     try {
       await updateApplicationStatus(applicationId, newStatus)
       showSuccess('Estado actualizado exitosamente')
@@ -1134,6 +1166,8 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error updating application status:', error)
       showError('Error al actualizar el estado')
+    } finally {
+      setPendingApplicationStatusId(null)
     }
   }
 
@@ -1158,6 +1192,8 @@ export default function AdminDashboard() {
   }
 
   const handleContactStatusChange = async (contactId: string, newStatus: Contact['status']) => {
+    if (pendingContactStatusId) return
+    setPendingContactStatusId(contactId)
     try {
       await updateContactStatus(contactId, newStatus)
       showSuccess('Estado del contacto actualizado')
@@ -1174,6 +1210,8 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error al actualizar estado del contacto:', error)
       showError('Error al actualizar el estado del contacto')
+    } finally {
+      setPendingContactStatusId(null)
     }
   }
 
@@ -1190,6 +1228,7 @@ export default function AdminDashboard() {
       type: 'danger',
       confirmText: 'Eliminar contacto',
       onConfirm: async () => {
+        setPendingDeleteContactId(contactId)
         try {
           await deleteContactApi(contactId)
           showSuccess('Contacto eliminado exitosamente')
@@ -1198,7 +1237,8 @@ export default function AdminDashboard() {
           console.error('Error al eliminar contacto:', error)
           showError('Error al eliminar el contacto')
         } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+          setPendingDeleteContactId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
         }
       }
     })
@@ -1219,7 +1259,8 @@ export default function AdminDashboard() {
     event.stopPropagation()
   }
 
-  const openConfirmDialog = (config: typeof confirmDialog) => {
+  const openConfirmDialog = (config: ConfirmDialogConfig) => {
+    setIsConfirmLoading(false)
     setConfirmDialog(config)
   }
 
@@ -1586,616 +1627,97 @@ const handleTestSentry = () => {
 
         {/* Vacancies Tab */}
         {activeTab === 'vacancies' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-            <h2 className="text-lg font-semibold text-gray-900">Gestión de Vacantes</h2>
-            <button
-              data-tour="create-vacancy"
-              onClick={handleOpenCreateModal}
-              className={`w-full sm:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors ${getTourClass('create-vacancy')}`}
-            >
-              + Nueva Vacante
-            </button>
-          </div>
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-              <input
-                type="text"
-                placeholder="Buscar por título o ubicación"
-                value={searchVacancies}
-                onChange={(event) => setSearchVacancies(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              />
-              <select
-                value={filterVacancyStatus}
-                onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'closed')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              >
-                <option value="all">Todos los estados</option>
-                <option value="active">Activas</option>
-                <option value="closed">Cerradas</option>
-              </select>
-              <select
-                value={sortVacanciesBy}
-                onChange={(event) => setSortVacanciesBy(event.target.value as VacancySortKey)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              >
-                <option value="createdAt">Ordenar por fecha</option>
-                <option value="title">Ordenar por título</option>
-                <option value="location">Ordenar por ubicación</option>
-                <option value="status">Ordenar por estado</option>
-              </select>
-              <select
-                value={sortVacanciesDirection}
-                onChange={(event) => setSortVacanciesDirection(event.target.value as SortDirection)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              >
-                <option value="desc">Más recientes primero</option>
-                <option value="asc">Más antiguos primero</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
-                  <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jornada</th>
-                  <th className="hidden xl:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Modalidad</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {paginatedVacancies.map((vacancy, index) => {
-                  const workdayLabels = {
-                    'FULL_TIME': 'Jornada Completa',
-                    'PART_TIME': 'Media Jornada',
-                    'PROJECT_BASED': 'Por Proyecto',
-                    'INTERNSHIP': 'Pasantía'
-                  }
-                  const modalityLabels = {
-                    'ON_SITE': 'Presencial',
-                    'REMOTE': 'Remoto',
-                    'HYBRID': 'Híbrido'
-                  }
-                  return (
-                  <tr key={vacancy.id} className="hover:bg-gray-50">
-                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{vacancy.title}</td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{vacancy.location}</td>
-                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
-                      {workdayLabels[vacancy.workday as keyof typeof workdayLabels] || vacancy.workday}
-                    </td>
-                    <td className="hidden xl:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
-                      {modalityLabels[vacancy.modality as keyof typeof modalityLabels] || vacancy.modality}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vacancy.status === 'active' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {vacancy.status === 'active' ? 'Activa' : 'Cerrada'}
-                      </span>
-                    </td>
-                    <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
-                      {new Date(vacancy.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-right">
-                      <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                      <button
-                        data-tour={index === 0 ? 'vacancy-toggle-btn' : undefined}
-                        onClick={() => handleStatusToggle(vacancy)}
-                        className={`${
-                          vacancy.status === 'active' 
-                            ? 'text-orange-600 hover:text-orange-800' 
-                            : 'text-green-600 hover:text-green-800'
-                        } font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-toggle-btn')}` : ''}`}
-                        title={vacancy.status === 'active' ? 'Cerrar esta vacante (no aparecerá en la página pública)' : 'Activar esta vacante (aparecerá en la página pública)'}
-                      >
-                        {vacancy.status === 'active' ? '🔒 Cerrar' : '✅ Activar'}
-                      </button>
-                      <button
-                        data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
-                        onClick={() => handleOpenEditModal(vacancy)}
-                        className={`text-blue-600 hover:text-blue-800 font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-edit-btn')}` : ''}`}
-                      >
-                        ✏️ Editar
-                      </button>
-                      <button
-                        data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
-                        onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
-                        className={`text-red-600 hover:text-red-800 font-medium ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
-                      >
-                        🗑️ Eliminar
-                      </button>
-                      </div>
-                    </td>
-                  </tr>
-                )})
-                }
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Paginación */}
-          <Pagination
-            currentPage={currentVacancyPage}
-            totalItems={filteredVacancies.length}
+          <AdminVacanciesSection
+            filteredVacancies={filteredVacancies}
+            paginatedVacancies={paginatedVacancies}
+            currentVacancyPage={currentVacancyPage}
             itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentVacancyPage}
+            setCurrentVacancyPage={setCurrentVacancyPage}
+            searchVacancies={searchVacancies}
+            setSearchVacancies={setSearchVacancies}
+            filterVacancyStatus={filterVacancyStatus}
+            setFilterVacancyStatus={setFilterVacancyStatus}
+            sortVacanciesBy={sortVacanciesBy}
+            setSortVacanciesBy={setSortVacanciesBy}
+            sortVacanciesDirection={sortVacanciesDirection}
+            setSortVacanciesDirection={setSortVacanciesDirection}
+            getTourClass={getTourClass}
+            onOpenCreateModal={handleOpenCreateModal}
+            onToggleStatus={handleStatusToggle}
+            onOpenEditModal={handleOpenEditModal}
+            onDeleteVacancy={handleDeleteVacancy}
+            pendingToggleVacancyId={pendingToggleVacancyId}
+            pendingDeleteVacancyId={pendingDeleteVacancyId}
           />
-        </div>
         )}
 
         {/* Applications Tab */}
         {activeTab === 'applications' && (
-          <>
-            {/* Stats pequeñas para applications */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
-                <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-                <div className="text-xl sm:text-2xl font-bold text-yellow-800">
-                  {applications.filter(a => a.status === 'PENDING').length}
-                </div>
-              </div>
-              <div className="bg-blue-50 rounded-lg shadow-sm p-4 border border-blue-200">
-                <div className="text-xs font-medium text-blue-700 mb-1">En Revisión</div>
-                <div className="text-xl sm:text-2xl font-bold text-blue-800">
-                  {applications.filter(a => a.status === 'REVIEWING').length}
-                </div>
-              </div>
-              <div className="bg-purple-50 rounded-lg shadow-sm p-4 border border-purple-200">
-                <div className="text-xs font-medium text-purple-700 mb-1">Entrevistados</div>
-                <div className="text-xl sm:text-2xl font-bold text-purple-800">
-                  {applications.filter(a => a.status === 'INTERVIEWED').length}
-                </div>
-              </div>
-              <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
-                <div className="text-xs font-medium text-green-700 mb-1">Aceptados</div>
-                <div className="text-xl sm:text-2xl font-bold text-green-800">
-                  {applications.filter(a => a.status === 'ACCEPTED').length}
-                </div>
-              </div>
-              <div className="bg-red-50 rounded-lg shadow-sm p-4 border border-red-200">
-                <div className="text-xs font-medium text-red-700 mb-1">Rechazados</div>
-                <div className="text-xl sm:text-2xl font-bold text-red-800">
-                  {applications.filter(a => a.status === 'REJECTED').length}
-                </div>
-              </div>
-            </div>
-
-            {/* Filtros */}
-            <div
-              data-tour="applications-filters"
-              className={`bg-white rounded-lg shadow p-4 mb-6 ${getTourClass('applications-filters')}`}
-            >
-              <div className="flex flex-col gap-4">
-                {/* Búsqueda */}
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="Buscar por nombre, email o vacante..."
-                    value={searchApplications}
-                    onChange={(e) => setSearchApplications(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  />
-                  <svg
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-
-                {/* Filtros */}
-                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="PENDING">Pendientes</option>
-                    <option value="REVIEWING">En Revisión</option>
-                    <option value="INTERVIEWED">Entrevistados</option>
-                    <option value="ACCEPTED">Aceptados</option>
-                    <option value="REJECTED">Rechazados</option>
-                  </select>
-                  <select
-                    value={filterApplicationsVacancyId}
-                    onChange={(event) => setFilterApplicationsVacancyId(event.target.value)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="all">Todas las vacantes</option>
-                    {vacancies.map((vacancy) => (
-                      <option key={vacancy.id} value={vacancy.id}>
-                        {vacancy.title}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={sortApplicationsBy}
-                    onChange={(event) => setSortApplicationsBy(event.target.value as ApplicationSortKey)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="submittedAt">Ordenar por fecha</option>
-                    <option value="candidateName">Ordenar por candidato</option>
-                    <option value="status">Ordenar por estado</option>
-                  </select>
-                  <select
-                    value={sortApplicationsDirection}
-                    onChange={(event) => setSortApplicationsDirection(event.target.value as SortDirection)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="desc">Descendente</option>
-                    <option value="asc">Ascendente</option>
-                  </select>
-                  <span className="text-sm text-gray-600 text-center sm:text-left">
-                    {filteredApplications.length} postulaciones
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabla de postulaciones */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Candidato</th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vacante</th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                      <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredApplications.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                          No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'disponibles'}
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedApplications.map((application) => (
-                        <tr key={application.id} className="hover:bg-gray-50">
-                          <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                            {application.candidateName}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{application.email}</td>
-                          <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>
-                          <td className="px-4 sm:px-6 py-4 text-sm">
-                            <select
-                              value={application.status}
-                              onChange={(e) => handleStatusChange(application.id, e.target.value as Application['status'])}
-                              className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${statusColors[application.status]}`}
-                            >
-                              <option value="PENDING">Pendiente</option>
-                              <option value="REVIEWING">En Revisión</option>
-                              <option value="INTERVIEWED">Entrevistado</option>
-                              <option value="ACCEPTED">Aceptado</option>
-                              <option value="REJECTED">Rechazado</option>
-                            </select>
-                          </td>
-                          <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
-                            {new Date(application.submittedAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 text-sm text-right">
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                            <button
-                              data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined}
-                              onClick={() => handleViewApplicationDetails(application)}
-                              className={`text-blue-600 hover:text-blue-800 font-medium ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}
-                            >
-                              👁️ Ver
-                            </button>
-                            {application.resumeUrl && (
-                              <button
-                                data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined}
-                                onClick={() => handleDownloadCV(application)}
-                                className={`text-green-600 hover:text-green-800 font-medium ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`}
-                              >
-                                📄 CV
-                              </button>
-                            )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Paginación */}
-              <Pagination
-                currentPage={currentApplicationPage}
-                totalItems={filteredApplications.length}
-                itemsPerPage={itemsPerPage}
-                onPageChange={setCurrentApplicationPage}
-              />
-            </div>
-          </>
+          <AdminApplicationsSection
+            applications={applications}
+            vacancies={vacancies}
+            filteredApplications={filteredApplications}
+            paginatedApplications={paginatedApplications}
+            currentApplicationPage={currentApplicationPage}
+            itemsPerPage={itemsPerPage}
+            setCurrentApplicationPage={setCurrentApplicationPage}
+            searchApplications={searchApplications}
+            setSearchApplications={setSearchApplications}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            filterApplicationsVacancyId={filterApplicationsVacancyId}
+            setFilterApplicationsVacancyId={setFilterApplicationsVacancyId}
+            sortApplicationsBy={sortApplicationsBy}
+            setSortApplicationsBy={setSortApplicationsBy}
+            sortApplicationsDirection={sortApplicationsDirection}
+            setSortApplicationsDirection={setSortApplicationsDirection}
+            firstApplicationId={firstApplicationId}
+            firstApplicationWithCvId={firstApplicationWithCvId}
+            getTourClass={getTourClass}
+            onStatusChange={handleStatusChange}
+            onViewDetails={handleViewApplicationDetails}
+            onDownloadCv={handleDownloadCV}
+            pendingApplicationStatusId={pendingApplicationStatusId}
+          />
         )}
 
         {/* Contacts Tab */}
         {activeTab === 'contacts' && (
-          <>
-            {/* Stats pequeñas para contactos */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="bg-yellow-50 rounded-lg shadow-sm p-4 border border-yellow-200">
-                <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-                <div className="text-xl sm:text-2xl font-bold text-yellow-800">
-                  {contacts.filter(c => c.status === 'PENDING').length}
-                </div>
-              </div>
-              <div className="bg-green-50 rounded-lg shadow-sm p-4 border border-green-200">
-                <div className="text-xs font-medium text-green-700 mb-1">Respondidos</div>
-                <div className="text-xl sm:text-2xl font-bold text-green-800">
-                  {contacts.filter(c => c.status === 'RESPONDED').length}
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-lg shadow-sm p-4 border border-gray-200">
-                <div className="text-xs font-medium text-gray-700 mb-1">Archivados</div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-800">
-                  {contacts.filter(c => c.status === 'ARCHIVED').length}
-                </div>
-              </div>
-            </div>
-
-            {/* Filtros */}
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
-              <div className="flex flex-col gap-4">
-                {/* Búsqueda */}
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="Buscar por nombre, email o asunto..."
-                    value={searchContacts}
-                    onChange={(e) => setSearchContacts(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  />
-                  <svg
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-
-                {/* Filtros */}
-                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
-                  <select
-                    value={filterContactStatus}
-                    onChange={(e) => setFilterContactStatus(e.target.value)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="PENDING">Pendientes</option>
-                    <option value="RESPONDED">Respondidos</option>
-                    <option value="ARCHIVED">Archivados</option>
-                  </select>
-                  <select
-                    value={sortContactsBy}
-                    onChange={(event) => setSortContactsBy(event.target.value as ContactSortKey)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="createdAt">Ordenar por fecha</option>
-                    <option value="name">Ordenar por nombre</option>
-                    <option value="status">Ordenar por estado</option>
-                  </select>
-                  <select
-                    value={sortContactsDirection}
-                    onChange={(event) => setSortContactsDirection(event.target.value as SortDirection)}
-                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="desc">Descendente</option>
-                    <option value="asc">Ascendente</option>
-                  </select>
-                  <span className="text-sm text-gray-600 text-center sm:text-left">
-                    {filteredContacts.length} contactos
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabla de contactos */}
-            <div
-              data-tour="contacts-table"
-              className={`bg-white rounded-lg shadow overflow-hidden ${getTourClass('contacts-table')}`}
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="hidden lg:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asunto</th>
-                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                      <th className="hidden md:table-cell px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredContacts.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                          No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'disponibles'}
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedContacts.map((contact) => (
-                        <tr key={contact.id} className="hover:bg-gray-50">
-                          <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                            {contact.name}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{contact.email}</td>
-                          <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                            {contact.subject}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 text-sm">
-                            <select
-                              value={contact.status}
-                              onChange={(e) => handleContactStatusChange(contact.id, e.target.value as Contact['status'])}
-                              className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${contactStatusColors[contact.status]}`}
-                            >
-                              <option value="PENDING">Pendiente</option>
-                              <option value="RESPONDED">Respondido</option>
-                              <option value="ARCHIVED">Archivado</option>
-                            </select>
-                          </td>
-                          <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
-                            {new Date(contact.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 text-sm text-right">
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                            <button
-                              onClick={() => handleViewContactDetails(contact)}
-                              data-tour={contact.id === firstContactId ? 'contact-view-btn' : undefined}
-                              className={`text-blue-600 hover:text-blue-800 font-medium ${contact.id === firstContactId ? getTourClass('contact-view-btn') : ''}`}
-                            >
-                              👁️ Ver
-                            </button>
-                            <button
-                              onClick={() => handleDeleteContact(contact.id, contact.name)}
-                              className="text-red-600 hover:text-red-800 font-medium"
-                            >
-                              🗑️
-                            </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Paginación */}
-              <Pagination
-                currentPage={currentContactPage}
-                totalItems={filteredContacts.length}
-                itemsPerPage={itemsPerPage}
-                onPageChange={setCurrentContactPage}
-              />
-            </div>
-          </>
+          <AdminContactsSection
+            contacts={contacts}
+            filteredContacts={filteredContacts}
+            paginatedContacts={paginatedContacts}
+            currentContactPage={currentContactPage}
+            itemsPerPage={itemsPerPage}
+            setCurrentContactPage={setCurrentContactPage}
+            searchContacts={searchContacts}
+            setSearchContacts={setSearchContacts}
+            filterContactStatus={filterContactStatus}
+            setFilterContactStatus={setFilterContactStatus}
+            sortContactsBy={sortContactsBy}
+            setSortContactsBy={setSortContactsBy}
+            sortContactsDirection={sortContactsDirection}
+            setSortContactsDirection={setSortContactsDirection}
+            firstContactId={firstContactId}
+            getTourClass={getTourClass}
+            onStatusChange={handleContactStatusChange}
+            onViewDetails={handleViewContactDetails}
+            onDeleteContact={handleDeleteContact}
+            pendingContactStatusId={pendingContactStatusId}
+            pendingDeleteContactId={pendingDeleteContactId}
+          />
         )}
 
         {activeTab === 'settings' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900">Configuración de cuenta</h2>
-              </div>
-              <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</p>
-                  <p className="text-sm font-medium text-gray-900">{session.user?.email ?? 'No disponible'}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Rol</p>
-                  <p className="text-sm font-medium text-gray-900">{session.user?.role ?? 'ADMIN'}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
-                  <label htmlFor="adminName" className="text-xs font-semibold text-gray-500 uppercase mb-1 block">
-                    Nombre visible
-                  </label>
-                  <input
-                    id="adminName"
-                    type="text"
-                    value={settingsForm.name}
-                    onChange={(event) => setSettingsForm((prev) => ({ ...prev, name: event.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                    placeholder="Administrador"
-                  />
-                </div>
-                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>
-                  <p className="text-sm text-gray-700">
-                    Gestiona el cambio de contraseña desde el flujo seguro de recuperación.
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <a
-                      href="/admin/forgot-password"
-                      className="inline-flex px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
-                    >
-                      Cambiar contraseña
-                    </a>
-                    <span className="text-xs text-gray-500">Sesión activa por JWT (8h) y cookies seguras.</span>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-gray-200 p-4 md:col-span-2 space-y-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Preferencias de notificaciones</p>
-                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
-                    <span>Habilitar notificaciones del panel</span>
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.notificationsEnabled}
-                      onChange={(event) =>
-                        setSettingsForm((prev) => ({ ...prev, notificationsEnabled: event.target.checked }))
-                      }
-                    />
-                  </label>
-                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
-                    <span>Nuevas postulaciones</span>
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.notifyNewApplications}
-                      onChange={(event) =>
-                        setSettingsForm((prev) => ({ ...prev, notifyNewApplications: event.target.checked }))
-                      }
-                      disabled={!settingsForm.notificationsEnabled}
-                    />
-                  </label>
-                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
-                    <span>Nuevos contactos</span>
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.notifyNewContacts}
-                      onChange={(event) =>
-                        setSettingsForm((prev) => ({ ...prev, notifyNewContacts: event.target.checked }))
-                      }
-                      disabled={!settingsForm.notificationsEnabled}
-                    />
-                  </label>
-                  <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
-                    <span>Alertas de seguridad</span>
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.notifySecurityAlerts}
-                      onChange={(event) =>
-                        setSettingsForm((prev) => ({ ...prev, notifySecurityAlerts: event.target.checked }))
-                      }
-                      disabled={!settingsForm.notificationsEnabled}
-                    />
-                  </label>
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveSettings()}
-                      disabled={settingsSaving || !settingsLoaded}
-                      className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
-                    >
-                      {settingsSaving ? 'Guardando...' : 'Guardar configuración'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminSettingsSection
+            email={session.user?.email}
+            role={session.user?.role}
+            settingsForm={settingsForm}
+            setSettingsForm={(updater) => setSettingsForm(updater)}
+            settingsSaving={settingsSaving}
+            settingsLoaded={settingsLoaded}
+            onSaveSettings={() => void handleSaveSettings()}
+          />
         )}
       </main>
 
@@ -2678,9 +2200,21 @@ const handleTestSentry = () => {
           type={confirmDialog.type}
           confirmText={confirmDialog.confirmText}
           cancelText={confirmDialog.cancelText}
-          closeOnBackdropClick={confirmDialog.closeOnBackdropClick}
-          onConfirm={confirmDialog.onConfirm}
-          onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+          closeOnBackdropClick={isConfirmLoading ? false : confirmDialog.closeOnBackdropClick}
+          isLoading={isConfirmLoading}
+          onConfirm={async () => {
+            if (isConfirmLoading) return
+            setIsConfirmLoading(true)
+            try {
+              await confirmDialog.onConfirm()
+            } finally {
+              setIsConfirmLoading(false)
+            }
+          }}
+          onCancel={() => {
+            if (isConfirmLoading) return
+            setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+          }}
         />
       )}
 
