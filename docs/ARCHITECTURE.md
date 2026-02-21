@@ -123,6 +123,12 @@ spa-rrhh/
 - Posicionamiento estándar: bottom-center.
 - Usar toasts para confirmaciones de éxito/error en flujos principales de formularios, auth admin y acciones CRUD del panel.
 
+**Hardening UX de acciones críticas (MIS-104)**:
+- Acciones destructivas y sensibles del panel usan `ConfirmDialog` con estado de carga (`isLoading`) para evitar dobles ejecuciones.
+- Acciones por fila (eliminar/cerrar/activar) bloquean solo la fila afectada con feedback inmediato (`Procesando...` / `Eliminando...`).
+- Acciones masivas de notificaciones (`marcar todas leídas` / `limpiar leídas`) muestran estado de progreso y, en borrado, confirmación explícita previa.
+- Flujos críticos muestran resultado explícito (toast de éxito/error) y fallback de recarga cuando una operación falla.
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.

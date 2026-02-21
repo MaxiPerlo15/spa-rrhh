@@ -292,6 +292,9 @@ export default function AdminDashboard() {
   const [guideDialogPosition, setGuideDialogPosition] = useState<CSSProperties | undefined>(undefined)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [pendingNotificationDeleteIds, setPendingNotificationDeleteIds] = useState<Set<string>>(new Set())
+  const [pendingNotificationBulkAction, setPendingNotificationBulkAction] = useState<
+    'mark-all-read' | 'clear-read' | null
+  >(null)
   const [settingsForm, setSettingsForm] = useState({
     notificationsEnabled: true,
     notifyNewApplications: true,
@@ -384,9 +387,11 @@ export default function AdminDashboard() {
   }, [createNotification, settingsForm.notificationsEnabled])
 
   const markAllNotificationsAsRead = () => {
+    if (pendingNotificationBulkAction) return
     const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id)
     if (unreadIds.length === 0) return
 
+    setPendingNotificationBulkAction('mark-all-read')
     setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
     void (async () => {
       try {
@@ -403,34 +408,50 @@ export default function AdminDashboard() {
         if (hasErrors) {
           throw new Error('No se pudieron marcar todas como leídas')
         }
+        showSuccess('Todas las notificaciones fueron marcadas como leídas.')
       } catch (error) {
         console.error('Error al marcar todas las notificaciones como leídas', error)
         showError('No se pudieron actualizar todas las notificaciones.')
         await reloadNotifications()
+      } finally {
+        setPendingNotificationBulkAction(null)
       }
     })()
   }
 
   const clearReadNotifications = () => {
+    if (pendingNotificationBulkAction) return
     const readIds = notifications.filter((notification) => notification.isRead).map((notification) => notification.id)
     if (readIds.length === 0) return
 
-    setNotifications((prev) => prev.filter((notification) => !notification.isRead))
-    showSuccess('Notificaciones leidas limpiadas.')
-    void (async () => {
-      try {
-        const response = await fetch('/api/admin/notifications?view=read', {
-          method: 'DELETE'
-        })
-        if (!response.ok) {
-          throw new Error('No se pudieron limpiar todas las notificaciones leídas')
+    openConfirmDialog({
+      isOpen: true,
+      title: 'Limpiar notificaciones leídas',
+      message: 'Se eliminarán todas las notificaciones ya leídas. Esta acción no se puede deshacer.',
+      type: 'danger',
+      confirmText: 'Sí, limpiar leídas',
+      closeOnBackdropClick: false,
+      onConfirm: async () => {
+        setPendingNotificationBulkAction('clear-read')
+        try {
+          const response = await fetch('/api/admin/notifications?view=read', {
+            method: 'DELETE'
+          })
+          if (!response.ok) {
+            throw new Error('No se pudieron limpiar todas las notificaciones leídas')
+          }
+          setNotifications((prev) => prev.filter((notification) => !notification.isRead))
+          showSuccess('Notificaciones leídas limpiadas.')
+        } catch (error) {
+          console.error('Error al limpiar notificaciones leídas', error)
+          showError('No se pudieron limpiar todas las notificaciones leídas.')
+          await reloadNotifications()
+        } finally {
+          setPendingNotificationBulkAction(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
         }
-      } catch (error) {
-        console.error('Error al limpiar notificaciones leídas', error)
-        showError('No se pudieron limpiar todas las notificaciones leídas.')
-        await reloadNotifications()
       }
-    })()
+    })
   }
 
   const toggleNotificationRead = (notificationId: string) => {
@@ -1316,13 +1337,19 @@ export default function AdminDashboard() {
       cancelText: 'Permanecer',
       closeOnBackdropClick: true,
       onConfirm: async () => {
-        const callbackUrl = `${window.location.origin}/admin/signin`
-        await signOut({
-          callbackUrl,
-          redirect: false
-        })
-        router.replace('/admin/signin')
-        router.refresh()
+        try {
+          const callbackUrl = `${window.location.origin}/admin/signin`
+          await signOut({
+            callbackUrl,
+            redirect: false
+          })
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+          router.replace('/admin/signin')
+          router.refresh()
+        } catch (error) {
+          console.error('Error al cerrar sesión', error)
+          showError('No se pudo cerrar la sesión. Reintentá en unos segundos.')
+        }
       }
     })
   }
@@ -1608,6 +1635,7 @@ const handleTestSentry = () => {
         onOpenSettings={handleOpenSettings}
         notifications={orderedNotifications}
         pendingNotificationDeleteIds={[...pendingNotificationDeleteIds]}
+        isNotificationBulkLoading={pendingNotificationBulkAction !== null}
         onDeleteNotification={handleDeleteNotification}
         onToggleNotificationRead={toggleNotificationRead}
         onMarkAllNotificationsAsRead={markAllNotificationsAsRead}

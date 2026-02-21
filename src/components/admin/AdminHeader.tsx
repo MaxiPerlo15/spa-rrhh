@@ -30,6 +30,7 @@ interface AdminHeaderProps {
   onOpenSettings: () => void
   notifications: HeaderNotification[]
   pendingNotificationDeleteIds?: string[]
+  isNotificationBulkLoading?: boolean
   onDeleteNotification: (notificationId: string) => void
   onToggleNotificationRead: (notificationId: string) => void
   onMarkAllNotificationsAsRead: () => void
@@ -49,6 +50,7 @@ export default function AdminHeader({
   onOpenSettings,
   notifications,
   pendingNotificationDeleteIds = [],
+  isNotificationBulkLoading = false,
   onDeleteNotification,
   onToggleNotificationRead,
   onMarkAllNotificationsAsRead,
@@ -247,17 +249,19 @@ export default function AdminHeader({
                         {unreadCount > 0 && (
                           <button
                             onClick={onMarkAllNotificationsAsRead}
+                            disabled={isNotificationBulkLoading}
                             className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                           >
-                            Marcar todas leidas
+                            {isNotificationBulkLoading ? 'Procesando...' : 'Marcar todas leidas'}
                           </button>
                         )}
                         {readCount > 0 && (
                           <button
                             onClick={onClearReadNotifications}
+                            disabled={isNotificationBulkLoading}
                             className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                           >
-                            Limpiar leidas
+                            {isNotificationBulkLoading ? 'Procesando...' : 'Limpiar leidas'}
                           </button>
                         )}
                       </div>
@@ -297,6 +301,7 @@ export default function AdminHeader({
                                 </p>
                                 <button
                                   onClick={() => onToggleNotificationRead(notification.id)}
+                                  disabled={isNotificationBulkLoading}
                                   className="mt-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 transition-colors"
                                 >
                                   {notification.isRead ? 'Marcar como no leida' : 'Marcar como leida'}
@@ -304,6 +309,7 @@ export default function AdminHeader({
                                 {notification.action && (
                                   <button
                                     onClick={() => onNotificationAction(notification)}
+                                    disabled={isNotificationBulkLoading}
                                     className="mt-1.5 ml-2 text-xs font-semibold text-primary-700 hover:text-primary-800 transition-colors"
                                   >
                                     {notification.action.label}
@@ -312,7 +318,7 @@ export default function AdminHeader({
                               </div>
                               <button
                                 onClick={() => onDeleteNotification(notification.id)}
-                                disabled={pendingDeleteSet.has(notification.id)}
+                                disabled={isNotificationBulkLoading || pendingDeleteSet.has(notification.id)}
                                 className="shrink-0 rounded-md px-1 text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg leading-none"
                                 aria-label="Eliminar notificacion"
                               >
