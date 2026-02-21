@@ -10,6 +10,43 @@ interface AdminSettingsSectionProps {
   settingsSaving: boolean
   settingsLoaded: boolean
   onSaveSettings: () => void
+  auditTimeline: {
+    items: Array<{
+      id: string
+      actorEmail: string | null
+      action: string
+      resourceType: string
+      resourceId: string | null
+      outcome: 'SUCCESS' | 'DENIED' | 'ERROR'
+      metadata: unknown
+      createdAt: string
+    }>
+    loading: boolean
+    error: string | null
+    pagination: {
+      page: number
+      totalPages: number
+      total: number
+    }
+    filterOptions: {
+      actorEmails: string[]
+      actions: string[]
+      resourceTypes: string[]
+    }
+    filters: {
+      actorEmail: string
+      action: string
+      resourceType: string
+      dateFrom: string
+      dateTo: string
+    }
+  }
+  onAuditFilterChange: (
+    key: 'actorEmail' | 'action' | 'resourceType' | 'dateFrom' | 'dateTo',
+    value: string
+  ) => void
+  onAuditPageChange: (page: number) => void
+  onReloadAuditTimeline: () => void
 }
 
 function ToggleSwitch({
@@ -48,8 +85,24 @@ export default function AdminSettingsSection({
   setSettingsForm,
   settingsSaving,
   settingsLoaded,
-  onSaveSettings
+  onSaveSettings,
+  auditTimeline,
+  onAuditFilterChange,
+  onAuditPageChange,
+  onReloadAuditTimeline
 }: AdminSettingsSectionProps) {
+  const outcomeLabel = {
+    SUCCESS: 'Correcto',
+    DENIED: 'Denegado',
+    ERROR: 'Error'
+  }
+
+  const outcomeBadgeClass = {
+    SUCCESS: 'bg-green-100 text-green-800',
+    DENIED: 'bg-yellow-100 text-yellow-800',
+    ERROR: 'bg-red-100 text-red-800'
+  }
+
   return (
     <div className="space-y-6">
       <div className="ds-surface overflow-hidden">
@@ -111,6 +164,166 @@ export default function AdminSettingsSection({
             <div className="pt-2 flex justify-end">
               <button type="button" onClick={onSaveSettings} disabled={settingsSaving || !settingsLoaded} className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
                 {settingsSaving ? 'Guardando...' : 'Guardar configuración'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="ds-surface overflow-hidden">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <h2 className="font-display text-lg font-semibold text-gray-900">Timeline de auditoría</h2>
+          <button
+            type="button"
+            onClick={onReloadAuditTimeline}
+            disabled={auditTimeline.loading}
+            className="w-full sm:w-auto px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {auditTimeline.loading ? 'Actualizando...' : 'Actualizar'}
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <select
+              value={auditTimeline.filters.actorEmail}
+              onChange={(event) => onAuditFilterChange('actorEmail', event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            >
+              <option value="">Todos los usuarios</option>
+              {auditTimeline.filterOptions.actorEmails.map((actorEmail) => (
+                <option key={actorEmail} value={actorEmail}>
+                  {actorEmail}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={auditTimeline.filters.action}
+              onChange={(event) => onAuditFilterChange('action', event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            >
+              <option value="">Todas las acciones</option>
+              {auditTimeline.filterOptions.actions.map((action) => (
+                <option key={action} value={action}>
+                  {action}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={auditTimeline.filters.resourceType}
+              onChange={(event) => onAuditFilterChange('resourceType', event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            >
+              <option value="">Todas las entidades</option>
+              {auditTimeline.filterOptions.resourceTypes.map((resourceType) => (
+                <option key={resourceType} value={resourceType}>
+                  {resourceType}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={auditTimeline.filters.dateFrom}
+              onChange={(event) => onAuditFilterChange('dateFrom', event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            />
+
+            <input
+              type="date"
+              value={auditTimeline.filters.dateTo}
+              onChange={(event) => onAuditFilterChange('dateTo', event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            />
+          </div>
+
+          {auditTimeline.error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {auditTimeline.error}
+            </div>
+          )}
+
+          <div className="overflow-x-auto border border-gray-100 rounded-xl">
+            <table className="w-full min-w-[840px]">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Usuario</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Acción</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Entidad</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Resultado</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Detalle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {auditTimeline.loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-sm text-center text-gray-500">
+                      Cargando eventos de auditoría...
+                    </td>
+                  </tr>
+                ) : auditTimeline.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-sm text-center text-gray-500">
+                      No hay eventos para los filtros seleccionados.
+                    </td>
+                  </tr>
+                ) : (
+                  auditTimeline.items.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {new Date(entry.createdAt).toLocaleString('es-AR')}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{entry.actorEmail ?? 'Sistema'}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{entry.action}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {entry.resourceType}
+                        {entry.resourceId ? ` (${entry.resourceId.slice(0, 8)}...)` : ''}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${outcomeBadgeClass[entry.outcome]}`}>
+                          {outcomeLabel[entry.outcome]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 max-w-[320px]">
+                        <code className="block overflow-hidden text-ellipsis whitespace-nowrap">
+                          {entry.metadata ? JSON.stringify(entry.metadata) : '-'}
+                        </code>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-gray-500">
+              {auditTimeline.pagination.total} eventos totales
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onAuditPageChange(auditTimeline.pagination.page - 1)}
+                disabled={auditTimeline.pagination.page <= 1 || auditTimeline.loading}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-gray-600">
+                Página {auditTimeline.pagination.page} / {auditTimeline.pagination.totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => onAuditPageChange(auditTimeline.pagination.page + 1)}
+                disabled={
+                  auditTimeline.pagination.page >= auditTimeline.pagination.totalPages || auditTimeline.loading
+                }
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
               </button>
             </div>
           </div>

@@ -129,6 +129,12 @@ spa-rrhh/
 - Acciones masivas de notificaciones (`marcar todas leídas` / `limpiar leídas`) muestran estado de progreso y, en borrado, confirmación explícita previa.
 - Flujos críticos muestran resultado explícito (toast de éxito/error) y fallback de recarga cuando una operación falla.
 
+**Timeline de auditoría operativa (MIS-107)**:
+- Endpoint dedicado para trazabilidad admin: `GET /api/admin/audit`.
+- Filtros soportados: `actorEmail`, `action`, `resourceType`, `dateFrom`, `dateTo`.
+- Vista integrada en `Configuración` con tabla cronológica, estados de resultado (`SUCCESS`, `DENIED`, `ERROR`) y paginación.
+- La UI permite investigar acciones críticas sin depender de logs técnicos externos.
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.

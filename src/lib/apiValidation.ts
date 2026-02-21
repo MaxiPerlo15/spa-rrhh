@@ -181,6 +181,24 @@ export const adminNotificationsListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional().default(20)
 })
 
+export const adminAuditListQuerySchema = z.object({
+  actorEmail: z.string().trim().min(1).optional(),
+  action: z.string().trim().min(1).optional(),
+  resourceType: z.string().trim().min(1).optional(),
+  dateFrom: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || !Number.isNaN(new Date(value).getTime()), 'dateFrom inválida'),
+  dateTo: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || !Number.isNaN(new Date(value).getTime()), 'dateTo inválida'),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20)
+})
+
 export const createAdminNotificationSchema = z.object({
   title: nonEmptyString.max(120, 'Título demasiado largo'),
   message: nonEmptyString.max(500, 'Mensaje demasiado largo'),

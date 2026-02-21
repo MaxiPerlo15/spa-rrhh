@@ -87,6 +87,31 @@ type AdminSettingsResponse = {
   updatedAt: string
 }
 
+type AdminAuditLogItem = {
+  id: string
+  actorEmail: string | null
+  action: string
+  resourceType: string
+  resourceId: string | null
+  outcome: 'SUCCESS' | 'DENIED' | 'ERROR'
+  metadata: unknown
+  createdAt: string
+}
+
+type AdminAuditResponse = {
+  items: AdminAuditLogItem[]
+  pagination: {
+    page: number
+    totalPages: number
+    total: number
+  }
+  filters: {
+    actorEmails: string[]
+    actions: string[]
+    resourceTypes: string[]
+  }
+}
+
 type DomainStep = {
   target: TourTarget
   tab: AdminTab
@@ -303,6 +328,28 @@ export default function AdminDashboard() {
   })
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [auditTimeline, setAuditTimeline] = useState<AdminAuditLogItem[]>([])
+  const [auditTimelineLoading, setAuditTimelineLoading] = useState(false)
+  const [auditTimelineError, setAuditTimelineError] = useState<string | null>(null)
+  const [auditTimelinePage, setAuditTimelinePage] = useState(1)
+  const [auditTimelineTotalPages, setAuditTimelineTotalPages] = useState(1)
+  const [auditTimelineTotal, setAuditTimelineTotal] = useState(0)
+  const [auditFilterOptions, setAuditFilterOptions] = useState<{
+    actorEmails: string[]
+    actions: string[]
+    resourceTypes: string[]
+  }>({
+    actorEmails: [],
+    actions: [],
+    resourceTypes: []
+  })
+  const [auditFilters, setAuditFilters] = useState({
+    actorEmail: '',
+    action: '',
+    resourceType: '',
+    dateFrom: '',
+    dateTo: ''
+  })
   const lastObservedStatsRef = useRef<{
     totalApplications: number
     pendingContacts: number
@@ -513,6 +560,46 @@ export default function AdminDashboard() {
       }
     })()
   }
+
+  const loadAuditTimeline = useCallback(async () => {
+    if (status !== 'authenticated') return
+
+    setAuditTimelineLoading(true)
+    setAuditTimelineError(null)
+    try {
+      const params = new URLSearchParams({
+        page: String(auditTimelinePage),
+        limit: '20'
+      })
+
+      if (auditFilters.actorEmail) params.set('actorEmail', auditFilters.actorEmail)
+      if (auditFilters.action) params.set('action', auditFilters.action)
+      if (auditFilters.resourceType) params.set('resourceType', auditFilters.resourceType)
+      if (auditFilters.dateFrom) params.set('dateFrom', auditFilters.dateFrom)
+      if (auditFilters.dateTo) params.set('dateTo', auditFilters.dateTo)
+
+      const response = await fetch(`/api/admin/audit?${params.toString()}`, { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('No se pudo cargar la auditoría operativa')
+      }
+
+      const data = (await response.json()) as AdminAuditResponse
+      setAuditTimeline(Array.isArray(data.items) ? data.items : [])
+      setAuditTimelinePage(data.pagination.page)
+      setAuditTimelineTotalPages(data.pagination.totalPages)
+      setAuditTimelineTotal(data.pagination.total)
+      setAuditFilterOptions({
+        actorEmails: data.filters.actorEmails ?? [],
+        actions: data.filters.actions ?? [],
+        resourceTypes: data.filters.resourceTypes ?? []
+      })
+    } catch (error) {
+      console.error('Error al cargar timeline de auditoría', error)
+      setAuditTimelineError('No se pudo cargar la auditoría operativa.')
+    } finally {
+      setAuditTimelineLoading(false)
+    }
+  }, [auditFilters.action, auditFilters.actorEmail, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.resourceType, auditTimelinePage, status])
 
   const filteredVacancies = useMemo(() => {
     let next = [...vacancies]
@@ -743,6 +830,11 @@ export default function AdminDashboard() {
       }
     })()
   }, [showError, status])
+
+  useEffect(() => {
+    if (status !== 'authenticated' || activeTab !== 'settings') return
+    void loadAuditTimeline()
+  }, [activeTab, loadAuditTimeline, status])
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -1381,6 +1473,19 @@ export default function AdminDashboard() {
     setActiveTab('settings')
   }
 
+  const handleAuditFilterChange = (
+    key: 'actorEmail' | 'action' | 'resourceType' | 'dateFrom' | 'dateTo',
+    value: string
+  ) => {
+    setAuditFilters((prev) => ({ ...prev, [key]: value }))
+    setAuditTimelinePage(1)
+  }
+
+  const handleAuditPageChange = (page: number) => {
+    if (page < 1 || page > auditTimelineTotalPages) return
+    setAuditTimelinePage(page)
+  }
+
   const handleSaveSettings = async () => {
     setSettingsSaving(true)
     try {
@@ -1799,6 +1904,21 @@ const handleTestSentry = () => {
             settingsSaving={settingsSaving}
             settingsLoaded={settingsLoaded}
             onSaveSettings={() => void handleSaveSettings()}
+            auditTimeline={{
+              items: auditTimeline,
+              loading: auditTimelineLoading,
+              error: auditTimelineError,
+              pagination: {
+                page: auditTimelinePage,
+                totalPages: auditTimelineTotalPages,
+                total: auditTimelineTotal
+              },
+              filterOptions: auditFilterOptions,
+              filters: auditFilters
+            }}
+            onAuditFilterChange={handleAuditFilterChange}
+            onAuditPageChange={handleAuditPageChange}
+            onReloadAuditTimeline={() => void loadAuditTimeline()}
           />
         )}
       </main>
