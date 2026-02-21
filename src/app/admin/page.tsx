@@ -260,6 +260,7 @@ export default function AdminDashboard() {
   } = useAdminDashboard()
   
   const [activeTab, setActiveTab] = useState<AdminTab>('vacancies')
+  const [lastNonSettingsTab, setLastNonSettingsTab] = useState<AdminTab>('vacancies')
   const [searchVacancies, setSearchVacancies] = useState<string>('')
   const [filterVacancyStatus, setFilterVacancyStatus] = useState<'all' | 'active' | 'closed'>('all')
   const [sortVacanciesBy, setSortVacanciesBy] = useState<VacancySortKey>('createdAt')
@@ -806,6 +807,12 @@ export default function AdminDashboard() {
       router.push('/admin/signin')
     }
   }, [status, router])
+
+  useEffect(() => {
+    if (activeTab !== 'settings') {
+      setLastNonSettingsTab(activeTab)
+    }
+  }, [activeTab])
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -1496,6 +1503,10 @@ export default function AdminDashboard() {
     setActiveTab('settings')
   }
 
+  const handleBackFromSettings = () => {
+    setActiveTab(lastNonSettingsTab)
+  }
+
   const handleAuditFilterChange = (
     key: 'actorEmail' | 'action' | 'resourceType' | 'dateFrom' | 'dateTo',
     value: string
@@ -1755,8 +1766,10 @@ const handleTestSentry = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminHeader 
+        activeTab={activeTab}
         userEmail={session.user?.email ?? undefined}
         onSignOut={handleSignOut}
+        onBackFromSettings={handleBackFromSettings}
         onOpenFullTutorial={handleOpenHelp}
         onOpenSectionTutorial={handleOpenSectionTutorial}
         onOpenNotifications={handleOpenNotifications}

@@ -22,8 +22,10 @@ interface HeaderNotification {
 }
 
 interface AdminHeaderProps {
+  activeTab: 'vacancies' | 'applications' | 'contacts' | 'settings'
   userEmail?: string
   onSignOut: () => void
+  onBackFromSettings: () => void
   onOpenFullTutorial: () => void
   onOpenSectionTutorial: () => void
   onOpenNotifications: () => void
@@ -42,8 +44,10 @@ interface AdminHeaderProps {
 type NotificationsView = 'unread' | 'read'
 
 export default function AdminHeader({
+  activeTab,
   userEmail,
   onSignOut,
+  onBackFromSettings,
   onOpenFullTutorial,
   onOpenSectionTutorial,
   onOpenNotifications,
@@ -60,12 +64,15 @@ export default function AdminHeader({
 }: AdminHeaderProps) {
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false)
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false)
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [notificationsView, setNotificationsView] = useState<NotificationsView>('unread')
   const [notificationsReferenceNow, setNotificationsReferenceNow] = useState<number>(0)
   const [isCompactViewport, setIsCompactViewport] = useState(false)
 
   const helpMenuRef = useRef<HTMLDivElement | null>(null)
-  const notificationsMenuRef = useRef<HTMLDivElement | null>(null)
+  const desktopNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobileNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
+  const actionMenuRef = useRef<HTMLDivElement | null>(null)
   const notificationsPanelRef = useRef<HTMLDivElement | null>(null)
 
   const unreadCount = notifications.filter((notification) => !notification.isRead).length
@@ -106,15 +113,33 @@ export default function AdminHeader({
     return `hace ${diffDays} d`
   }
 
+  const openNotifications = () => {
+    const willOpen = !isNotificationsMenuOpen
+    setIsNotificationsMenuOpen(willOpen)
+    setIsHelpMenuOpen(false)
+    setIsActionMenuOpen(false)
+    if (willOpen) {
+      setNotificationsReferenceNow(new Date().getTime())
+      setNotificationsView('unread')
+      onOpenNotifications()
+    }
+  }
+
   useEffect(() => {
-    if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
+    if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
 
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (helpMenuRef.current && !helpMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (helpMenuRef.current && !helpMenuRef.current.contains(target)) {
         setIsHelpMenuOpen(false)
       }
-      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
+      const clickedDesktopNotifications = desktopNotificationsMenuRef.current?.contains(target)
+      const clickedMobileNotifications = mobileNotificationsMenuRef.current?.contains(target)
+      if (!clickedDesktopNotifications && !clickedMobileNotifications) {
         setIsNotificationsMenuOpen(false)
+      }
+      if (actionMenuRef.current && !actionMenuRef.current.contains(target)) {
+        setIsActionMenuOpen(false)
       }
     }
 
@@ -124,10 +149,10 @@ export default function AdminHeader({
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
     }
-  }, [isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 639px)')
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
     const syncViewport = () => setIsCompactViewport(mediaQuery.matches)
     syncViewport()
     mediaQuery.addEventListener('change', syncViewport)
@@ -135,16 +160,17 @@ export default function AdminHeader({
   }, [])
 
   useEffect(() => {
-    if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
+    if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
 
     const handleScroll = () => {
       setIsHelpMenuOpen(false)
       setIsNotificationsMenuOpen(false)
+      setIsActionMenuOpen(false)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
     if (!isNotificationsMenuOpen) return
@@ -186,7 +212,7 @@ export default function AdminHeader({
   }, [isNotificationsMenuOpen, notificationsView, visibleNotifications.length])
 
   return (
-    <header className="bg-primary-600 shadow-sm sticky top-0 z-40">
+    <header className="bg-primary-600 shadow-sm md:sticky md:top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -202,20 +228,11 @@ export default function AdminHeader({
               </div>
             )}
 
-            <div className="grid grid-cols-4 gap-2 w-full sm:w-auto sm:flex sm:items-center">
-              <div className="relative" ref={notificationsMenuRef}>
+            <div className="hidden md:flex gap-2 w-full sm:w-auto">
+              <div className="relative" ref={desktopNotificationsMenuRef}>
                 <button
-                  onClick={() => {
-                    const willOpen = !isNotificationsMenuOpen
-                    setIsNotificationsMenuOpen(willOpen)
-                    setIsHelpMenuOpen(false)
-                    if (willOpen) {
-                      setNotificationsReferenceNow(new Date().getTime())
-                      setNotificationsView('unread')
-                      onOpenNotifications()
-                    }
-                  }}
-                  className="relative h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all duration-150 inline-flex items-center justify-center"
+                  onClick={openNotifications}
+                  className="relative h-11 w-11 px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all duration-150 inline-flex items-center justify-center"
                   aria-label="Notificaciones"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -223,16 +240,13 @@ export default function AdminHeader({
                     <path d="M9 17a3 3 0 0 0 6 0" />
                   </svg>
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-primary-900 animate-pulse-subtle">
+                    <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-primary-900">
                       {unreadNotifications}
                     </span>
                   )}
-                  <span className="sr-only" aria-live="polite">
-                    {unreadNotifications} notificaciones nuevas
-                  </span>
                 </button>
 
-                {isNotificationsMenuOpen && (
+                {isNotificationsMenuOpen && !isCompactViewport && (
                   <div
                     ref={notificationsPanelRef}
                     role="dialog"
@@ -368,7 +382,7 @@ export default function AdminHeader({
                     setIsHelpMenuOpen((prev) => !prev)
                     setIsNotificationsMenuOpen(false)
                   }}
-                  className="h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
+                  className="h-11 w-11 px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
                   aria-label="Ayuda"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -378,13 +392,7 @@ export default function AdminHeader({
                   </svg>
                 </button>
                 {isHelpMenuOpen && (
-                  <div
-                    className={`rounded-lg border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden ${
-                      isCompactViewport
-                        ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+5.75rem)]'
-                        : 'absolute right-0 mt-2 w-64'
-                    }`}
-                  >
+                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden">
                     <button
                       onClick={() => {
                         setIsHelpMenuOpen(false)
@@ -409,7 +417,7 @@ export default function AdminHeader({
 
               <button
                 onClick={onOpenSettings}
-                className="h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
+                className="h-11 w-11 px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
                 aria-label="Configuracion"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -420,9 +428,8 @@ export default function AdminHeader({
 
               <button
                 onClick={onSignOut}
-                className="col-span-1 sm:col-span-none h-11 w-full sm:w-auto px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors inline-flex items-center justify-center"
+                className="h-11 w-11 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors inline-flex items-center justify-center"
                 aria-label="Cerrar sesión"
-                title="Cerrar sesión"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
@@ -430,6 +437,138 @@ export default function AdminHeader({
                   <path d="M15 12H3" />
                 </svg>
               </button>
+            </div>
+
+            <div className="md:hidden flex items-center justify-end gap-2">
+              {activeTab === 'settings' && (
+                <button
+                  type="button"
+                  onClick={onBackFromSettings}
+                  className="h-11 px-3 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
+                  aria-label="Volver"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </button>
+              )}
+
+              <div className="relative" ref={mobileNotificationsMenuRef}>
+                <button
+                  onClick={openNotifications}
+                  className="relative h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all duration-150 inline-flex items-center justify-center"
+                  aria-label="Notificaciones"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                    <path d="M9 17a3 3 0 0 0 6 0" />
+                  </svg>
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-primary-900">
+                      {unreadNotifications}
+                    </span>
+                  )}
+                </button>
+
+                {isNotificationsMenuOpen && isCompactViewport && (
+                  <div
+                    ref={notificationsPanelRef}
+                    role="dialog"
+                    aria-label="Bandeja de notificaciones"
+                    className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+5.75rem)] rounded-xl border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden animate-fade-in"
+                  >
+                    <div className="border-b border-gray-100 px-4 py-3 space-y-3 bg-gray-50/60">
+                      <div className="flex items-center justify-between gap-3">
+                        <div />
+                        <div className="text-xs text-gray-500 text-right">
+                          <span className="font-medium text-gray-900">{notifications.length}</span> totales
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setNotificationsView('unread')} className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${notificationsView === 'unread' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                          Nuevas ({unreadCount})
+                        </button>
+                        <button onClick={() => setNotificationsView('read')} className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${notificationsView === 'read' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                          Leidas ({readCount})
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {visibleNotifications.length === 0 ? (
+                        <div className="px-4 py-10 text-center">
+                          <p className="text-sm font-medium text-gray-700">Sin notificaciones.</p>
+                        </div>
+                      ) : (
+                        visibleNotifications.map((notification) => {
+                          const style = levelStyles[notification.level]
+                          return (
+                            <div key={notification.id} className={`flex items-start gap-3 border-b border-l-4 border-gray-100 px-4 py-2.5 last:border-b-0 ${style.accent}`}>
+                              <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${style.dot}`} />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{notification.title}</p>
+                                <p className="mt-0.5 text-sm text-gray-700">{notification.message}</p>
+                                <p className="text-xs text-gray-500 mt-1">{formatRelativeTimestamp(notification.createdAt)}</p>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={actionMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionMenuOpen((prev) => !prev)
+                    setIsNotificationsMenuOpen(false)
+                    setIsHelpMenuOpen(false)
+                  }}
+                  className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
+                  aria-label="Abrir menú"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+
+                {isActionMenuOpen && (
+                  <div className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+5.75rem)] rounded-lg border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionMenuOpen(false)
+                        onOpenSectionTutorial()
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      Ayuda
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionMenuOpen(false)
+                        onOpenSettings()
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100"
+                    >
+                      Configuración
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionMenuOpen(false)
+                        onSignOut()
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-50 border-t border-gray-100"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
