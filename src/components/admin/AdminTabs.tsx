@@ -23,8 +23,8 @@ function TabButton({ isActive, onClick, icon, label, mobileLabel, badge, compact
     <button
       onClick={onClick}
       className={`min-w-0 shrink-0 flex items-center justify-center gap-2 ${
-        compact ? 'px-2 py-2 text-[13px]' : 'px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base'
-      } font-semibold rounded-lg transition-all ${
+        compact ? 'min-h-11 min-w-11 px-2 py-2 text-[13px]' : 'px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base'
+      } font-semibold rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
         isActive
           ? 'bg-primary-500 text-white shadow-md'
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

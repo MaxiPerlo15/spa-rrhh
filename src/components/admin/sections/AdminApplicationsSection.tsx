@@ -177,6 +177,7 @@ export default function AdminApplicationsSection({
                     {
                       key: 'view',
                       label: 'Ver',
+                      ariaLabel: `Ver detalle de postulación de ${application.candidateName}`,
                       onClick: () => onViewDetails(application),
                       className: 'bg-blue-600',
                       disabled: isRowBusy
@@ -186,6 +187,7 @@ export default function AdminApplicationsSection({
                           {
                             key: 'cv',
                             label: 'CV',
+                            ariaLabel: `Descargar CV de ${application.candidateName}`,
                             onClick: () => onDownloadCv(application),
                             className: 'bg-green-600',
                             disabled: isRowBusy
@@ -195,6 +197,7 @@ export default function AdminApplicationsSection({
                     {
                       key: 'delete',
                       label: isDeleting ? '...' : 'Eliminar',
+                      ariaLabel: `Eliminar postulación de ${application.candidateName}`,
                       onClick: () => onDeleteApplication(application.id, application.candidateName),
                       className: 'bg-red-600',
                       disabled: isRowBusy
@@ -238,7 +241,8 @@ export default function AdminApplicationsSection({
                         type="button"
                         disabled={isRowBusy}
                         onClick={() => onViewDetails(application)}
-                        className={`text-sm font-medium text-primary-700 ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}
+                        className={`rounded-md px-1 py-1 text-sm font-medium text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}
+                        aria-label={`Ver detalle de postulación de ${application.candidateName}`}
                       >
                         Ver detalle
                       </button>
@@ -291,20 +295,27 @@ export default function AdminApplicationsSection({
                     <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{new Date(application.submittedAt).toLocaleDateString()}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-right">
                       <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                        <button disabled={isRowBusy} data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined} onClick={() => onViewDetails(application)} className={`text-blue-600 hover:text-blue-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}>
-                          👁️ Ver
+                        <button disabled={isRowBusy} data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined} onClick={() => onViewDetails(application)} className={`text-blue-700 hover:text-blue-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`} aria-label={`Ver detalle de postulación de ${application.candidateName}`}>
+                          <span aria-hidden="true">👁️ </span>Ver
                         </button>
                         {application.resumeUrl && (
-                          <button disabled={isRowBusy} data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined} onClick={() => onDownloadCv(application)} className={`text-green-600 hover:text-green-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`}>
-                            📄 CV
+                          <button disabled={isRowBusy} data-tour={application.id === firstApplicationWithCvId ? 'application-cv-btn' : undefined} onClick={() => onDownloadCv(application)} className={`text-green-700 hover:text-green-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${application.id === firstApplicationWithCvId ? getTourClass('application-cv-btn') : ''}`} aria-label={`Descargar CV de ${application.candidateName}`}>
+                            <span aria-hidden="true">📄 </span>CV
                           </button>
                         )}
                         <button
                           disabled={isRowBusy}
                           onClick={() => onDeleteApplication(application.id, application.candidateName)}
-                          className="text-red-600 hover:text-red-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="text-red-700 hover:text-red-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
+                          aria-label={`Eliminar postulación de ${application.candidateName}`}
                         >
-                          {isDeleting ? 'Eliminando...' : '🗑️ Eliminar'}
+                          {isDeleting ? (
+                            'Eliminando...'
+                          ) : (
+                            <>
+                              <span aria-hidden="true">🗑️ </span>Eliminar
+                            </>
+                          )}
                         </button>
                       </div>
                     </td>

@@ -52,26 +52,28 @@ interface AdminSettingsSectionProps {
 function ToggleSwitch({
   checked,
   onChange,
-  disabled
+  disabled,
+  ariaLabel
 }: {
   checked: boolean
   onChange: (next: boolean) => void
   disabled?: boolean
+  ariaLabel: string
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label="Cambiar preferencia"
+      aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
         checked ? 'bg-primary-500' : 'bg-gray-300'
       } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform ${
           checked ? 'translate-x-5' : 'translate-x-1'
         }`}
       />
@@ -122,7 +124,7 @@ export default function AdminSettingsSection({
             <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>
             <p className="text-sm text-gray-700">Gestiona el cambio de contraseña desde el flujo seguro de recuperación.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <a href="/admin/forgot-password" className="inline-flex px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium">
+              <a href="/admin/forgot-password" className="inline-flex min-h-11 items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
                 Cambiar contraseña
               </a>
               <span className="text-xs text-gray-500">Sesión activa por JWT (8h) y cookies seguras.</span>
@@ -135,6 +137,7 @@ export default function AdminSettingsSection({
               <ToggleSwitch
                 checked={settingsForm.notificationsEnabled}
                 onChange={(next) => setSettingsForm((prev) => ({ ...prev, notificationsEnabled: next }))}
+                ariaLabel="Habilitar notificaciones del panel"
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
@@ -143,6 +146,7 @@ export default function AdminSettingsSection({
                 checked={settingsForm.notifyNewApplications}
                 onChange={(next) => setSettingsForm((prev) => ({ ...prev, notifyNewApplications: next }))}
                 disabled={!settingsForm.notificationsEnabled}
+                ariaLabel="Nuevas postulaciones"
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
@@ -151,6 +155,7 @@ export default function AdminSettingsSection({
                 checked={settingsForm.notifyNewContacts}
                 onChange={(next) => setSettingsForm((prev) => ({ ...prev, notifyNewContacts: next }))}
                 disabled={!settingsForm.notificationsEnabled}
+                ariaLabel="Nuevos contactos"
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
@@ -159,10 +164,11 @@ export default function AdminSettingsSection({
                 checked={settingsForm.notifySecurityAlerts}
                 onChange={(next) => setSettingsForm((prev) => ({ ...prev, notifySecurityAlerts: next }))}
                 disabled={!settingsForm.notificationsEnabled}
+                ariaLabel="Alertas de seguridad"
               />
             </label>
             <div className="pt-2 flex justify-end">
-              <button type="button" onClick={onSaveSettings} disabled={settingsSaving || !settingsLoaded} className="px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+              <button type="button" onClick={onSaveSettings} disabled={settingsSaving || !settingsLoaded} className="min-h-11 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
                 {settingsSaving ? 'Guardando...' : 'Guardar configuración'}
               </button>
             </div>

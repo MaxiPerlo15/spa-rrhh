@@ -55,8 +55,8 @@ export default function ConfirmDialog({
     },
     warning: {
       icon: '⚠️',
-      accent: 'text-yellow-700',
-      button: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500'
+      accent: 'text-amber-800',
+      button: 'bg-amber-700 hover:bg-amber-800 focus:ring-amber-700'
     },
     info: {
       icon: 'ℹ️',
@@ -97,14 +97,14 @@ export default function ConfirmDialog({
             ref={cancelButtonRef}
             onClick={onCancel}
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className={`flex-1 rounded-lg px-4 py-2 font-medium text-white transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${styles[type].button}`}
+            className={`flex-1 min-h-11 rounded-lg px-4 py-2 font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 ${styles[type].button}`}
           >
             {isLoading ? loadingText : confirmText}
           </button>

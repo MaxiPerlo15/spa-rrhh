@@ -130,6 +130,7 @@ export default function AdminVacanciesSection({
                   {
                     key: 'toggle',
                     label: isToggling ? 'Procesando' : vacancy.status === 'active' ? 'Cerrar' : 'Activar',
+                    ariaLabel: `${vacancy.status === 'active' ? 'Cerrar' : 'Activar'} vacante ${vacancy.title}`,
                     onClick: () => onToggleStatus(vacancy),
                     className: vacancy.status === 'active' ? 'bg-orange-600' : 'bg-green-600',
                     disabled: isRowBusy
@@ -137,6 +138,7 @@ export default function AdminVacanciesSection({
                   {
                     key: 'edit',
                     label: 'Editar',
+                    ariaLabel: `Editar vacante ${vacancy.title}`,
                     onClick: () => onOpenEditModal(vacancy),
                     className: 'bg-blue-600',
                     disabled: isRowBusy
@@ -144,6 +146,7 @@ export default function AdminVacanciesSection({
                   {
                     key: 'delete',
                     label: isDeleting ? '...' : 'Eliminar',
+                    ariaLabel: `Eliminar vacante ${vacancy.title}`,
                     onClick: () => onDeleteVacancy(vacancy.id, vacancy.title),
                     className: 'bg-red-600',
                     disabled: isRowBusy
@@ -182,8 +185,9 @@ export default function AdminVacanciesSection({
                     data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
                     type="button"
                     onClick={() => onOpenEditModal(vacancy)}
-                    className={`text-sm font-medium text-primary-700 ${index === 0 ? getTourClass('vacancy-edit-btn') : ''}`}
+                    className={`rounded-md px-1 py-1 text-sm font-medium text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${index === 0 ? getTourClass('vacancy-edit-btn') : ''}`}
                     disabled={isRowBusy}
+                    aria-label={`Ver detalle de vacante ${vacancy.title}`}
                   >
                     Ver detalle
                   </button>
@@ -241,27 +245,46 @@ export default function AdminVacanciesSection({
                         onClick={() => onToggleStatus(vacancy)}
                         disabled={isRowBusy}
                         className={`${
-                          vacancy.status === 'active' ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'
-                        } font-medium disabled:opacity-60 disabled:cursor-not-allowed ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-toggle-btn')}` : ''}`}
+                          vacancy.status === 'active' ? 'text-orange-700 hover:text-orange-900' : 'text-green-700 hover:text-green-900'
+                        } font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-toggle-btn')}` : ''}`}
                         title={vacancy.status === 'active' ? 'Cerrar esta vacante (no aparecerá en la página pública)' : 'Activar esta vacante (aparecerá en la página pública)'}
+                        aria-label={`${vacancy.status === 'active' ? 'Cerrar' : 'Activar'} vacante ${vacancy.title}`}
                       >
-                        {isToggling ? 'Procesando...' : vacancy.status === 'active' ? '🔒 Cerrar' : '✅ Activar'}
+                        {isToggling ? (
+                          'Procesando...'
+                        ) : vacancy.status === 'active' ? (
+                          <>
+                            <span aria-hidden="true">🔒 </span>Cerrar
+                          </>
+                        ) : (
+                          <>
+                            <span aria-hidden="true">✅ </span>Activar
+                          </>
+                        )}
                       </button>
                       <button
                         data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
                         onClick={() => onOpenEditModal(vacancy)}
                         disabled={isRowBusy}
-                        className={`text-blue-600 hover:text-blue-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-edit-btn')}` : ''}`}
+                        className={`text-blue-700 hover:text-blue-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-edit-btn')}` : ''}`}
+                        aria-label={`Editar vacante ${vacancy.title}`}
                       >
-                        ✏️ Editar
+                        <span aria-hidden="true">✏️ </span>Editar
                       </button>
                       <button
                         data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
                         onClick={() => onDeleteVacancy(vacancy.id, vacancy.title)}
                         disabled={isRowBusy}
-                        className={`text-red-600 hover:text-red-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
+                        className={`text-red-700 hover:text-red-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
+                        aria-label={`Eliminar vacante ${vacancy.title}`}
                       >
-                        {isDeleting ? 'Eliminando...' : '🗑️ Eliminar'}
+                        {isDeleting ? (
+                          'Eliminando...'
+                        ) : (
+                          <>
+                            <span aria-hidden="true">🗑️ </span>Eliminar
+                          </>
+                        )}
                       </button>
                     </div>
                   </td>

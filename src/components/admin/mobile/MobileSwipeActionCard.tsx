@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 type SwipeAction = {
   key: string
   label: string
+  ariaLabel?: string
   onClick: () => void
   className?: string
   disabled?: boolean
@@ -103,7 +104,8 @@ export default function MobileSwipeActionCard({ children, actions }: MobileSwipe
               closeSwipe()
             }}
             disabled={action.disabled}
-            className={`w-[88px] px-2 text-xs font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed ${action.className ?? 'bg-primary-600'}`}
+            aria-label={action.ariaLabel ?? action.label}
+            className={`w-[88px] min-h-11 px-2 text-xs font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-700 ${action.className ?? 'bg-primary-600'}`}
           >
             {action.label}
           </button>

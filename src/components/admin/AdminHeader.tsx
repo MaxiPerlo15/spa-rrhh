@@ -62,6 +62,8 @@ export default function AdminHeader({
   onNotificationAction,
   unreadNotifications = 0
 }: AdminHeaderProps) {
+  const notificationsDialogTitleId = 'admin-notifications-title'
+  const mobileActionMenuId = 'admin-mobile-action-menu'
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false)
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
@@ -246,7 +248,8 @@ export default function AdminHeader({
     <div
       ref={notificationsPanelRef}
       role="dialog"
-      aria-label="Bandeja de notificaciones"
+      aria-modal={mobile ? true : undefined}
+      aria-labelledby={notificationsDialogTitleId}
       style={
         mobile
           ? {
@@ -269,7 +272,9 @@ export default function AdminHeader({
 
       <div className="border-b border-gray-100 px-4 py-3 space-y-3 bg-gray-50/80">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-gray-900">Notificaciones</p>
+          <p id={notificationsDialogTitleId} className="text-sm font-semibold text-gray-900">
+            Notificaciones
+          </p>
           <div className="text-xs text-gray-500 text-right">
             <span className="font-medium text-gray-900">{notifications.length}</span> totales
           </div>
@@ -278,7 +283,7 @@ export default function AdminHeader({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setNotificationsView('unread')}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-2.5 min-h-11 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
               notificationsView === 'unread' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -286,7 +291,7 @@ export default function AdminHeader({
           </button>
           <button
             onClick={() => setNotificationsView('read')}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-2.5 min-h-11 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
               notificationsView === 'read' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -320,7 +325,7 @@ export default function AdminHeader({
                     <button
                       onClick={() => onToggleNotificationRead(notification.id)}
                       disabled={isNotificationBulkLoading}
-                      className="text-xs font-medium text-primary-700 hover:text-primary-800"
+                      className="min-h-11 rounded-md px-2 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                     >
                       {notification.isRead ? 'No leida' : 'Marcar leida'}
                     </button>
@@ -328,7 +333,7 @@ export default function AdminHeader({
                       <button
                         onClick={() => onNotificationAction(notification)}
                         disabled={isNotificationBulkLoading}
-                        className="text-xs font-semibold text-primary-700 hover:text-primary-800"
+                        className="min-h-11 rounded-md px-2 text-xs font-semibold text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                       >
                         {notification.action.label}
                       </button>
@@ -338,10 +343,10 @@ export default function AdminHeader({
                 <button
                   onClick={() => onDeleteNotification(notification.id)}
                   disabled={isNotificationBulkLoading || pendingDeleteSet.has(notification.id)}
-                  className="shrink-0 rounded-md px-1 text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg leading-none"
-                  aria-label="Eliminar notificacion"
+                  className="shrink-0 min-h-11 min-w-11 rounded-md text-gray-400 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
+                  aria-label={`Eliminar notificación: ${notification.title}`}
                 >
-                  x
+                  <span aria-hidden="true">×</span>
                 </button>
               </div>
             )
@@ -355,7 +360,7 @@ export default function AdminHeader({
             <button
               onClick={onMarkAllNotificationsAsRead}
               disabled={isNotificationBulkLoading}
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-gray-300 px-2.5 min-h-11 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             >
               Marcar todas leidas
             </button>
@@ -364,7 +369,7 @@ export default function AdminHeader({
             <button
               onClick={onClearReadNotifications}
               disabled={isNotificationBulkLoading}
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-gray-300 px-2.5 min-h-11 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             >
               Limpiar leidas
             </button>
@@ -401,7 +406,7 @@ export default function AdminHeader({
             )}
 
             <div className="relative" ref={desktopNotificationsMenuRef}>
-              <button onClick={openNotifications} className="relative h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Notificaciones">
+              <button onClick={openNotifications} className="relative h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Notificaciones del panel">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
                   <path d="M9 17a3 3 0 0 0 6 0" />
@@ -414,7 +419,7 @@ export default function AdminHeader({
             </div>
 
             <div className="relative" ref={helpMenuRef}>
-              <button onClick={() => { setIsHelpMenuOpen((prev) => !prev); setIsNotificationsMenuOpen(false) }} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Ayuda">
+              <button onClick={() => { setIsHelpMenuOpen((prev) => !prev); setIsNotificationsMenuOpen(false) }} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Ayuda del panel">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4" />
                   <circle cx="12" cy="17" r="1" />
@@ -423,20 +428,20 @@ export default function AdminHeader({
               </button>
               {isHelpMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl z-[90] overflow-hidden">
-                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenFullTutorial() }} className="block w-full px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50">Ver tutorial completo</button>
-                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenSectionTutorial() }} className="block w-full px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50 border-t border-gray-100">Ver tutorial de la seccion</button>
+                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenFullTutorial() }} className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset">Ver tutorial completo</button>
+                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenSectionTutorial() }} className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset">Ver tutorial de la seccion</button>
                 </div>
               )}
             </div>
 
-            <button onClick={onOpenSettings} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Configuracion">
+            <button onClick={onOpenSettings} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Configuración del panel">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.1a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.1a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.4-.2.7-.6.6-1V3a2 2 0 1 1 4 0v.1c0 .4.2.8.6 1 .3.2.7.2 1 0a1.65 1.65 0 0 0 1-.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.3.3-.4.8-.3 1.2.1.4.4.7.8.9.4.1.8.2 1.2.1H21a2 2 0 1 1 0 4h-.1a1.65 1.65 0 0 0-1 .33 1.65 1.65 0 0 0-.5 1z" />
               </svg>
             </button>
 
-            <button onClick={onSignOut} className="h-11 w-11 bg-red-600 text-white rounded-lg hover:bg-red-700 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Cerrar sesión">
+            <button onClick={onSignOut} className="h-11 w-11 bg-red-600 text-white rounded-lg hover:bg-red-700 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Cerrar sesión del panel">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
                 <path d="M10 17l5-5-5-5" />
@@ -449,7 +454,7 @@ export default function AdminHeader({
         <div ref={mobileHeaderBarRef} className="md:hidden flex items-center justify-between gap-2 h-11">
           <div className="flex items-center gap-2 min-w-0">
             {activeTab === 'settings' && (
-              <button type="button" onClick={onBackFromSettings} className="h-9 w-9 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Volver">
+              <button type="button" onClick={onBackFromSettings} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Volver a la vista anterior">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
@@ -468,7 +473,7 @@ export default function AdminHeader({
 
           <div className="flex items-center gap-2">
             <div className="relative" ref={mobileNotificationsMenuRef}>
-              <button onClick={openNotifications} className="relative h-9 w-9 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Notificaciones">
+              <button onClick={openNotifications} className="relative h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Notificaciones del panel">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
                   <path d="M9 17a3 3 0 0 0 6 0" />
@@ -488,8 +493,10 @@ export default function AdminHeader({
                   setIsNotificationsMenuOpen(false)
                   setIsHelpMenuOpen(false)
                 }}
-                className="h-9 w-9 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center"
-                aria-label="Abrir menú"
+                className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600"
+                aria-label="Abrir menú de acciones"
+                aria-expanded={isActionMenuOpen}
+                aria-controls={mobileActionMenuId}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M4 6h16M4 12h16M4 18h16" />
@@ -498,6 +505,7 @@ export default function AdminHeader({
 
               {isActionMenuOpen && (
                 <div
+                  id={mobileActionMenuId}
                   style={{ top: `${mobileOverlayTop}px`, maxHeight: `calc(100dvh - ${mobileOverlayTop + 8}px)` }}
                   className="fixed right-2 w-[min(16rem,calc(100vw-1rem))] max-h-[65vh] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in overflow-y-auto"
                 >
@@ -508,7 +516,7 @@ export default function AdminHeader({
                       setIsActionMenuOpen(false)
                       onOpenFullTutorial()
                     }}
-                    className="w-full text-left px-4 py-3.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
                   >
                     Tutorial completo
                   </button>
@@ -518,7 +526,7 @@ export default function AdminHeader({
                       setIsActionMenuOpen(false)
                       onOpenSectionTutorial()
                     }}
-                    className="w-full text-left px-4 py-3.5 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100"
+                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
                   >
                     Tutorial de esta sección
                   </button>
@@ -528,7 +536,7 @@ export default function AdminHeader({
                       setIsActionMenuOpen(false)
                       onOpenSettings()
                     }}
-                    className="w-full text-left px-4 py-3.5 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100"
+                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
                   >
                     Configuración
                   </button>
@@ -538,7 +546,7 @@ export default function AdminHeader({
                       setIsActionMenuOpen(false)
                       onSignOut()
                     }}
-                    className="w-full text-left px-4 py-3.5 text-sm font-medium text-red-700 hover:bg-red-50 border-t border-gray-100"
+                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-red-700 hover:bg-red-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-inset"
                   >
                     Cerrar sesión
                   </button>
