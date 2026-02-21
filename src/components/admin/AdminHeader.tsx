@@ -216,12 +216,18 @@ export default function AdminHeader({
       ref={notificationsPanelRef}
       role="dialog"
       aria-label="Bandeja de notificaciones"
-      className={`rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in ${
+      className={`z-[90] overflow-hidden animate-fade-in ${
         mobile
-          ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+3.25rem)] max-h-[65vh]'
-          : 'absolute right-0 mt-2 w-[390px] max-w-[95vw] origin-top-right'
+          ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+3.25rem)] max-h-[65vh] rounded-3xl border border-white/60 bg-white/95 shadow-[0_24px_60px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl'
+          : 'absolute right-0 mt-2 w-[390px] max-w-[95vw] origin-top-right rounded-2xl border border-gray-200 bg-white shadow-2xl'
       }`}
     >
+      {mobile && (
+        <div className="flex justify-center bg-gray-50/80 pt-2 pb-1">
+          <span className="h-1.5 w-10 rounded-full bg-gray-300" />
+        </div>
+      )}
+
       <div className="border-b border-gray-100 px-4 py-3 space-y-3 bg-gray-50/80">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-gray-900">Notificaciones</p>
