@@ -5,6 +5,7 @@ import NavBar from '@/components/NavBar'
 import Footer from '@/components/Footer'
 import VacancyCard from '@/components/VacancyCard'
 import PostularForm from '@/components/PostularForm'
+import MobileFilterSheet, { type FilterOption } from '@/components/admin/mobile/MobileFilterSheet'
 import { getVacancies } from '@/lib/api/vacancies'
 
 interface Vacancy {
@@ -36,6 +37,23 @@ export default function VacantesPage() {
 
   // Obtener ubicaciones únicas
   const uniqueLocations = Array.from(new Set(vacancies.map(v => v.location)))
+  const workdayOptions: FilterOption[] = [
+    { value: 'all', label: 'Todas las jornadas' },
+    { value: 'FULL_TIME', label: 'Jornada Completa' },
+    { value: 'PART_TIME', label: 'Media Jornada' },
+    { value: 'PROJECT_BASED', label: 'Por Proyecto' },
+    { value: 'INTERNSHIP', label: 'Pasantía' }
+  ]
+  const modalityOptions: FilterOption[] = [
+    { value: 'all', label: 'Todas las modalidades' },
+    { value: 'ON_SITE', label: 'Presencial' },
+    { value: 'REMOTE', label: 'Remoto' },
+    { value: 'HYBRID', label: 'Híbrido' }
+  ]
+  const locationOptions: FilterOption[] = [
+    { value: 'all', label: 'Todas las ubicaciones' },
+    ...uniqueLocations.map((location) => ({ value: location, label: location }))
+  ]
 
   useEffect(() => {
     fetchVacancies()
@@ -165,11 +183,36 @@ export default function VacantesPage() {
 
           {/* Filtros */}
           <div className="flex flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
-            {/* Filtro por jornada */}
+            <div className="w-full md:hidden space-y-3">
+              <MobileFilterSheet
+                label="Filtrar por jornada"
+                value={filterWorkday}
+                options={workdayOptions}
+                onChange={setFilterWorkday}
+                ariaLabel="Filtrar vacantes por jornada"
+              />
+              <MobileFilterSheet
+                label="Filtrar por modalidad"
+                value={filterModality}
+                options={modalityOptions}
+                onChange={setFilterModality}
+                ariaLabel="Filtrar vacantes por modalidad"
+              />
+              {uniqueLocations.length > 0 && (
+                <MobileFilterSheet
+                  label="Filtrar por ubicación"
+                  value={filterLocation}
+                  options={locationOptions}
+                  onChange={setFilterLocation}
+                  ariaLabel="Filtrar vacantes por ubicación"
+                />
+              )}
+            </div>
+
             <select
               value={filterWorkday}
               onChange={(e) => setFilterWorkday(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+              className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             >
               <option value="all">Todas las jornadas</option>
               <option value="FULL_TIME">Jornada Completa</option>
@@ -178,11 +221,10 @@ export default function VacantesPage() {
               <option value="INTERNSHIP">Pasantía</option>
             </select>
 
-            {/* Filtro por modalidad */}
             <select
               value={filterModality}
               onChange={(e) => setFilterModality(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+              className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             >
               <option value="all">Todas las modalidades</option>
               <option value="ON_SITE">Presencial</option>
@@ -190,12 +232,11 @@ export default function VacantesPage() {
               <option value="HYBRID">Híbrido</option>
             </select>
 
-            {/* Filtro por ubicación */}
             {uniqueLocations.length > 0 && (
               <select
                 value={filterLocation}
                 onChange={(e) => setFilterLocation(e.target.value)}
-                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
               >
                 <option value="all">Todas las ubicaciones</option>
                 {uniqueLocations.map(location => (
