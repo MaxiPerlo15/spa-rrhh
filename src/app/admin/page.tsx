@@ -278,7 +278,7 @@ export default function AdminDashboard() {
   const [currentVacancyPage, setCurrentVacancyPage] = useState(1)
   const [currentApplicationPage, setCurrentApplicationPage] = useState(1)
   const [currentContactPage, setCurrentContactPage] = useState(1)
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
@@ -885,6 +885,9 @@ export default function AdminDashboard() {
           sortBy?: ContactSortKey
           sortDirection?: SortDirection
         }
+        pagination?: {
+          itemsPerPage?: number
+        }
       }
 
       if (parsed.vacancies) {
@@ -905,6 +908,12 @@ export default function AdminDashboard() {
         setFilterContactStatus(parsed.contacts.status ?? 'all')
         setSortContactsBy(parsed.contacts.sortBy ?? 'createdAt')
         setSortContactsDirection(parsed.contacts.sortDirection ?? 'desc')
+      }
+      if (parsed.pagination?.itemsPerPage) {
+        const nextItemsPerPage = parsed.pagination.itemsPerPage
+        if ([10, 25, 50, 100, 200].includes(nextItemsPerPage)) {
+          setItemsPerPage(nextItemsPerPage)
+        }
       }
     } catch {
       // ignore invalid persisted state
@@ -935,6 +944,9 @@ export default function AdminDashboard() {
             status: filterContactStatus,
             sortBy: sortContactsBy,
             sortDirection: sortContactsDirection
+          },
+          pagination: {
+            itemsPerPage
           }
         })
       )
@@ -955,6 +967,7 @@ export default function AdminDashboard() {
     sortContactsDirection,
     sortVacanciesBy,
     sortVacanciesDirection,
+    itemsPerPage,
     status
   ])
 
@@ -1153,15 +1166,15 @@ export default function AdminDashboard() {
   // Resetear páginas cuando cambian los filtros
   useEffect(() => {
     setCurrentVacancyPage(1)
-  }, [searchVacancies, filterVacancyStatus, sortVacanciesBy, sortVacanciesDirection])
+  }, [searchVacancies, filterVacancyStatus, sortVacanciesBy, sortVacanciesDirection, itemsPerPage])
 
   useEffect(() => {
     setCurrentApplicationPage(1)
-  }, [filterStatus, filterApplicationsVacancyId, searchApplications, sortApplicationsBy, sortApplicationsDirection])
+  }, [filterStatus, filterApplicationsVacancyId, searchApplications, sortApplicationsBy, sortApplicationsDirection, itemsPerPage])
 
   useEffect(() => {
     setCurrentContactPage(1)
-  }, [filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection])
+  }, [filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection, itemsPerPage])
 
   const handleDeleteVacancy = async (id: string, title: string) => {
     openConfirmDialog({
@@ -1841,6 +1854,7 @@ const handleTestSentry = () => {
             paginatedVacancies={paginatedVacancies}
             currentVacancyPage={currentVacancyPage}
             itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
             setCurrentVacancyPage={setCurrentVacancyPage}
             searchVacancies={searchVacancies}
             setSearchVacancies={setSearchVacancies}
@@ -1869,6 +1883,7 @@ const handleTestSentry = () => {
             paginatedApplications={paginatedApplications}
             currentApplicationPage={currentApplicationPage}
             itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
             setCurrentApplicationPage={setCurrentApplicationPage}
             searchApplications={searchApplications}
             setSearchApplications={setSearchApplications}
@@ -1900,6 +1915,7 @@ const handleTestSentry = () => {
             paginatedContacts={paginatedContacts}
             currentContactPage={currentContactPage}
             itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
             setCurrentContactPage={setCurrentContactPage}
             searchContacts={searchContacts}
             setSearchContacts={setSearchContacts}

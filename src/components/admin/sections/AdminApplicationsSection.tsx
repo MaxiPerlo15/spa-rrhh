@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import { useVirtualizedRows } from '@/hooks/useVirtualizedRows'
 import type { Application } from '@/lib/api/applications'
 import type { Vacancy } from '@/lib/api/vacancies'
 
@@ -9,6 +11,7 @@ interface AdminApplicationsSectionProps {
   paginatedApplications: Application[]
   currentApplicationPage: number
   itemsPerPage: number
+  setItemsPerPage: (value: number) => void
   setCurrentApplicationPage: (page: number) => void
   searchApplications: string
   setSearchApplications: (value: string) => void
@@ -38,6 +41,7 @@ export default function AdminApplicationsSection({
   paginatedApplications,
   currentApplicationPage,
   itemsPerPage,
+  setItemsPerPage,
   setCurrentApplicationPage,
   searchApplications,
   setSearchApplications,
@@ -66,29 +70,54 @@ export default function AdminApplicationsSection({
     ACCEPTED: 'bg-green-100 text-green-800',
     REJECTED: 'bg-red-100 text-red-800'
   }
+  const applicationCounts = useMemo(
+    () =>
+      applications.reduce(
+        (acc, application) => {
+          acc[application.status] += 1
+          return acc
+        },
+        {
+          PENDING: 0,
+          REVIEWING: 0,
+          INTERVIEWED: 0,
+          ACCEPTED: 0,
+          REJECTED: 0
+        } as Record<Application['status'], number>
+      ),
+    [applications]
+  )
+  const { isVirtualized, visibleRows, hasMoreRows, handleScroll } = useVirtualizedRows({
+    enabled: itemsPerPage >= 50,
+    totalRows: paginatedApplications.length
+  })
+  const visibleApplications = useMemo(
+    () => paginatedApplications.slice(0, visibleRows),
+    [paginatedApplications, visibleRows]
+  )
 
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="ds-surface p-4 bg-yellow-50 border-yellow-200">
           <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-          <div className="text-xl sm:text-2xl font-bold text-yellow-800">{applications.filter((a) => a.status === 'PENDING').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-yellow-800">{applicationCounts.PENDING}</div>
         </div>
         <div className="ds-surface p-4 bg-blue-50 border-blue-200">
           <div className="text-xs font-medium text-blue-700 mb-1">En Revisión</div>
-          <div className="text-xl sm:text-2xl font-bold text-blue-800">{applications.filter((a) => a.status === 'REVIEWING').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-blue-800">{applicationCounts.REVIEWING}</div>
         </div>
         <div className="ds-surface p-4 bg-purple-50 border-purple-200">
           <div className="text-xs font-medium text-purple-700 mb-1">Entrevistados</div>
-          <div className="text-xl sm:text-2xl font-bold text-purple-800">{applications.filter((a) => a.status === 'INTERVIEWED').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-purple-800">{applicationCounts.INTERVIEWED}</div>
         </div>
         <div className="ds-surface p-4 bg-green-50 border-green-200">
           <div className="text-xs font-medium text-green-700 mb-1">Aceptados</div>
-          <div className="text-xl sm:text-2xl font-bold text-green-800">{applications.filter((a) => a.status === 'ACCEPTED').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-800">{applicationCounts.ACCEPTED}</div>
         </div>
         <div className="ds-surface p-4 bg-red-50 border-red-200">
           <div className="text-xs font-medium text-red-700 mb-1">Rechazados</div>
-          <div className="text-xl sm:text-2xl font-bold text-red-800">{applications.filter((a) => a.status === 'REJECTED').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-red-800">{applicationCounts.REJECTED}</div>
         </div>
       </div>
 
@@ -132,13 +161,23 @@ export default function AdminApplicationsSection({
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>
+            <select value={itemsPerPage} onChange={(event) => setItemsPerPage(Number(event.target.value))} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+              <option value={10}>10 por página</option>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+              <option value={200}>200 por página</option>
+            </select>
             <span className="text-sm text-gray-600 text-center whitespace-nowrap sm:basis-full sm:text-left md:basis-auto md:ml-auto">{filteredApplications.length} postulaciones</span>
           </div>
         </div>
       </div>
 
       <div className="ds-surface overflow-hidden">
-        <div className="overflow-x-auto">
+        <div
+          className={isVirtualized ? 'overflow-auto max-h-[34rem]' : 'overflow-x-auto'}
+          onScroll={isVirtualized ? handleScroll : undefined}
+        >
           <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50">
               <tr>
@@ -158,7 +197,7 @@ export default function AdminApplicationsSection({
                   </td>
                 </tr>
               ) : (
-                paginatedApplications.map((application) => {
+                visibleApplications.map((application) => {
                   const isStatusUpdating = pendingApplicationStatusId === application.id
                   const isDeleting = pendingDeleteApplicationId === application.id
                   const isRowBusy = isStatusUpdating || isDeleting
@@ -198,6 +237,13 @@ export default function AdminApplicationsSection({
                     </td>
                   </tr>
                 )})
+              )}
+              {isVirtualized && hasMoreRows && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-3 text-center text-xs text-gray-500">
+                    Desplaza para cargar más filas...
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

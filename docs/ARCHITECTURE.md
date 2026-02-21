@@ -485,6 +485,9 @@ Ubicación: `tests/e2e/`
 - ✅ Client Components solo cuando necesario
 - ✅ Lazy loading de imágenes
 - ✅ Código dividido automáticamente (Next.js)
+- ✅ Virtualización incremental por lotes en tablas admin cuando el tamaño de página es alto (`>=50` filas)
+- ✅ Selector global de filas por página (10/25/50/100/200) con persistencia en `localStorage`
+- ✅ Memoización selectiva de métricas de estado en módulos de Postulaciones y Contactos
 - 🔄 ISR para páginas públicas (pendiente)
 - 🔄 API caching (pendiente)
 

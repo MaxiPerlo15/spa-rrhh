@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import { useVirtualizedRows } from '@/hooks/useVirtualizedRows'
 import type { Contact } from '@/lib/api/contacts'
 
 interface AdminContactsSectionProps {
@@ -7,6 +9,7 @@ interface AdminContactsSectionProps {
   paginatedContacts: Contact[]
   currentContactPage: number
   itemsPerPage: number
+  setItemsPerPage: (value: number) => void
   setCurrentContactPage: (page: number) => void
   searchContacts: string
   setSearchContacts: (value: string) => void
@@ -31,6 +34,7 @@ export default function AdminContactsSection({
   paginatedContacts,
   currentContactPage,
   itemsPerPage,
+  setItemsPerPage,
   setCurrentContactPage,
   searchContacts,
   setSearchContacts,
@@ -53,21 +57,41 @@ export default function AdminContactsSection({
     RESPONDED: 'bg-green-100 text-green-800',
     ARCHIVED: 'bg-gray-100 text-gray-800'
   }
+  const contactCounts = useMemo(
+    () =>
+      contacts.reduce(
+        (acc, contact) => {
+          acc[contact.status] += 1
+          return acc
+        },
+        {
+          PENDING: 0,
+          RESPONDED: 0,
+          ARCHIVED: 0
+        } as Record<Contact['status'], number>
+      ),
+    [contacts]
+  )
+  const { isVirtualized, visibleRows, hasMoreRows, handleScroll } = useVirtualizedRows({
+    enabled: itemsPerPage >= 50,
+    totalRows: paginatedContacts.length
+  })
+  const visibleContacts = useMemo(() => paginatedContacts.slice(0, visibleRows), [paginatedContacts, visibleRows])
 
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="ds-surface p-4 bg-yellow-50 border-yellow-200">
           <div className="text-xs font-medium text-yellow-700 mb-1">Pendientes</div>
-          <div className="text-xl sm:text-2xl font-bold text-yellow-800">{contacts.filter((c) => c.status === 'PENDING').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-yellow-800">{contactCounts.PENDING}</div>
         </div>
         <div className="ds-surface p-4 bg-green-50 border-green-200">
           <div className="text-xs font-medium text-green-700 mb-1">Respondidos</div>
-          <div className="text-xl sm:text-2xl font-bold text-green-800">{contacts.filter((c) => c.status === 'RESPONDED').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-800">{contactCounts.RESPONDED}</div>
         </div>
         <div className="ds-surface p-4 bg-gray-50 border-gray-200">
           <div className="text-xs font-medium text-gray-700 mb-1">Archivados</div>
-          <div className="text-xl sm:text-2xl font-bold text-gray-800">{contacts.filter((c) => c.status === 'ARCHIVED').length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-gray-800">{contactCounts.ARCHIVED}</div>
         </div>
       </div>
 
@@ -103,13 +127,23 @@ export default function AdminContactsSection({
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>
+            <select value={itemsPerPage} onChange={(event) => setItemsPerPage(Number(event.target.value))} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+              <option value={10}>10 por página</option>
+              <option value={25}>25 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+              <option value={200}>200 por página</option>
+            </select>
             <span className="text-sm text-gray-600 text-center sm:text-left">{filteredContacts.length} contactos</span>
           </div>
         </div>
       </div>
 
       <div data-tour="contacts-table" className={`ds-surface overflow-hidden ${getTourClass('contacts-table')}`}>
-        <div className="overflow-x-auto">
+        <div
+          className={isVirtualized ? 'overflow-auto max-h-[34rem]' : 'overflow-x-auto'}
+          onScroll={isVirtualized ? handleScroll : undefined}
+        >
           <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50">
               <tr>
@@ -129,7 +163,7 @@ export default function AdminContactsSection({
                   </td>
                 </tr>
               ) : (
-                paginatedContacts.map((contact) => {
+                visibleContacts.map((contact) => {
                   const isStatusUpdating = pendingContactStatusId === contact.id
                   const isDeleting = pendingDeleteContactId === contact.id
                   const isRowBusy = isStatusUpdating || isDeleting
@@ -158,6 +192,13 @@ export default function AdminContactsSection({
                     </td>
                   </tr>
                 )})
+              )}
+              {isVirtualized && hasMoreRows && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-3 text-center text-xs text-gray-500">
+                    Desplaza para cargar más filas...
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
