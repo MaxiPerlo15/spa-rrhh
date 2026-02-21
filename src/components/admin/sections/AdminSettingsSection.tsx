@@ -170,20 +170,30 @@ export default function AdminSettingsSection({
         </div>
       </div>
 
-      <div className="ds-surface overflow-hidden">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-          <h2 className="font-display text-lg font-semibold text-gray-900">Timeline de auditoría</h2>
-          <button
-            type="button"
-            onClick={onReloadAuditTimeline}
-            disabled={auditTimeline.loading}
-            className="w-full sm:w-auto px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {auditTimeline.loading ? 'Actualizando...' : 'Actualizar'}
-          </button>
-        </div>
+      <details className="ds-surface overflow-hidden group">
+        <summary className="list-none cursor-pointer px-4 sm:px-6 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold text-gray-900">Actividad técnica (opcional)</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Este bloque es para soporte y diagnóstico. En uso diario no hace falta abrirlo.
+              </p>
+            </div>
+            <span className="text-gray-500 transition-transform group-open:rotate-180">⌄</span>
+          </div>
+        </summary>
 
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="border-t border-gray-100 p-4 sm:p-6 space-y-4">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onReloadAuditTimeline}
+              disabled={auditTimeline.loading}
+              className="w-full sm:w-auto px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {auditTimeline.loading ? 'Actualizando...' : 'Actualizar'}
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <select
               value={auditTimeline.filters.actorEmail}
@@ -328,7 +338,7 @@ export default function AdminSettingsSection({
             </div>
           </div>
         </div>
-      </div>
+      </details>
     </div>
   )
 }

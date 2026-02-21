@@ -171,14 +171,14 @@ export default function AdminHeader({
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
             {userEmail && (
-              <div className="text-left sm:text-right">
-                <p className="text-sm font-medium text-white">{userEmail}</p>
+              <div className="text-left sm:text-right min-w-0">
+                <p className="text-sm font-medium text-white truncate max-w-[240px] sm:max-w-none">{userEmail}</p>
                 <p className="text-xs text-gray-300">Administrador</p>
               </div>
             )}
 
-            <div className="flex w-full gap-2 sm:w-auto">
-              <div className="relative w-full sm:w-auto" ref={notificationsMenuRef}>
+            <div className="grid grid-cols-4 gap-2 w-full sm:w-auto sm:flex sm:items-center">
+              <div className="relative" ref={notificationsMenuRef}>
                 <button
                   onClick={() => {
                     const willOpen = !isNotificationsMenuOpen
@@ -190,7 +190,7 @@ export default function AdminHeader({
                       onOpenNotifications()
                     }
                   }}
-                  className="relative w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all duration-150"
+                  className="relative h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all duration-150 inline-flex items-center justify-center"
                   aria-label="Notificaciones"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -333,13 +333,13 @@ export default function AdminHeader({
                 )}
               </div>
 
-              <div className="relative w-full sm:w-auto" ref={helpMenuRef}>
+              <div className="relative" ref={helpMenuRef}>
                 <button
                   onClick={() => {
                     setIsHelpMenuOpen((prev) => !prev)
                     setIsNotificationsMenuOpen(false)
                   }}
-                  className="w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                  className="h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
                   aria-label="Ayuda"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -374,7 +374,7 @@ export default function AdminHeader({
 
               <button
                 onClick={onOpenSettings}
-                className="w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                className="h-11 w-full sm:w-auto px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors inline-flex items-center justify-center"
                 aria-label="Configuracion"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -385,7 +385,7 @@ export default function AdminHeader({
 
               <button
                 onClick={onSignOut}
-                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+                className="col-span-1 sm:col-span-none h-11 w-full sm:w-auto px-2 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-xs sm:text-sm whitespace-nowrap"
               >
                 Cerrar Sesion
               </button>

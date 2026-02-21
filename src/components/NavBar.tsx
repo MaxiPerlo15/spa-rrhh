@@ -65,8 +65,8 @@ export default function NavBar() {
       <div className="container-custom">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <span className="text-lg sm:text-2xl font-bold text-white tracking-tight">
+          <Link href="/" className="flex items-center min-w-0">
+            <span className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight leading-tight">
               Meinardi&Perlo{' '}
               <span className="text-yellow-400 animate-pulse-subtle inline-block">
                 RRHH
@@ -75,13 +75,13 @@ export default function NavBar() {
           </Link>
 
           {/* Links desktop */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden lg:flex items-center space-x-6">
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
                 onClick={(e) => handleScrollToSection(e, link.href)}
-                className="text-white hover:text-yellow-400 font-medium transition-colors duration-200"
+                className="text-white hover:text-yellow-400 font-medium transition-colors duration-200 whitespace-nowrap"
               >
                 {link.label}
               </a>
@@ -89,7 +89,7 @@ export default function NavBar() {
             {/* Botón CTA Ver Ofertas */}
             <a
               href="/ofertas-laborales"
-              className="btn-motion px-6 py-2.5 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 hover:scale-105 hover:shadow-lg"
+              className="btn-motion px-4 xl:px-6 py-2.5 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 hover:scale-105 hover:shadow-lg whitespace-nowrap"
             >
               Ver Ofertas Laborales
             </a>
@@ -99,7 +99,7 @@ export default function NavBar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-primary-600 transition-colors"
+            className="lg:hidden p-2 rounded-lg hover:bg-primary-600 transition-colors"
             aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={mobileMenuOpen}
           >
@@ -123,7 +123,7 @@ export default function NavBar() {
 
         {/* Menu mobile */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-white/20 animate-fade-in">
+          <div className="lg:hidden py-4 border-t border-white/20 animate-fade-in">
             <div className="flex flex-col space-y-4">
               {navLinks.map((link) => (
                 <a

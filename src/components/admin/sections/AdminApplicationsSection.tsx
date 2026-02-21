@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
-import { useVirtualizedRows } from '@/hooks/useVirtualizedRows'
 import type { Application } from '@/lib/api/applications'
 import type { Vacancy } from '@/lib/api/vacancies'
 
@@ -11,7 +10,6 @@ interface AdminApplicationsSectionProps {
   paginatedApplications: Application[]
   currentApplicationPage: number
   itemsPerPage: number
-  setItemsPerPage: (value: number) => void
   setCurrentApplicationPage: (page: number) => void
   searchApplications: string
   setSearchApplications: (value: string) => void
@@ -41,7 +39,6 @@ export default function AdminApplicationsSection({
   paginatedApplications,
   currentApplicationPage,
   itemsPerPage,
-  setItemsPerPage,
   setCurrentApplicationPage,
   searchApplications,
   setSearchApplications,
@@ -87,15 +84,6 @@ export default function AdminApplicationsSection({
       ),
     [applications]
   )
-  const { isVirtualized, visibleRows, hasMoreRows, handleScroll } = useVirtualizedRows({
-    enabled: itemsPerPage >= 50,
-    totalRows: paginatedApplications.length
-  })
-  const visibleApplications = useMemo(
-    () => paginatedApplications.slice(0, visibleRows),
-    [paginatedApplications, visibleRows]
-  )
-
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -161,23 +149,13 @@ export default function AdminApplicationsSection({
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>
-            <select value={itemsPerPage} onChange={(event) => setItemsPerPage(Number(event.target.value))} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
-              <option value={10}>10 por página</option>
-              <option value={25}>25 por página</option>
-              <option value={50}>50 por página</option>
-              <option value={100}>100 por página</option>
-              <option value={200}>200 por página</option>
-            </select>
             <span className="text-sm text-gray-600 text-center whitespace-nowrap sm:basis-full sm:text-left md:basis-auto md:ml-auto">{filteredApplications.length} postulaciones</span>
           </div>
         </div>
       </div>
 
       <div className="ds-surface overflow-hidden">
-        <div
-          className={isVirtualized ? 'overflow-auto max-h-[34rem]' : 'overflow-x-auto'}
-          onScroll={isVirtualized ? handleScroll : undefined}
-        >
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50">
               <tr>
@@ -197,7 +175,7 @@ export default function AdminApplicationsSection({
                   </td>
                 </tr>
               ) : (
-                visibleApplications.map((application) => {
+                paginatedApplications.map((application) => {
                   const isStatusUpdating = pendingApplicationStatusId === application.id
                   const isDeleting = pendingDeleteApplicationId === application.id
                   const isRowBusy = isStatusUpdating || isDeleting
@@ -237,13 +215,6 @@ export default function AdminApplicationsSection({
                     </td>
                   </tr>
                 )})
-              )}
-              {isVirtualized && hasMoreRows && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-3 text-center text-xs text-gray-500">
-                    Desplaza para cargar más filas...
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
