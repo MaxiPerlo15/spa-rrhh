@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Contact } from '@/lib/api/contacts'
 
 interface AdminContactsSectionProps {
@@ -124,7 +125,87 @@ export default function AdminContactsSection({
       </div>
 
       <div data-tour="contacts-table" className={`ds-surface overflow-hidden ${getTourClass('contacts-table')}`}>
-        <div className="overflow-x-auto">
+        <div className="md:hidden p-4 space-y-3">
+          {paginatedContacts.length > 0 && (
+            <p className="text-xs text-gray-500">Desliza cada contacto hacia la izquierda para acciones rápidas.</p>
+          )}
+          {filteredContacts.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+              No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'disponibles'}
+            </div>
+          ) : (
+            paginatedContacts.map((contact) => {
+              const isStatusUpdating = pendingContactStatusId === contact.id
+              const isDeleting = pendingDeleteContactId === contact.id
+              const isRowBusy = isStatusUpdating || isDeleting
+              return (
+                <MobileSwipeActionCard
+                  key={contact.id}
+                  actions={[
+                    {
+                      key: 'view',
+                      label: 'Ver',
+                      onClick: () => onViewDetails(contact),
+                      className: 'bg-blue-600',
+                      disabled: isRowBusy
+                    },
+                    {
+                      key: 'delete',
+                      label: isDeleting ? '...' : 'Eliminar',
+                      onClick: () => onDeleteContact(contact.id, contact.name),
+                      className: 'bg-red-600',
+                      disabled: isRowBusy
+                    }
+                  ]}
+                >
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">{contact.name}</h3>
+                        <p className="text-xs text-gray-600">{contact.email}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${contactStatusColors[contact.status]}`}>
+                        {contact.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium text-gray-700">Asunto:</span> {contact.subject}
+                      </p>
+                      <p>
+                        <span className="font-medium text-gray-700">Fecha:</span>{' '}
+                        {new Date(contact.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <select
+                        disabled={isRowBusy}
+                        value={contact.status}
+                        onChange={(event) => onStatusChange(contact.id, event.target.value as Contact['status'])}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border-0 disabled:opacity-60 disabled:cursor-not-allowed ${contactStatusColors[contact.status]}`}
+                      >
+                        <option value="PENDING">Pendiente</option>
+                        <option value="RESPONDED">Respondido</option>
+                        <option value="ARCHIVED">Archivado</option>
+                      </select>
+                      <button
+                        data-tour={contact.id === firstContactId ? 'contact-view-btn' : undefined}
+                        type="button"
+                        disabled={isRowBusy}
+                        onClick={() => onViewDetails(contact)}
+                        className={`text-sm font-medium text-primary-700 ${contact.id === firstContactId ? getTourClass('contact-view-btn') : ''}`}
+                      >
+                        Ver detalle
+                      </button>
+                    </div>
+                  </div>
+                </MobileSwipeActionCard>
+              )
+            })
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50">
               <tr>

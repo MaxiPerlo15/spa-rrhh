@@ -62,6 +62,7 @@ export default function AdminHeader({
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false)
   const [notificationsView, setNotificationsView] = useState<NotificationsView>('unread')
   const [notificationsReferenceNow, setNotificationsReferenceNow] = useState<number>(0)
+  const [isCompactViewport, setIsCompactViewport] = useState(false)
 
   const helpMenuRef = useRef<HTMLDivElement | null>(null)
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null)
@@ -108,7 +109,7 @@ export default function AdminHeader({
   useEffect(() => {
     if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (helpMenuRef.current && !helpMenuRef.current.contains(event.target as Node)) {
         setIsHelpMenuOpen(false)
       }
@@ -118,7 +119,31 @@ export default function AdminHeader({
     }
 
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [isHelpMenuOpen, isNotificationsMenuOpen])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 639px)')
+    const syncViewport = () => setIsCompactViewport(mediaQuery.matches)
+    syncViewport()
+    mediaQuery.addEventListener('change', syncViewport)
+    return () => mediaQuery.removeEventListener('change', syncViewport)
+  }, [])
+
+  useEffect(() => {
+    if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
+
+    const handleScroll = () => {
+      setIsHelpMenuOpen(false)
+      setIsNotificationsMenuOpen(false)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
@@ -161,7 +186,7 @@ export default function AdminHeader({
   }, [isNotificationsMenuOpen, notificationsView, visibleNotifications.length])
 
   return (
-    <header className="bg-primary-600 shadow-sm sticky top-0 z-10">
+    <header className="bg-primary-600 shadow-sm sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -212,7 +237,11 @@ export default function AdminHeader({
                     ref={notificationsPanelRef}
                     role="dialog"
                     aria-label="Bandeja de notificaciones"
-                    className="absolute right-0 mt-2 w-[370px] max-w-[95vw] rounded-xl border border-gray-200 bg-white shadow-xl z-20 overflow-hidden animate-fade-in origin-top-right"
+                    className={`rounded-xl border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden animate-fade-in ${
+                      isCompactViewport
+                        ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+5.75rem)]'
+                        : 'absolute right-0 mt-2 w-[370px] max-w-[95vw] origin-top-right'
+                    }`}
                   >
                     <div className="border-b border-gray-100 px-4 py-3 space-y-3 bg-gray-50/60">
                       <div className="flex items-center justify-between gap-3">
@@ -349,7 +378,13 @@ export default function AdminHeader({
                   </svg>
                 </button>
                 {isHelpMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-xl z-20 overflow-hidden">
+                  <div
+                    className={`rounded-lg border border-gray-200 bg-white shadow-xl z-[80] overflow-hidden ${
+                      isCompactViewport
+                        ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+5.75rem)]'
+                        : 'absolute right-0 mt-2 w-64'
+                    }`}
+                  >
                     <button
                       onClick={() => {
                         setIsHelpMenuOpen(false)
@@ -385,9 +420,15 @@ export default function AdminHeader({
 
               <button
                 onClick={onSignOut}
-                className="col-span-1 sm:col-span-none h-11 w-full sm:w-auto px-2 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-xs sm:text-sm whitespace-nowrap"
+                className="col-span-1 sm:col-span-none h-11 w-full sm:w-auto px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors inline-flex items-center justify-center"
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
               >
-                Cerrar Sesion
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                  <path d="M10 17l5-5-5-5" />
+                  <path d="M15 12H3" />
+                </svg>
               </button>
             </div>
           </div>

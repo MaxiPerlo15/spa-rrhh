@@ -1,4 +1,5 @@
 import Pagination from '@/components/Pagination'
+import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Vacancy } from '@/lib/api/vacancies'
 
 interface AdminVacanciesSectionProps {
@@ -46,6 +47,18 @@ export default function AdminVacanciesSection({
   pendingToggleVacancyId,
   pendingDeleteVacancyId
 }: AdminVacanciesSectionProps) {
+  const workdayLabels = {
+    FULL_TIME: 'Jornada Completa',
+    PART_TIME: 'Media Jornada',
+    PROJECT_BASED: 'Por Proyecto',
+    INTERNSHIP: 'Pasantía'
+  }
+  const modalityLabels = {
+    ON_SITE: 'Presencial',
+    REMOTE: 'Remoto',
+    HYBRID: 'Híbrido'
+  }
+
   return (
     <div className="ds-surface overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
@@ -97,7 +110,91 @@ export default function AdminVacanciesSection({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="md:hidden p-4 space-y-3">
+        {paginatedVacancies.length > 0 && (
+          <p className="text-xs text-gray-500">Desliza cada vacante hacia la izquierda para ver acciones rápidas.</p>
+        )}
+        {paginatedVacancies.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+            No hay vacantes para los filtros actuales.
+          </div>
+        ) : (
+          paginatedVacancies.map((vacancy, index) => {
+            const isToggling = pendingToggleVacancyId === vacancy.id
+            const isDeleting = pendingDeleteVacancyId === vacancy.id
+            const isRowBusy = isToggling || isDeleting
+            return (
+              <MobileSwipeActionCard
+                key={vacancy.id}
+                actions={[
+                  {
+                    key: 'toggle',
+                    label: isToggling ? 'Procesando' : vacancy.status === 'active' ? 'Cerrar' : 'Activar',
+                    onClick: () => onToggleStatus(vacancy),
+                    className: vacancy.status === 'active' ? 'bg-orange-600' : 'bg-green-600',
+                    disabled: isRowBusy
+                  },
+                  {
+                    key: 'edit',
+                    label: 'Editar',
+                    onClick: () => onOpenEditModal(vacancy),
+                    className: 'bg-blue-600',
+                    disabled: isRowBusy
+                  },
+                  {
+                    key: 'delete',
+                    label: isDeleting ? '...' : 'Eliminar',
+                    onClick: () => onDeleteVacancy(vacancy.id, vacancy.title),
+                    className: 'bg-red-600',
+                    disabled: isRowBusy
+                  }
+                ]}
+              >
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">{vacancy.title}</h3>
+                      <p className="text-xs text-gray-600">{vacancy.location}</p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        vacancy.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {vacancy.status === 'active' ? 'Activa' : 'Cerrada'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div>
+                      <span className="font-medium text-gray-700">Jornada:</span>{' '}
+                      {workdayLabels[vacancy.workday as keyof typeof workdayLabels] || vacancy.workday}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Modalidad:</span>{' '}
+                      {modalityLabels[vacancy.modality as keyof typeof modalityLabels] || vacancy.modality}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-medium text-gray-700">Fecha:</span>{' '}
+                      {new Date(vacancy.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button
+                    data-tour={index === 0 ? 'vacancy-edit-btn' : undefined}
+                    type="button"
+                    onClick={() => onOpenEditModal(vacancy)}
+                    className={`text-sm font-medium text-primary-700 ${index === 0 ? getTourClass('vacancy-edit-btn') : ''}`}
+                    disabled={isRowBusy}
+                  >
+                    Ver detalle
+                  </button>
+                </div>
+              </MobileSwipeActionCard>
+            )
+          })
+        )}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-[760px]">
           <thead className="bg-gray-50">
             <tr>
@@ -115,17 +212,6 @@ export default function AdminVacanciesSection({
               const isToggling = pendingToggleVacancyId === vacancy.id
               const isDeleting = pendingDeleteVacancyId === vacancy.id
               const isRowBusy = isToggling || isDeleting
-              const workdayLabels = {
-                FULL_TIME: 'Jornada Completa',
-                PART_TIME: 'Media Jornada',
-                PROJECT_BASED: 'Por Proyecto',
-                INTERNSHIP: 'Pasantía'
-              }
-              const modalityLabels = {
-                ON_SITE: 'Presencial',
-                REMOTE: 'Remoto',
-                HYBRID: 'Híbrido'
-              }
               return (
                 <tr key={vacancy.id} className="hover:bg-gray-50">
                   <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{vacancy.title}</td>

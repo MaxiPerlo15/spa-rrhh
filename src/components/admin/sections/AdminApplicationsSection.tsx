@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Application } from '@/lib/api/applications'
 import type { Vacancy } from '@/lib/api/vacancies'
 
@@ -155,7 +156,101 @@ export default function AdminApplicationsSection({
       </div>
 
       <div className="ds-surface overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="md:hidden p-4 space-y-3">
+          {paginatedApplications.length > 0 && (
+            <p className="text-xs text-gray-500">Desliza cada postulación hacia la izquierda para acciones rápidas.</p>
+          )}
+          {filteredApplications.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+              No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'disponibles'}
+            </div>
+          ) : (
+            paginatedApplications.map((application) => {
+              const isStatusUpdating = pendingApplicationStatusId === application.id
+              const isDeleting = pendingDeleteApplicationId === application.id
+              const isRowBusy = isStatusUpdating || isDeleting
+
+              return (
+                <MobileSwipeActionCard
+                  key={application.id}
+                  actions={[
+                    {
+                      key: 'view',
+                      label: 'Ver',
+                      onClick: () => onViewDetails(application),
+                      className: 'bg-blue-600',
+                      disabled: isRowBusy
+                    },
+                    ...(application.resumeUrl
+                      ? [
+                          {
+                            key: 'cv',
+                            label: 'CV',
+                            onClick: () => onDownloadCv(application),
+                            className: 'bg-green-600',
+                            disabled: isRowBusy
+                          }
+                        ]
+                      : []),
+                    {
+                      key: 'delete',
+                      label: isDeleting ? '...' : 'Eliminar',
+                      onClick: () => onDeleteApplication(application.id, application.candidateName),
+                      className: 'bg-red-600',
+                      disabled: isRowBusy
+                    }
+                  ]}
+                >
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">{application.candidateName}</h3>
+                        <p className="text-xs text-gray-600">{application.email}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[application.status]}`}>
+                        {application.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium text-gray-700">Vacante:</span> {application.vacancy.title}
+                      </p>
+                      <p>
+                        <span className="font-medium text-gray-700">Fecha:</span>{' '}
+                        {new Date(application.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <select
+                        disabled={isRowBusy}
+                        value={application.status}
+                        onChange={(event) => onStatusChange(application.id, event.target.value as Application['status'])}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border-0 disabled:opacity-60 disabled:cursor-not-allowed ${statusColors[application.status]}`}
+                      >
+                        <option value="PENDING">Pendiente</option>
+                        <option value="REVIEWING">En Revisión</option>
+                        <option value="INTERVIEWED">Entrevistado</option>
+                        <option value="ACCEPTED">Aceptado</option>
+                        <option value="REJECTED">Rechazado</option>
+                      </select>
+                      <button
+                        data-tour={application.id === firstApplicationId ? 'application-view-btn' : undefined}
+                        type="button"
+                        disabled={isRowBusy}
+                        onClick={() => onViewDetails(application)}
+                        className={`text-sm font-medium text-primary-700 ${application.id === firstApplicationId ? getTourClass('application-view-btn') : ''}`}
+                      >
+                        Ver detalle
+                      </button>
+                    </div>
+                  </div>
+                </MobileSwipeActionCard>
+              )
+            })
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50">
               <tr>
