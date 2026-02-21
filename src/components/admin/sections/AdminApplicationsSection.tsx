@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import MobileFilterSheet, { type FilterOption } from '@/components/admin/mobile/MobileFilterSheet'
 import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Application } from '@/lib/api/applications'
 import type { Vacancy } from '@/lib/api/vacancies'
@@ -85,6 +86,27 @@ export default function AdminApplicationsSection({
       ),
     [applications]
   )
+  const applicationStatusOptions: FilterOption[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'PENDING', label: 'Pendientes' },
+    { value: 'REVIEWING', label: 'En Revisión' },
+    { value: 'INTERVIEWED', label: 'Entrevistados' },
+    { value: 'ACCEPTED', label: 'Aceptados' },
+    { value: 'REJECTED', label: 'Rechazados' }
+  ]
+  const applicationVacancyOptions: FilterOption[] = [
+    { value: 'all', label: 'Todas las vacantes' },
+    ...vacancies.map((vacancy) => ({ value: vacancy.id, label: vacancy.title }))
+  ]
+  const applicationSortByOptions: FilterOption[] = [
+    { value: 'submittedAt', label: 'Ordenar por fecha' },
+    { value: 'candidateName', label: 'Ordenar por candidato' },
+    { value: 'status', label: 'Ordenar por estado' }
+  ]
+  const applicationSortDirectionOptions: FilterOption[] = [
+    { value: 'desc', label: 'Descendente' },
+    { value: 'asc', label: 'Ascendente' }
+  ]
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -125,7 +147,39 @@ export default function AdminApplicationsSection({
             </svg>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+          <div className="md:hidden flex flex-col items-stretch gap-3">
+            <MobileFilterSheet
+              label="Filtrar postulaciones por estado"
+              value={filterStatus}
+              options={applicationStatusOptions}
+              onChange={setFilterStatus}
+              ariaLabel="Filtrar postulaciones por estado"
+            />
+            <MobileFilterSheet
+              label="Filtrar por vacante"
+              value={filterApplicationsVacancyId}
+              options={applicationVacancyOptions}
+              onChange={setFilterApplicationsVacancyId}
+              ariaLabel="Filtrar postulaciones por vacante"
+            />
+            <MobileFilterSheet
+              label="Ordenar postulaciones por"
+              value={sortApplicationsBy}
+              options={applicationSortByOptions}
+              onChange={(nextValue) => setSortApplicationsBy(nextValue as 'submittedAt' | 'candidateName' | 'status')}
+              ariaLabel="Ordenar postulaciones por"
+            />
+            <MobileFilterSheet
+              label="Dirección de orden"
+              value={sortApplicationsDirection}
+              options={applicationSortDirectionOptions}
+              onChange={(nextValue) => setSortApplicationsDirection(nextValue as 'asc' | 'desc')}
+              ariaLabel="Seleccionar dirección de orden de postulaciones"
+            />
+            <span className="text-sm text-gray-600 text-center whitespace-nowrap">{filteredApplications.length} postulaciones</span>
+          </div>
+
+          <div className="hidden md:flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
             <label className="text-sm font-medium text-gray-700 sm:shrink-0">Filtrar por estado:</label>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>

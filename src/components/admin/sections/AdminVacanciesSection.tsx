@@ -1,4 +1,5 @@
 import Pagination from '@/components/Pagination'
+import MobileFilterSheet, { type FilterOption } from '@/components/admin/mobile/MobileFilterSheet'
 import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Vacancy } from '@/lib/api/vacancies'
 
@@ -58,6 +59,21 @@ export default function AdminVacanciesSection({
     REMOTE: 'Remoto',
     HYBRID: 'Híbrido'
   }
+  const vacancyStatusOptions: FilterOption[] = [
+    { value: 'all', label: 'Todos los estados' },
+    { value: 'active', label: 'Activas' },
+    { value: 'closed', label: 'Cerradas' }
+  ]
+  const sortVacancyByOptions: FilterOption[] = [
+    { value: 'createdAt', label: 'Ordenar por fecha' },
+    { value: 'title', label: 'Ordenar por título' },
+    { value: 'location', label: 'Ordenar por ubicación' },
+    { value: 'status', label: 'Ordenar por estado' }
+  ]
+  const sortVacancyDirectionOptions: FilterOption[] = [
+    { value: 'desc', label: 'Más recientes primero' },
+    { value: 'asc', label: 'Más antiguos primero' }
+  ]
 
   return (
     <div className="ds-surface overflow-hidden">
@@ -80,29 +96,56 @@ export default function AdminVacanciesSection({
             onChange={(event) => setSearchVacancies(event.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           />
+          <div className="md:hidden">
+            <MobileFilterSheet
+              label="Estado de vacantes"
+              value={filterVacancyStatus}
+              options={vacancyStatusOptions}
+              onChange={(nextValue) => setFilterVacancyStatus(nextValue as 'all' | 'active' | 'closed')}
+              ariaLabel="Filtrar vacantes por estado"
+            />
+          </div>
           <select
             value={filterVacancyStatus}
             onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'closed')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
             <option value="all">Todos los estados</option>
             <option value="active">Activas</option>
             <option value="closed">Cerradas</option>
           </select>
+          <div className="md:hidden">
+            <MobileFilterSheet
+              label="Orden de vacantes"
+              value={sortVacanciesBy}
+              options={sortVacancyByOptions}
+              onChange={(nextValue) => setSortVacanciesBy(nextValue as 'createdAt' | 'title' | 'location' | 'status')}
+              ariaLabel="Ordenar vacantes por"
+            />
+          </div>
           <select
             value={sortVacanciesBy}
             onChange={(event) => setSortVacanciesBy(event.target.value as 'createdAt' | 'title' | 'location' | 'status')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
             <option value="createdAt">Ordenar por fecha</option>
             <option value="title">Ordenar por título</option>
             <option value="location">Ordenar por ubicación</option>
             <option value="status">Ordenar por estado</option>
           </select>
+          <div className="md:hidden">
+            <MobileFilterSheet
+              label="Dirección de orden"
+              value={sortVacanciesDirection}
+              options={sortVacancyDirectionOptions}
+              onChange={(nextValue) => setSortVacanciesDirection(nextValue as 'asc' | 'desc')}
+              ariaLabel="Seleccionar dirección de orden de vacantes"
+            />
+          </div>
           <select
             value={sortVacanciesDirection}
             onChange={(event) => setSortVacanciesDirection(event.target.value as 'asc' | 'desc')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+            className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
             <option value="desc">Más recientes primero</option>
             <option value="asc">Más antiguos primero</option>

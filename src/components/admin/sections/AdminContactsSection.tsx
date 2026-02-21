@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import Pagination from '@/components/Pagination'
+import MobileFilterSheet, { type FilterOption } from '@/components/admin/mobile/MobileFilterSheet'
 import MobileSwipeActionCard from '@/components/admin/mobile/MobileSwipeActionCard'
 import type { Contact } from '@/lib/api/contacts'
 
@@ -70,6 +71,22 @@ export default function AdminContactsSection({
       ),
     [contacts]
   )
+  const contactStatusOptions: FilterOption[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'PENDING', label: 'Pendientes' },
+    { value: 'RESPONDED', label: 'Respondidos' },
+    { value: 'ARCHIVED', label: 'Archivados' }
+  ]
+  const contactSortByOptions: FilterOption[] = [
+    { value: 'createdAt', label: 'Ordenar por fecha' },
+    { value: 'name', label: 'Ordenar por nombre' },
+    { value: 'status', label: 'Ordenar por estado' }
+  ]
+  const contactSortDirectionOptions: FilterOption[] = [
+    { value: 'desc', label: 'Descendente' },
+    { value: 'asc', label: 'Ascendente' }
+  ]
+
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -102,7 +119,32 @@ export default function AdminContactsSection({
             </svg>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="md:hidden flex flex-col items-stretch gap-3">
+            <MobileFilterSheet
+              label="Filtrar contactos por estado"
+              value={filterContactStatus}
+              options={contactStatusOptions}
+              onChange={setFilterContactStatus}
+              ariaLabel="Filtrar contactos por estado"
+            />
+            <MobileFilterSheet
+              label="Ordenar contactos por"
+              value={sortContactsBy}
+              options={contactSortByOptions}
+              onChange={(nextValue) => setSortContactsBy(nextValue as 'createdAt' | 'name' | 'status')}
+              ariaLabel="Ordenar contactos por"
+            />
+            <MobileFilterSheet
+              label="Dirección de orden"
+              value={sortContactsDirection}
+              options={contactSortDirectionOptions}
+              onChange={(nextValue) => setSortContactsDirection(nextValue as 'asc' | 'desc')}
+              ariaLabel="Seleccionar dirección de orden de contactos"
+            />
+            <span className="text-sm text-gray-600 text-center">{filteredContacts.length} contactos</span>
+          </div>
+
+          <div className="hidden md:flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
             <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
             <select value={filterContactStatus} onChange={(e) => setFilterContactStatus(e.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>
