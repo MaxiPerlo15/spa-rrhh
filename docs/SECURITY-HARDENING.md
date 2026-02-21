@@ -207,6 +207,26 @@ Metadata registrada (según acción):
 - IP y user-agent
 - campos de contexto operacional (por ejemplo estado previo/nuevo)
 
+## MIS-113: Retención y purga automática de auditoría
+
+Implementado:
+- Política de retención por criticidad:
+  - Auditoría estándar: 90 días.
+  - Auditoría sensible de seguridad: 180 días.
+- Clasificación sensible:
+  - `outcome` en `DENIED` o `ERROR`, o
+  - `action` con prefijo `auth.` o `security.`
+- Servicio central:
+  - `src/lib/auditRetention.ts` (`purgeExpiredAdminAuditLogs`)
+- Endpoint interno protegido por secreto:
+  - `POST /api/internal/audit-retention`
+  - Auth por `Authorization: Bearer <AUDIT_CRON_SECRET>` o header `x-cron-secret`.
+- Script manual operativo:
+  - `npm run audit:purge` (`scripts/purge-admin-audit.mjs`)
+
+Variables de entorno:
+- `AUDIT_CRON_SECRET` (requerida en producción).
+
 ## Pre-Deploy Runtime Check
 
 Comandos recomendados antes de desplegar:

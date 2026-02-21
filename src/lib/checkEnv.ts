@@ -38,6 +38,7 @@ export function validateRuntimeEnv() {
     requireVar('TURNSTILE_SECRET_KEY', errors)
     requireVar('UPSTASH_REDIS_REST_URL', errors)
     requireVar('UPSTASH_REDIS_REST_TOKEN', errors)
+    requireVar('AUDIT_CRON_SECRET', errors)
     requireVar('RESEND_API_KEY', errors)
     requireVar('FROM_EMAIL', errors)
     validateUrlVar('NEXTAUTH_URL', errors)
