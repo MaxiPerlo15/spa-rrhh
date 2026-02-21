@@ -96,12 +96,12 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # E2E tests - solo en main o cuando se especifica en PR
+  # E2E tests - en PR siempre, y en pushes a main
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: lint-and-build
-    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     
     strategy:
       matrix:
