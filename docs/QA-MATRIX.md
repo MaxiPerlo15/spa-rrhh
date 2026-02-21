@@ -21,6 +21,11 @@ Validar flujos críticos de navegación pública + autenticación/recuperación 
 - Forgot/reset con límite de requests por IP y mensajes de bloqueo temporal.
 - Evidencia: captura + timestamp + navegador/dispositivo.
 
+## Validación en dispositivos físicos (MIS-120)
+
+- Checklist operativo: `docs/MOBILE-REAL-DEVICE-QA.md`
+- Plantilla de resultados: `docs/MOBILE-REAL-DEVICE-REPORT.md`
+
 ## Matriz objetivo
 
 - Desktop Chrome (`chromium`)
