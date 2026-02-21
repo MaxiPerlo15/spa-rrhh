@@ -60,10 +60,11 @@ El archivo `.github/workflows/ci.yml` ejecuta automáticamente:
    - ✅ Sube artefactos de build
 
 2. **Job: test**
-   - ✅ Ejecuta tests unitarios (`npm run test:unit`)
+   - ✅ Ejecuta tests unitarios con cobertura (`npm run test:coverage`)
+   - ✅ Valida umbrales mínimos de cobertura definidos en `vitest.config.ts`
    - ✅ Sube resultados de tests
 
-3. **Job: e2e** (solo en main o con label "run-e2e")
+3. **Job: e2e** (siempre en PR a `main` y en pushes a `main`)
    - ✅ Ejecuta tests E2E (`npm run test:e2e`)
    - ✅ Sube resultados
 
@@ -76,6 +77,29 @@ El pipeline se ejecuta en:
 - Push a `main`
 - Push a ramas `feature/*` y `release/*`
 - Pull Requests hacia `main`
+
+## Required Checks (Branch Protection)
+
+Para bloquear merges con señal incompleta, configura protección de `main` con checks granulares obligatorios:
+
+- `Lint and Build`
+- `Run Tests`
+- `E2E Tests`
+
+Opcional:
+- `CI Success` (solo como check resumen visual)
+
+### Checklist de configuración en GitHub
+
+1. Ve a **Settings** → **Branches**.
+2. Edita o crea la regla de protección para `main`.
+3. Activa **Require status checks to pass before merging**.
+4. Selecciona como required checks:
+   - `Lint and Build`
+   - `Run Tests`
+   - `E2E Tests`
+5. (Opcional) añade `CI Success`.
+6. Guarda la regla.
 
 ## Ver resultados
 
@@ -101,5 +125,5 @@ Puedes agregar un badge al README:
 - Asegúrate de pasar todas las env vars necesarias en el step de build
 
 ### E2E tests no se ejecutan en PR
-- Es normal: solo corren en `main` por defecto
-- Para ejecutarlos en un PR específico, añade el label `run-e2e` al PR
+- Verifica que el PR apunte a `main`
+- Revisa el `if` del job `e2e` en `.github/workflows/ci.yml`
