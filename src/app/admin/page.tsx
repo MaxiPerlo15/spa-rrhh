@@ -749,6 +749,13 @@ export default function AdminDashboard() {
           body: 'El botón eliminar inicia confirmación y borra vacante junto con postulaciones asociadas.'
         }
       )
+    } else {
+      vacancySteps.push({
+        target: 'create-vacancy',
+        tab: 'vacancies',
+        title: 'Sin vacantes cargadas',
+        body: 'No hay vacantes disponibles en esta vista. El tutorial se adapta y te guía para crear tu primera vacante.'
+      })
     }
 
     const applicationsSteps = firstApplicationId
@@ -756,6 +763,14 @@ export default function AdminDashboard() {
       : DOMAIN_TUTORIALS_BASE.applications.filter(
           (step) => step.target !== 'application-view-btn' && step.target !== 'application-detail-modal'
         )
+    if (!firstApplicationId) {
+      applicationsSteps.push({
+        target: 'applications-filters',
+        tab: 'applications',
+        title: 'Sin postulaciones registradas',
+        body: 'Como no hay postulaciones en la tabla, el tutorial evita pasos de detalle y se centra en filtros y criterios de revisión.'
+      })
+    }
     if (firstApplicationWithCvId) {
       applicationsSteps.push({
         target: 'application-cv-btn',
@@ -770,6 +785,14 @@ export default function AdminDashboard() {
       : DOMAIN_TUTORIALS_BASE.contacts.filter(
           (step) => step.target !== 'contact-view-btn' && step.target !== 'contact-detail-modal'
         )
+    if (!firstContactId) {
+      contactsSteps.push({
+        target: 'contacts-table',
+        tab: 'contacts',
+        title: 'Sin contactos pendientes',
+        body: 'Actualmente no hay contactos en la tabla. El tutorial te muestra solo controles relevantes hasta que ingresen nuevos mensajes.'
+      })
+    }
 
     return {
       vacancies: vacancySteps,

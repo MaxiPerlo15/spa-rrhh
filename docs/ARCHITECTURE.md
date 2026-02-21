@@ -135,6 +135,19 @@ spa-rrhh/
 - Vista integrada en `Configuración` con tabla cronológica, estados de resultado (`SUCCESS`, `DENIED`, `ERROR`) y paginación.
 - La UI permite investigar acciones críticas sin depender de logs técnicos externos.
 
+**Tutoriales adaptativos por estado de datos (MIS-110)**:
+- La secuencia de tutorial por módulo se ajusta dinámicamente según datos disponibles en tabla.
+- Si no existen registros (`vacantes`, `postulaciones`, `contactos`), se omiten pasos irrelevantes (ver/editar/detalle) y se reemplazan por guía contextual.
+- Se preserva el enfoque no bloqueante: onboarding y tutorial orientan acciones sin forzar ejecución operativa.
+
+**Cobertura E2E crítica ampliada (MIS-116)**:
+- Matriz E2E reforzada en `tests/e2e/qa-matrix.spec.ts` con smoke multiplataforma (desktop + mobile) sobre:
+  - landing/home y secciones core,
+  - ofertas laborales y formularios públicos,
+  - rutas de auth admin (`signin`, `forgot`, `reset`),
+  - validación de navegación/hash y refresh.
+- Flujos autenticados quedan cubiertos de forma condicional por credenciales de entorno (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) para mantener estabilidad CI cuando no están configuradas.
+
 ### 2. Capa de Lógica de Negocio (`src/hooks`)
 
 **Responsabilidad**: Encapsular lógica de estado y efectos secundarios.
