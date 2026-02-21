@@ -15,6 +15,7 @@ import AdminApplicationsSection from '@/components/admin/sections/AdminApplicati
 import AdminContactsSection from '@/components/admin/sections/AdminContactsSection'
 import AdminSettingsSection from '@/components/admin/sections/AdminSettingsSection'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
+import { useMobileKeyboardAssist } from '@/hooks/useMobileKeyboardAssist'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
 import type { Contact } from '@/lib/api/contacts'
@@ -239,6 +240,7 @@ export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { showSuccess, showError, showInfo } = useToast()
+  useMobileKeyboardAssist()
   
   // Usar el hook customizado para manejar datos y operaciones
   const {

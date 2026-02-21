@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface HeaderNotification {
   id: string
@@ -68,12 +68,14 @@ export default function AdminHeader({
   const [notificationsView, setNotificationsView] = useState<NotificationsView>('unread')
   const [notificationsReferenceNow, setNotificationsReferenceNow] = useState<number>(0)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const [mobileOverlayTop, setMobileOverlayTop] = useState(72)
 
   const helpMenuRef = useRef<HTMLDivElement | null>(null)
   const desktopNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
   const notificationsPanelRef = useRef<HTMLDivElement | null>(null)
+  const mobileHeaderBarRef = useRef<HTMLDivElement | null>(null)
 
   const unreadCount = notifications.filter((notification) => !notification.isRead).length
   const readCount = notifications.length - unreadCount
@@ -115,11 +117,11 @@ export default function AdminHeader({
     return `hace ${diffDays} d`
   }
 
-  const closeAllMenus = () => {
+  const closeAllMenus = useCallback(() => {
     setIsHelpMenuOpen(false)
     setIsNotificationsMenuOpen(false)
     setIsActionMenuOpen(false)
-  }
+  }, [])
 
   const openNotifications = () => {
     const willOpen = !isNotificationsMenuOpen
@@ -142,6 +144,35 @@ export default function AdminHeader({
   }, [])
 
   useEffect(() => {
+    if (!isMobileViewport) return
+
+    const measureMobileOverlayTop = () => {
+      const rect = mobileHeaderBarRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setMobileOverlayTop(Math.max(64, Math.ceil(rect.bottom + 8)))
+    }
+
+    const rafId = window.requestAnimationFrame(measureMobileOverlayTop)
+    const onResize = () => {
+      measureMobileOverlayTop()
+      closeAllMenus()
+    }
+    const onOrientationChange = () => {
+      measureMobileOverlayTop()
+      closeAllMenus()
+    }
+
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onOrientationChange)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onOrientationChange)
+    }
+  }, [closeAllMenus, isMobileViewport])
+
+  useEffect(() => {
     if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
 
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -162,7 +193,7 @@ export default function AdminHeader({
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
     }
-  }, [isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [closeAllMenus, isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
     if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
@@ -170,7 +201,7 @@ export default function AdminHeader({
     const handleScroll = () => closeAllMenus()
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [closeAllMenus, isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
     if (!isNotificationsMenuOpen) return
@@ -216,9 +247,17 @@ export default function AdminHeader({
       ref={notificationsPanelRef}
       role="dialog"
       aria-label="Bandeja de notificaciones"
+      style={
+        mobile
+          ? {
+              top: `${mobileOverlayTop}px`,
+              maxHeight: `calc(100dvh - ${mobileOverlayTop + 8}px)`
+            }
+          : undefined
+      }
       className={`z-[90] overflow-hidden animate-fade-in ${
         mobile
-          ? 'fixed left-2 right-2 top-[calc(env(safe-area-inset-top)+3.25rem)] max-h-[65vh] rounded-3xl border border-white/60 bg-white/95 shadow-[0_24px_60px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl'
+          ? 'fixed left-2 right-2 max-h-[65vh] rounded-3xl border border-white/60 bg-white/95 shadow-[0_24px_60px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl'
           : 'absolute right-0 mt-2 w-[390px] max-w-[95vw] origin-top-right rounded-2xl border border-gray-200 bg-white shadow-2xl'
       }`}
     >
@@ -407,7 +446,7 @@ export default function AdminHeader({
           </div>
         </div>
 
-        <div className="md:hidden flex items-center justify-between gap-2 h-11">
+        <div ref={mobileHeaderBarRef} className="md:hidden flex items-center justify-between gap-2 h-11">
           <div className="flex items-center gap-2 min-w-0">
             {activeTab === 'settings' && (
               <button type="button" onClick={onBackFromSettings} className="h-9 w-9 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center" aria-label="Volver">
@@ -458,7 +497,10 @@ export default function AdminHeader({
               </button>
 
               {isActionMenuOpen && (
-                <div className="fixed right-2 top-[calc(env(safe-area-inset-top)+3.25rem)] w-[min(16rem,calc(100vw-1rem))] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in">
+                <div
+                  style={{ top: `${mobileOverlayTop}px`, maxHeight: `calc(100dvh - ${mobileOverlayTop + 8}px)` }}
+                  className="fixed right-2 w-[min(16rem,calc(100vw-1rem))] max-h-[65vh] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in overflow-y-auto"
+                >
                   {userEmail && <p className="px-4 py-3 text-xs text-gray-500 border-b border-gray-100 truncate">{userEmail}</p>}
                   <button
                     type="button"
