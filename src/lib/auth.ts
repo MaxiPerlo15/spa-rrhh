@@ -17,6 +17,7 @@ const sameSite =
     ? configuredSameSite
     : 'lax'
 const cookieSameSite = sameSite === 'none' && !secureCookiesEnabled ? 'lax' : sameSite
+const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? null
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -48,11 +49,27 @@ export const authOptions: NextAuthOptions = {
           throw new Error(`AUTH_THROTTLED:${lockState.retryAfterSeconds}`)
         }
 
+        // MIS-108: single-admin guard. If ADMIN_EMAIL is configured,
+        // only that account can authenticate into the admin panel.
+        if (configuredAdminEmail && normalizedEmail !== configuredAdminEmail) {
+          const attemptState = await recordAttemptFailure('login', identity)
+          logger.security('auth.login.denied.single_admin_email_mismatch', {
+            email: normalizedEmail,
+            ip,
+            failures: attemptState.failures,
+            blocked: attemptState.blocked
+          })
+          if (attemptState.blocked) {
+            throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
+          }
+          return null
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: normalizedEmail }
         })
 
-        if (!user) {
+        if (!user || user.role !== 'ADMIN') {
           const attemptState = await recordAttemptFailure('login', identity)
           logger.security('auth.login.failed', {
             email: normalizedEmail,

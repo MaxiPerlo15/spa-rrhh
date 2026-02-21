@@ -253,6 +253,13 @@ Nota de implementación:
 - El panel admin consume `GET /api/vacancies?all=1` para gestionar el ciclo completo (`active`, `closed`, `draft`).
 - El flujo de edición en admin debe precargar campos opcionales (`salary`, `requirements`, `benefits`) para evitar sobrescrituras accidentales.
 
+## Modelo de acceso admin (single-admin)
+
+- El panel está diseñado para una cuenta administrativa operativa única.
+- No se implementa jerarquía `OWNER/ADMIN/VIEWER`; el permiso efectivo para panel/API privada es `ADMIN`.
+- Si se configura `ADMIN_EMAIL`, la autenticación en panel solo acepta ese email (guardrail adicional).
+- Todas las acciones críticas del panel deben mantener confirmación explícita + estado de carga visible + feedback de resultado.
+
 ## Estándar de Validación (Zod)
 
 Las rutas API usan validación runtime centralizada en:

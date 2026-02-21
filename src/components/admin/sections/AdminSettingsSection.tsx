@@ -1,6 +1,5 @@
 interface AdminSettingsSectionProps {
   email?: string | null
-  role?: string | null
   settingsForm: {
     notificationsEnabled: boolean
     notifyNewApplications: boolean
@@ -45,7 +44,6 @@ function ToggleSwitch({
 
 export default function AdminSettingsSection({
   email,
-  role,
   settingsForm,
   setSettingsForm,
   settingsSaving,
@@ -64,8 +62,8 @@ export default function AdminSettingsSection({
             <p className="text-sm font-medium text-gray-900">{email ?? 'No disponible'}</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Rol</p>
-            <p className="text-sm font-medium text-gray-900">{role ?? 'ADMIN'}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Modelo de acceso</p>
+            <p className="text-sm font-medium text-gray-900">Single-admin (cuenta única)</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
             <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>

@@ -1766,7 +1766,6 @@ const handleTestSentry = () => {
         {activeTab === 'settings' && (
           <AdminSettingsSection
             email={session.user?.email}
-            role={session.user?.role}
             settingsForm={settingsForm}
             setSettingsForm={(updater) => setSettingsForm(updater)}
             settingsSaving={settingsSaving}
