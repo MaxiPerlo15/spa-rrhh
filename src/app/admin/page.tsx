@@ -1788,7 +1788,7 @@ const handleTestSentry = () => {
       {isGuidedMode && (
         <div className="pointer-events-none fixed inset-0 z-[71] bg-gray-900/35 backdrop-blur-[2px]" />
       )}
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${isGuidedMode ? 'pointer-events-none' : ''}`}>
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[calc(env(safe-area-inset-top)+4.5rem)] pb-6 sm:pb-8 md:pt-6 md:py-8 ${isGuidedMode ? 'pointer-events-none' : ''}`}>
         <DashboardStats
           totalVacancies={stats.totalVacancies}
           activeVacancies={stats.activeVacancies}

@@ -13,25 +13,30 @@ interface TabButtonProps {
   onClick: () => void
   icon: Parameters<typeof AppIcon>[0]['name']
   label: string
+  mobileLabel?: string
   badge?: number
+  compact?: boolean
 }
 
-function TabButton({ isActive, onClick, icon, label, badge }: TabButtonProps) {
+function TabButton({ isActive, onClick, icon, label, mobileLabel, badge, compact = false }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
-      className={`min-w-fit shrink-0 flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all ${
+      className={`min-w-0 shrink-0 flex items-center justify-center gap-2 ${
+        compact ? 'px-2 py-2 text-[13px]' : 'px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base'
+      } font-semibold rounded-lg transition-all ${
         isActive
           ? 'bg-primary-500 text-white shadow-md'
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
       }`}
+      aria-current={isActive ? 'page' : undefined}
     >
-      <span className="text-xl">
-        <AppIcon name={icon} className="h-5 w-5" />
+      <span className={compact ? 'text-base' : 'text-xl'}>
+        <AppIcon name={icon} className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
       </span>
-      <span>{label}</span>
+      <span className="truncate">{compact ? (mobileLabel ?? label) : label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+        <span className={`ml-1 px-1.5 py-0.5 text-[11px] rounded-full ${
           isActive ? 'bg-white text-primary-600' : 'bg-primary-500 text-white'
         }`}>
           {badge}
@@ -54,28 +59,34 @@ interface AdminTabsProps {
 
 export default function AdminTabs({ activeTab, onTabChange, className = '', stats = {} }: AdminTabsProps) {
   return (
-    <div data-tour="tabs" className={`bg-white rounded-lg shadow p-2 mb-8 ${className}`}>
+    <div data-tour="tabs" className={`bg-white rounded-lg shadow p-2 mb-8 overflow-hidden ${className}`}>
       <div className="grid grid-cols-3 gap-2 md:hidden">
         <TabButton
           isActive={activeTab === 'vacancies'}
           onClick={() => onTabChange('vacancies')}
           icon="briefcase"
           label="Vacantes"
+          mobileLabel="Vacantes"
           badge={stats.activeVacancies}
+          compact
         />
         <TabButton
           isActive={activeTab === 'applications'}
           onClick={() => onTabChange('applications')}
           icon="file"
           label="Postulaciones"
+          mobileLabel="Postulac."
           badge={stats.pendingApplications}
+          compact
         />
         <TabButton
           isActive={activeTab === 'contacts'}
           onClick={() => onTabChange('contacts')}
           icon="mail"
           label="Contactos"
+          mobileLabel="Contactos"
           badge={stats.pendingContacts}
+          compact
         />
       </div>
 
