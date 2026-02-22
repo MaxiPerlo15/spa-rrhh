@@ -197,7 +197,7 @@ export default function Home() {
                 name="Ayelen Meinardi"
                 role="Fundadora"
                 description="Licencida en Recursos Humanos gradua de la universidad UCES con más de 10 años de experiencia, especializada en desarrollo organizacional y gestión del talento. Comprometida con el crecimiento profesional de los individuos y el éxito de las organizaciones."
-                imageUrl="/images/founder-2.jpg"
+                imageUrl="/logorrhh.webp"
               />
             </div>
           </div>
