@@ -22,7 +22,10 @@ type RateLimitResponse = {
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
+const isProduction = process.env.NODE_ENV === 'production'
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
+const isStrictSharedStore = isProduction
+const SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS = 60
 
 async function executeUpstashCommand<T>(...command: (string | number)[]) {
   if (!upstashUrl || !upstashToken) {
@@ -97,7 +100,22 @@ export async function rateLimit({
     try {
       return await sharedRateLimit({ key, windowMs, maxRequests })
     } catch {
-      // Fallback silencioso a memoria local para no interrumpir el servicio.
+      if (isStrictSharedStore) {
+        return {
+          allowed: false,
+          remaining: 0,
+          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
+        }
+      }
+      // fallback a memoria solo en entorno no productivo
+    }
+  }
+
+  if (isStrictSharedStore) {
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
     }
   }
 

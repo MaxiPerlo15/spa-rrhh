@@ -129,6 +129,50 @@ describe('authAttemptGuard', () => {
     expect(fetchMock).toHaveBeenCalled()
   })
 
+  it('en producción bloquea por fail-closed si Upstash falla', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network error')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { clearAttemptFailures, getAttemptLock, recordAttemptFailure } = await loadGuard({
+      NODE_ENV: 'production',
+      UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
+      UPSTASH_REDIS_REST_TOKEN: 'token'
+    })
+
+    const scope = 'login'
+    const identity = 'prod-store-failure'
+
+    const lockState = await getAttemptLock(scope, identity)
+    expect(lockState.blocked).toBe(true)
+    expect(lockState.retryAfterSeconds).toBeGreaterThan(0)
+
+    const failureState = await recordAttemptFailure(scope, identity)
+    expect(failureState.blocked).toBe(true)
+    expect(failureState.retryAfterSeconds).toBeGreaterThan(0)
+    expect(failureState.failures).toBe(0)
+
+    await clearAttemptFailures(scope, identity)
+    expect(fetchMock).toHaveBeenCalled()
+  })
+
+  it('en producción bloquea por fail-closed si faltan credenciales Upstash', async () => {
+    const { getAttemptLock, recordAttemptFailure } = await loadGuard({
+      NODE_ENV: 'production',
+      UPSTASH_REDIS_REST_URL: undefined,
+      UPSTASH_REDIS_REST_TOKEN: undefined
+    })
+
+    const lockState = await getAttemptLock('login', 'prod-no-store')
+    expect(lockState.blocked).toBe(true)
+    expect(lockState.retryAfterSeconds).toBeGreaterThan(0)
+
+    const failureState = await recordAttemptFailure('login', 'prod-no-store')
+    expect(failureState.blocked).toBe(true)
+    expect(failureState.failures).toBe(0)
+  })
+
   it('usa lock distribuido cuando Upstash responde PTTL positivo', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes('/PTTL/')) {

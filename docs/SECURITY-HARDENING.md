@@ -59,7 +59,11 @@ Implemented:
 
 `src/lib/rateLimit.ts` now supports:
 - Primary: Upstash Redis REST backend (shared across instances)
-- Fallback: in-memory local store (development-safe fallback)
+- Fallback: in-memory local store only in non-production environments
+
+Production fail-safe:
+- If Upstash is unavailable (network/provider failure), requests are denied (`fail-closed`) instead of silently using local memory.
+- This avoids per-instance bypasses in serverless/multi-instance runtime.
 
 Required production env vars:
 - `UPSTASH_REDIS_REST_URL`
@@ -158,7 +162,8 @@ Implemented baseline:
 - Forgot-password and reset-password now include additional temporary lock checks by identity, beyond standard per-IP rate limits.
 - Storage model:
   - Uses shared distributed store via Upstash Redis when configured (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
-  - Falls back to in-memory store only when distributed store is unavailable.
+  - In production, no in-memory fallback is used if distributed store fails (`fail-closed`).
+  - In development/test, local fallback remains available for DX.
 
 UX behavior:
 - Sign-in surface shows a user-friendly cooldown message when login is temporarily blocked.

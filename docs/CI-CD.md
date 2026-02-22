@@ -101,6 +101,12 @@ Opcional:
 5. (Opcional) añade `CI Success`.
 6. Guarda la regla.
 
+## Deployment strategy (Vercel)
+
+La estrategia operativa de despliegue, dominio y rollback está documentada en:
+
+- `docs/DEPLOYMENT-VERCEL.md`
+
 ## Governance en repo privado sin enforcement efectivo
 
 Actualmente, GitHub muestra que la ruleset puede no aplicar enforcement real en este repositorio privado según plan.

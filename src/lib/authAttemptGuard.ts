@@ -15,9 +15,12 @@ const LOCK_RULES: Array<{ minFailures: number; lockMs: number }> = [
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
+const isProduction = process.env.NODE_ENV === 'production'
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
+const isStrictSharedStore = isProduction
 const isDevBypassEnabled =
   process.env.NODE_ENV === 'development' && process.env.AUTH_ATTEMPT_GUARD_DEV_BYPASS !== 'false'
+const SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS = 60
 
 const globalForAttemptGuard = globalThis as unknown as {
   authAttemptStore?: Map<string, AttemptState>
@@ -129,7 +132,20 @@ export async function getAttemptLock(scope: string, identity: string) {
     try {
       return await sharedGetAttemptLock(scope, identity)
     } catch {
-      // fallback local si falla store distribuido
+      if (isStrictSharedStore) {
+        return {
+          blocked: true,
+          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
+        }
+      }
+      // fallback local solo en entorno no productivo
+    }
+  }
+
+  if (isStrictSharedStore) {
+    return {
+      blocked: true,
+      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
     }
   }
 
@@ -192,7 +208,22 @@ export async function recordAttemptFailure(scope: string, identity: string) {
     try {
       return await sharedRecordAttemptFailure(scope, identity)
     } catch {
-      // fallback local si falla store distribuido
+      if (isStrictSharedStore) {
+        return {
+          blocked: true,
+          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS,
+          failures: 0
+        }
+      }
+      // fallback local solo en entorno no productivo
+    }
+  }
+
+  if (isStrictSharedStore) {
+    return {
+      blocked: true,
+      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS,
+      failures: 0
     }
   }
 
@@ -215,8 +246,15 @@ export async function clearAttemptFailures(scope: string, identity: string) {
       await sharedClearAttemptFailures(scope, identity)
       return
     } catch {
-      // fallback local si falla store distribuido
+      if (isStrictSharedStore) {
+        return
+      }
+      // fallback local solo en entorno no productivo
     }
+  }
+
+  if (isStrictSharedStore) {
+    return
   }
 
   await memoryClearAttemptFailures(scope, identity)
