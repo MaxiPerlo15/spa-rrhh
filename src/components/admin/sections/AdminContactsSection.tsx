@@ -108,6 +108,8 @@ export default function AdminContactsSection({
         <div className="flex flex-col gap-4">
           <div className="relative flex-1">
             <input
+              id="admin-contacts-search"
+              name="admin_contacts_search"
               type="text"
               placeholder="Buscar por nombre, email o asunto..."
               value={searchContacts}
@@ -146,18 +148,18 @@ export default function AdminContactsSection({
 
           <div className="hidden md:flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
             <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
-            <select value={filterContactStatus} onChange={(e) => setFilterContactStatus(e.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-contacts-filter-status" name="admin_contacts_filter_status" value={filterContactStatus} onChange={(e) => setFilterContactStatus(e.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>
               <option value="PENDING">Pendientes</option>
               <option value="RESPONDED">Respondidos</option>
               <option value="ARCHIVED">Archivados</option>
             </select>
-            <select value={sortContactsBy} onChange={(event) => setSortContactsBy(event.target.value as 'createdAt' | 'name' | 'status')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-contacts-sort-by" name="admin_contacts_sort_by" value={sortContactsBy} onChange={(event) => setSortContactsBy(event.target.value as 'createdAt' | 'name' | 'status')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="createdAt">Ordenar por fecha</option>
               <option value="name">Ordenar por nombre</option>
               <option value="status">Ordenar por estado</option>
             </select>
-            <select value={sortContactsDirection} onChange={(event) => setSortContactsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-contacts-sort-direction" name="admin_contacts_sort_direction" value={sortContactsDirection} onChange={(event) => setSortContactsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>

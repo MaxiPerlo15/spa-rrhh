@@ -12,7 +12,7 @@ const cspDirectives = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://uploadthing.com https://*.uploadthing.com",
+  `script-src 'self' 'unsafe-inline'${isProduction ? '' : " 'unsafe-eval'"} https://challenges.cloudflare.com https://uploadthing.com https://*.uploadthing.com`,
   `connect-src 'self' ${isProduction ? '' : 'ws: http://localhost:* https://localhost:* '}https://*.ingest.sentry.io https://sentry.io https://challenges.cloudflare.com https://uploadthing.com https://*.uploadthing.com https://*.ufs.sh https://*.utfs.io`,
   "worker-src 'self' blob:",
   "media-src 'self' blob: https:",

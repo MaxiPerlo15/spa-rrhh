@@ -136,6 +136,8 @@ export default function AdminApplicationsSection({
         <div className="flex flex-col gap-4">
           <div className="relative flex-1">
             <input
+              id="admin-applications-search"
+              name="admin_applications_search"
               type="text"
               placeholder="Buscar por nombre, email o vacante..."
               value={searchApplications}
@@ -181,7 +183,7 @@ export default function AdminApplicationsSection({
 
           <div className="hidden md:flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
             <label className="text-sm font-medium text-gray-700 sm:shrink-0">Filtrar por estado:</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-applications-filter-status" name="admin_applications_filter_status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full sm:w-auto sm:min-w-[165px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>
               <option value="PENDING">Pendientes</option>
               <option value="REVIEWING">En Revisión</option>
@@ -189,18 +191,18 @@ export default function AdminApplicationsSection({
               <option value="ACCEPTED">Aceptados</option>
               <option value="REJECTED">Rechazados</option>
             </select>
-            <select value={filterApplicationsVacancyId} onChange={(event) => setFilterApplicationsVacancyId(event.target.value)} className="w-full sm:w-auto sm:min-w-[190px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-applications-filter-vacancy" name="admin_applications_filter_vacancy" value={filterApplicationsVacancyId} onChange={(event) => setFilterApplicationsVacancyId(event.target.value)} className="w-full sm:w-auto sm:min-w-[190px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todas las vacantes</option>
               {vacancies.map((vacancy) => (
                 <option key={vacancy.id} value={vacancy.id}>{vacancy.title}</option>
               ))}
             </select>
-            <select value={sortApplicationsBy} onChange={(event) => setSortApplicationsBy(event.target.value as 'submittedAt' | 'candidateName' | 'status')} className="w-full sm:w-auto sm:min-w-[180px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-applications-sort-by" name="admin_applications_sort_by" value={sortApplicationsBy} onChange={(event) => setSortApplicationsBy(event.target.value as 'submittedAt' | 'candidateName' | 'status')} className="w-full sm:w-auto sm:min-w-[180px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="submittedAt">Ordenar por fecha</option>
               <option value="candidateName">Ordenar por candidato</option>
               <option value="status">Ordenar por estado</option>
             </select>
-            <select value={sortApplicationsDirection} onChange={(event) => setSortApplicationsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto sm:min-w-[160px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
+            <select id="admin-applications-sort-direction" name="admin_applications_sort_direction" value={sortApplicationsDirection} onChange={(event) => setSortApplicationsDirection(event.target.value as 'asc' | 'desc')} className="w-full sm:w-auto sm:min-w-[160px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="desc">Descendente</option>
               <option value="asc">Ascendente</option>
             </select>

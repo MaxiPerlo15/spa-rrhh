@@ -90,6 +90,8 @@ export default function AdminVacanciesSection({
       <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           <input
+            id="admin-vacancies-search"
+            name="admin_vacancies_search"
             type="text"
             placeholder="Buscar por título o ubicación"
             value={searchVacancies}
@@ -106,6 +108,8 @@ export default function AdminVacanciesSection({
             />
           </div>
           <select
+            id="admin-vacancies-filter-status"
+            name="admin_vacancies_filter_status"
             value={filterVacancyStatus}
             onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'closed')}
             className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
@@ -124,6 +128,8 @@ export default function AdminVacanciesSection({
             />
           </div>
           <select
+            id="admin-vacancies-sort-by"
+            name="admin_vacancies_sort_by"
             value={sortVacanciesBy}
             onChange={(event) => setSortVacanciesBy(event.target.value as 'createdAt' | 'title' | 'location' | 'status')}
             className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
@@ -143,6 +149,8 @@ export default function AdminVacanciesSection({
             />
           </div>
           <select
+            id="admin-vacancies-sort-direction"
+            name="admin_vacancies_sort_direction"
             value={sortVacanciesDirection}
             onChange={(event) => setSortVacanciesDirection(event.target.value as 'asc' | 'desc')}
             className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"

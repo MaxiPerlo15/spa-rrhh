@@ -164,6 +164,8 @@ export default function VacantesPage() {
           <div className="mb-4">
             <div className="relative max-w-2xl">
               <input
+                id="jobs-search"
+                name="jobs_search"
                 type="text"
                 placeholder="Buscar por título, descripción o ubicación..."
                 value={searchTerm}
@@ -210,6 +212,8 @@ export default function VacantesPage() {
             </div>
 
             <select
+              id="jobs-filter-workday"
+              name="jobs_filter_workday"
               value={filterWorkday}
               onChange={(e) => setFilterWorkday(e.target.value)}
               className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
@@ -222,6 +226,8 @@ export default function VacantesPage() {
             </select>
 
             <select
+              id="jobs-filter-modality"
+              name="jobs_filter_modality"
               value={filterModality}
               onChange={(e) => setFilterModality(e.target.value)}
               className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
@@ -234,6 +240,8 @@ export default function VacantesPage() {
 
             {uniqueLocations.length > 0 && (
               <select
+                id="jobs-filter-location"
+                name="jobs_filter_location"
                 value={filterLocation}
                 onChange={(e) => setFilterLocation(e.target.value)}
                 className="hidden md:block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
