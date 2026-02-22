@@ -31,6 +31,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
       - name: Generate Prisma Client
         run: npx prisma generate
@@ -76,6 +81,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
       - name: Generate Prisma Client
         run: npx prisma generate
@@ -84,6 +94,9 @@ jobs:
       
       - name: Run unit tests with coverage thresholds
         run: npm run test:coverage
+
+      - name: Run API smoke checks
+        run: npx playwright test tests/e2e/api-smoke.spec.ts
       
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -116,6 +129,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
       - name: Generate Prisma Client
         run: npx prisma generate
