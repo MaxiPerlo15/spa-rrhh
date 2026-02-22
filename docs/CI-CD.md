@@ -101,6 +101,37 @@ Opcional:
 5. (Opcional) añade `CI Success`.
 6. Guarda la regla.
 
+## Governance en repo privado sin enforcement efectivo
+
+Actualmente, GitHub muestra que la ruleset puede no aplicar enforcement real en este repositorio privado según plan.
+Para mitigar ese riesgo se define la siguiente política operativa obligatoria:
+
+1. Todo cambio entra por PR hacia `main` (sin push directo).
+2. No se hace merge si no están verdes:
+   - `Lint and Build`
+   - `Run Tests`
+   - `E2E Tests`
+3. Si `CI Success` está configurado, también debe quedar en verde.
+4. Toda excepción debe quedar documentada en el PR (motivo + plan de remediación).
+
+### Checklist mínimo de merge (control compensatorio)
+
+- PR abierto contra `main`.
+- Descripción con alcance y riesgos.
+- Checks CI verdes.
+- Sin conflictos con `main`.
+- Evidencia de pruebas para cambios críticos (capturas/logs/comentarios).
+
+## CI hardening (migraciones + smoke API)
+
+El workflow incluye hardening para hacer la pipeline más determinista:
+
+1. Ejecuta `prisma migrate deploy` en jobs de `lint-and-build`, `test` y `e2e`.
+2. Ejecuta smoke tests de APIs críticas en CI:
+   - `GET /api/vacancies`
+   - `GET /api/auth/csrf`
+   - `GET /api/admin/notifications` (debe rechazar sin sesión)
+
 ## Ver resultados
 
 1. Ve a la pestaña **Actions** en GitHub
