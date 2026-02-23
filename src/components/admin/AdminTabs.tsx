@@ -16,27 +16,39 @@ interface TabButtonProps {
   mobileLabel?: string
   badge?: number
   compact?: boolean
+  iconOnly?: boolean
 }
 
-function TabButton({ isActive, onClick, icon, label, mobileLabel, badge, compact = false }: TabButtonProps) {
+function TabButton({
+  isActive,
+  onClick,
+  icon,
+  label,
+  mobileLabel,
+  badge,
+  compact = false,
+  iconOnly = false
+}: TabButtonProps) {
+  const effectiveLabel = compact ? (mobileLabel ?? label) : label
   return (
     <button
       onClick={onClick}
       className={`min-w-0 shrink-0 flex items-center justify-center gap-2 ${
         compact ? 'min-h-11 min-w-11 px-2 py-2 text-[13px]' : 'px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base'
-      } font-semibold rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+      } ${iconOnly ? 'relative' : ''} font-semibold rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
         isActive
           ? 'bg-primary-500 text-white shadow-md'
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
       }`}
       aria-current={isActive ? 'page' : undefined}
+      aria-label={effectiveLabel}
     >
       <span className={compact ? 'text-base' : 'text-xl'}>
         <AppIcon name={icon} className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
       </span>
-      <span className="truncate">{compact ? (mobileLabel ?? label) : label}</span>
+      {!iconOnly && <span className="truncate">{effectiveLabel}</span>}
       {badge !== undefined && badge > 0 && (
-        <span className={`ml-1 px-1.5 py-0.5 text-[11px] rounded-full ${
+        <span className={`${iconOnly ? 'absolute -top-1 -right-1' : 'ml-1'} px-1.5 py-0.5 text-[11px] rounded-full ${
           isActive ? 'bg-white text-primary-600' : 'bg-primary-500 text-white'
         }`}>
           {badge}
@@ -76,6 +88,7 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           mobileLabel="Vacantes"
           badge={stats.activeVacancies}
           compact
+          iconOnly
         />
         <TabButton
           isActive={activeTab === 'applications'}
@@ -85,6 +98,7 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           mobileLabel="Postulac."
           badge={stats.pendingApplications}
           compact
+          iconOnly
         />
         <TabButton
           isActive={activeTab === 'contacts'}
@@ -94,6 +108,7 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           mobileLabel="Contactos"
           badge={stats.pendingContacts}
           compact
+          iconOnly
         />
         <TabButton
           isActive={activeTab === 'settings'}
@@ -102,6 +117,7 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           label="Configuración"
           mobileLabel="Ajustes"
           compact
+          iconOnly
         />
         </div>
       </nav>
