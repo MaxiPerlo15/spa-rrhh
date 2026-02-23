@@ -63,10 +63,9 @@ export default function AdminHeader({
   unreadNotifications = 0
 }: AdminHeaderProps) {
   const notificationsDialogTitleId = 'admin-notifications-title'
-  const mobileActionMenuId = 'admin-mobile-action-menu'
+  const mobileHelpMenuId = 'admin-mobile-help-menu'
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false)
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false)
-  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [notificationsView, setNotificationsView] = useState<NotificationsView>('unread')
   const [notificationsReferenceNow, setNotificationsReferenceNow] = useState<number>(0)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
@@ -75,7 +74,6 @@ export default function AdminHeader({
   const helpMenuRef = useRef<HTMLDivElement | null>(null)
   const desktopNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileNotificationsMenuRef = useRef<HTMLDivElement | null>(null)
-  const actionMenuRef = useRef<HTMLDivElement | null>(null)
   const notificationsPanelRef = useRef<HTMLDivElement | null>(null)
   const mobileHeaderBarRef = useRef<HTMLDivElement | null>(null)
 
@@ -101,7 +99,7 @@ export default function AdminHeader({
     }
   }
 
-  const isOverlayOpen = isNotificationsMenuOpen || isActionMenuOpen
+  const isMobileOverlayOpen = isMobileViewport && (isNotificationsMenuOpen || isHelpMenuOpen)
 
   const formatRelativeTimestamp = (value: string) => {
     const timestamp = new Date(value).getTime()
@@ -122,14 +120,12 @@ export default function AdminHeader({
   const closeAllMenus = useCallback(() => {
     setIsHelpMenuOpen(false)
     setIsNotificationsMenuOpen(false)
-    setIsActionMenuOpen(false)
   }, [])
 
   const openNotifications = () => {
     const willOpen = !isNotificationsMenuOpen
     setIsNotificationsMenuOpen(willOpen)
     setIsHelpMenuOpen(false)
-    setIsActionMenuOpen(false)
     if (willOpen) {
       setNotificationsReferenceNow(Date.now())
       setNotificationsView('unread')
@@ -175,17 +171,15 @@ export default function AdminHeader({
   }, [closeAllMenus, isMobileViewport])
 
   useEffect(() => {
-    if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
+    if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
 
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node
       const clickedHelp = helpMenuRef.current?.contains(target)
-      const clickedAction = actionMenuRef.current?.contains(target)
       const clickedDesktopNotifications = desktopNotificationsMenuRef.current?.contains(target)
       const clickedMobileNotifications = mobileNotificationsMenuRef.current?.contains(target)
 
       if (!clickedHelp) setIsHelpMenuOpen(false)
-      if (!clickedAction) setIsActionMenuOpen(false)
       if (!clickedDesktopNotifications && !clickedMobileNotifications) setIsNotificationsMenuOpen(false)
     }
 
@@ -195,15 +189,15 @@ export default function AdminHeader({
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
     }
-  }, [closeAllMenus, isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [closeAllMenus, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
-    if (!isHelpMenuOpen && !isNotificationsMenuOpen && !isActionMenuOpen) return
+    if (!isHelpMenuOpen && !isNotificationsMenuOpen) return
 
     const handleScroll = () => closeAllMenus()
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [closeAllMenus, isActionMenuOpen, isHelpMenuOpen, isNotificationsMenuOpen])
+  }, [closeAllMenus, isHelpMenuOpen, isNotificationsMenuOpen])
 
   useEffect(() => {
     if (!isNotificationsMenuOpen) return
@@ -379,9 +373,47 @@ export default function AdminHeader({
     </div>
   )
 
+  const renderHelpPanel = (mobile: boolean) => (
+    <div
+      id={mobile ? mobileHelpMenuId : undefined}
+      style={
+        mobile
+          ? {
+              top: `${mobileOverlayTop}px`,
+              maxHeight: `calc(100dvh - ${mobileOverlayTop + 8}px)`
+            }
+          : undefined
+      }
+      className={
+        mobile
+          ? 'fixed right-2 w-[min(16rem,calc(100vw-1rem))] max-h-[65vh] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in overflow-y-auto'
+          : 'absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl z-[90] overflow-hidden'
+      }
+    >
+      <button
+        onClick={() => {
+          setIsHelpMenuOpen(false)
+          onOpenFullTutorial()
+        }}
+        className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
+      >
+        Ver tutorial completo
+      </button>
+      <button
+        onClick={() => {
+          setIsHelpMenuOpen(false)
+          onOpenSectionTutorial()
+        }}
+        className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
+      >
+        Ver tutorial de la seccion
+      </button>
+    </div>
+  )
+
   return (
     <header className="fixed inset-x-0 top-0 bg-primary-600/98 shadow-sm z-40 backdrop-blur-sm pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:pt-0">
-      {isMobileViewport && isOverlayOpen && (
+      {isMobileOverlayOpen && (
         <button
           type="button"
           aria-label="Cerrar panel"
@@ -426,12 +458,7 @@ export default function AdminHeader({
                   <circle cx="12" cy="12" r="10" />
                 </svg>
               </button>
-              {isHelpMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl z-[90] overflow-hidden">
-                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenFullTutorial() }} className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset">Ver tutorial completo</button>
-                  <button onClick={() => { setIsHelpMenuOpen(false); onOpenSectionTutorial() }} className="block w-full px-4 min-h-11 text-left text-sm text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset">Ver tutorial de la seccion</button>
-                </div>
-              )}
+              {isHelpMenuOpen && !isMobileViewport && renderHelpPanel(false)}
             </div>
 
             <button onClick={onOpenSettings} className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600" aria-label="Configuración del panel">
@@ -484,75 +511,36 @@ export default function AdminHeader({
               </button>
               {isNotificationsMenuOpen && isMobileViewport && renderNotificationsPanel(true)}
             </div>
-
-            <div className="relative" ref={actionMenuRef}>
+            <div className="relative" ref={helpMenuRef}>
               <button
-                type="button"
                 onClick={() => {
-                  setIsActionMenuOpen((prev) => !prev)
+                  setIsHelpMenuOpen((prev) => !prev)
                   setIsNotificationsMenuOpen(false)
-                  setIsHelpMenuOpen(false)
                 }}
                 className="h-11 w-11 bg-white/10 text-white rounded-lg hover:bg-white/20 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600"
-                aria-label="Abrir menú de acciones"
-                aria-expanded={isActionMenuOpen}
-                aria-controls={mobileActionMenuId}
+                aria-label="Ayuda del panel"
+                aria-expanded={isHelpMenuOpen}
+                aria-controls={mobileHelpMenuId}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M4 6h16M4 12h16M4 18h16" />
+                  <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4" />
+                  <circle cx="12" cy="17" r="1" />
+                  <circle cx="12" cy="12" r="10" />
                 </svg>
               </button>
-
-              {isActionMenuOpen && (
-                <div
-                  id={mobileActionMenuId}
-                  style={{ top: `${mobileOverlayTop}px`, maxHeight: `calc(100dvh - ${mobileOverlayTop + 8}px)` }}
-                  className="fixed right-2 w-[min(16rem,calc(100vw-1rem))] max-h-[65vh] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[90] overflow-hidden animate-fade-in overflow-y-auto"
-                >
-                  {userEmail && <p className="px-4 py-3 text-xs text-gray-500 border-b border-gray-100 truncate">{userEmail}</p>}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsActionMenuOpen(false)
-                      onOpenFullTutorial()
-                    }}
-                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
-                  >
-                    Tutorial completo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsActionMenuOpen(false)
-                      onOpenSectionTutorial()
-                    }}
-                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
-                  >
-                    Tutorial de esta sección
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsActionMenuOpen(false)
-                      onOpenSettings()
-                    }}
-                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-gray-800 hover:bg-gray-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
-                  >
-                    Configuración
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsActionMenuOpen(false)
-                      onSignOut()
-                    }}
-                    className="w-full text-left px-4 min-h-11 text-sm font-medium text-red-700 hover:bg-red-50 border-t border-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-inset"
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
+              {isHelpMenuOpen && isMobileViewport && renderHelpPanel(true)}
             </div>
+            <button
+              onClick={onSignOut}
+              className="h-11 w-11 bg-red-600 text-white rounded-lg hover:bg-red-700 active:scale-95 transition-all inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/95 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-600"
+              aria-label="Cerrar sesión del panel"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
