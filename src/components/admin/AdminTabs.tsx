@@ -59,8 +59,15 @@ interface AdminTabsProps {
 
 export default function AdminTabs({ activeTab, onTabChange, className = '', stats = {} }: AdminTabsProps) {
   return (
-    <div data-tour="tabs" className={`bg-white rounded-lg shadow p-2 mb-8 overflow-hidden ${className}`}>
-      <div className="grid grid-cols-3 gap-2 md:hidden">
+    <div
+      data-tour="tabs"
+      className={`md:bg-white md:rounded-lg md:shadow md:p-2 md:mb-8 md:overflow-hidden ${className}`}
+    >
+      <nav
+        aria-label="Navegación principal del panel admin"
+        className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur"
+      >
+        <div className="mx-auto max-w-7xl grid grid-cols-4 gap-2">
         <TabButton
           isActive={activeTab === 'vacancies'}
           onClick={() => onTabChange('vacancies')}
@@ -88,7 +95,16 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           badge={stats.pendingContacts}
           compact
         />
-      </div>
+        <TabButton
+          isActive={activeTab === 'settings'}
+          onClick={() => onTabChange('settings')}
+          icon="settings"
+          label="Configuración"
+          mobileLabel="Ajustes"
+          compact
+        />
+        </div>
+      </nav>
 
       <div className="hidden md:flex gap-2 overflow-x-auto pb-1">
         <TabButton
