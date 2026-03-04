@@ -93,6 +93,7 @@ export default function AdminVacanciesSection({
             id="admin-vacancies-search"
             name="admin_vacancies_search"
             type="text"
+            autoComplete="off"
             placeholder="Buscar por título o ubicación"
             value={searchVacancies}
             onChange={(event) => setSearchVacancies(event.target.value)}

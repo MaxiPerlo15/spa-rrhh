@@ -1,6 +1,6 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 
 interface AdminOnboardingDialogProps {
   isOpen: boolean
@@ -45,12 +45,30 @@ export default function AdminOnboardingDialog({
   const isLast = stepIndex === totalSteps - 1
   const progress = ((stepIndex + 1) / totalSteps) * 100
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onSkip()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onSkip])
+
   if (!isOpen) return null
 
   return (
     <div
       className="pointer-events-none fixed z-[75] w-[calc(100%-2rem)] max-w-md"
       style={positionStyle ?? { right: 16, bottom: 16 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
     >
       <div className="pointer-events-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-600">

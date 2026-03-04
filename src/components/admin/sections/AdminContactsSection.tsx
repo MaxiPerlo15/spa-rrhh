@@ -111,6 +111,7 @@ export default function AdminContactsSection({
               id="admin-contacts-search"
               name="admin_contacts_search"
               type="text"
+              autoComplete="off"
               placeholder="Buscar por nombre, email o asunto..."
               value={searchContacts}
               onChange={(e) => setSearchContacts(e.target.value)}
@@ -147,7 +148,7 @@ export default function AdminContactsSection({
           </div>
 
           <div className="hidden md:flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
+            <label htmlFor="admin-contacts-filter-status" className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
             <select id="admin-contacts-filter-status" name="admin_contacts_filter_status" value={filterContactStatus} onChange={(e) => setFilterContactStatus(e.target.value)} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900">
               <option value="all">Todos</option>
               <option value="PENDING">Pendientes</option>

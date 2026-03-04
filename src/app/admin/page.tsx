@@ -18,6 +18,7 @@ import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import { useMobileKeyboardAssist } from '@/hooks/useMobileKeyboardAssist'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
+import { downloadApplicationsCsv } from '@/lib/api/applications'
 import type { Contact } from '@/lib/api/contacts'
 import * as Sentry from '@sentry/nextjs'
 
@@ -299,6 +300,7 @@ export default function AdminDashboard() {
   const [pendingDeleteVacancyId, setPendingDeleteVacancyId] = useState<string | null>(null)
   const [pendingApplicationStatusId, setPendingApplicationStatusId] = useState<string | null>(null)
   const [pendingDeleteApplicationId, setPendingDeleteApplicationId] = useState<string | null>(null)
+  const [isExportingApplicationsCsv, setIsExportingApplicationsCsv] = useState(false)
   const [pendingContactStatusId, setPendingContactStatusId] = useState<string | null>(null)
   const [pendingDeleteContactId, setPendingDeleteContactId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -365,6 +367,45 @@ export default function AdminDashboard() {
     () => [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [notifications]
   )
+
+  useEffect(() => {
+    if (!showCreateModal && !showApplicationDetail && !showContactDetail) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (confirmDialog.isOpen) return
+
+      if (showCreateModal) {
+        setShowCreateModal(false)
+        setEditingVacancy(null)
+        setFormData({
+          title: '',
+          description: '',
+          location: '',
+          workday: 'FULL_TIME',
+          modality: 'ON_SITE',
+          salary: '',
+          requirements: '',
+          benefits: ''
+        })
+        return
+      }
+
+      if (showApplicationDetail) {
+        setShowApplicationDetail(false)
+        return
+      }
+
+      if (showContactDetail) {
+        setShowContactDetail(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [confirmDialog.isOpen, showApplicationDetail, showContactDetail, showCreateModal])
 
   const reloadNotifications = useCallback(async () => {
     try {
@@ -639,7 +680,7 @@ export default function AdminDashboard() {
       next = next.filter((app) => app.status === filterStatus)
     }
     if (filterApplicationsVacancyId !== 'all') {
-      next = next.filter((app) => app.vacancy.id === filterApplicationsVacancyId)
+      next = next.filter((app) => app.vacancy?.id === filterApplicationsVacancyId)
     }
     if (searchApplications.trim()) {
       const search = searchApplications.toLowerCase()
@@ -647,7 +688,7 @@ export default function AdminDashboard() {
         (app) =>
           app.candidateName.toLowerCase().includes(search) ||
           app.email.toLowerCase().includes(search) ||
-          app.vacancy.title.toLowerCase().includes(search)
+          (app.vacancy?.title ?? 'espontánea').toLowerCase().includes(search)
       )
     }
 
@@ -1378,6 +1419,26 @@ export default function AdminDashboard() {
     setShowApplicationDetail(true)
   }
 
+  const handleExportApplicationsCsv = async () => {
+    if (isExportingApplicationsCsv) return
+    setIsExportingApplicationsCsv(true)
+    try {
+      await downloadApplicationsCsv({
+        search: searchApplications.trim() || undefined,
+        status: filterStatus,
+        vacancyId: filterApplicationsVacancyId,
+        sortBy: sortApplicationsBy,
+        sortDirection: sortApplicationsDirection
+      })
+      showSuccess('CSV de postulaciones exportado correctamente.')
+    } catch (error) {
+      console.error('Error exportando postulaciones CSV', error)
+      showError('No se pudo exportar el CSV de postulaciones.')
+    } finally {
+      setIsExportingApplicationsCsv(false)
+    }
+  }
+
   const handleContactStatusChange = async (contactId: string, newStatus: Contact['status']) => {
     if (pendingContactStatusId) return
     setPendingContactStatusId(contactId)
@@ -1904,6 +1965,10 @@ const handleTestSentry = () => {
             onDeleteApplication={handleDeleteApplication}
             pendingApplicationStatusId={pendingApplicationStatusId}
             pendingDeleteApplicationId={pendingDeleteApplicationId}
+            onExportCsv={() => {
+              void handleExportApplicationsCsv()
+            }}
+            isExportingCsv={isExportingApplicationsCsv}
           />
         )}
 
@@ -1998,24 +2063,24 @@ const handleTestSentry = () => {
               {/* Información de contacto */}
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</p>
                   <p className="text-gray-900">{selectedContact.phone}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Asunto</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Asunto</p>
                   <p className="text-gray-900">{selectedContact.subject}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Estado</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${contactStatusColors[selectedContact.status]}`}>
                     {contactStatusLabels[selectedContact.status]}
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Fecha</p>
                   <p className="text-gray-900">
                     {new Date(selectedContact.createdAt).toLocaleString('es-AR', {
                       dateStyle: 'long',
@@ -2027,7 +2092,7 @@ const handleTestSentry = () => {
 
               {/* Mensaje */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Mensaje</label>
+                <p className="block text-sm font-semibold text-gray-700 mb-2">Mensaje</p>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <p className="text-gray-900 whitespace-pre-line">{selectedContact.message}</p>
                 </div>
@@ -2045,7 +2110,7 @@ const handleTestSentry = () => {
 
               {/* Cambiar estado */}
               <div className="border-t pt-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
+                <p className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     onClick={() => {
@@ -2111,7 +2176,7 @@ const handleTestSentry = () => {
                     {selectedApplication.candidateName}
                   </h3>
                   <p className="text-gray-600">
-                    Postulación para: <span className="font-semibold text-primary-500">{selectedApplication.vacancy.title}</span>
+                    Postulación para: <span className="font-semibold text-primary-500">{selectedApplication.vacancy?.title ?? 'Espontánea'}</span>
                   </p>
                 </div>
                 <button
@@ -2126,24 +2191,24 @@ const handleTestSentry = () => {
               {/* Información de contacto */}
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Email</p>
                   <p className="text-gray-900">{selectedApplication.email}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</p>
                   <p className="text-gray-900">{selectedApplication.phone || 'No proporcionado'}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Estado</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[selectedApplication.status]}`}>
                     {statusLabels[selectedApplication.status]}
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Postulación</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Postulación</p>
                   <p className="text-gray-900">
                     {new Date(selectedApplication.submittedAt).toLocaleString('es-AR', {
                       dateStyle: 'long',
@@ -2156,7 +2221,7 @@ const handleTestSentry = () => {
               {/* Carta de presentación */}
               {selectedApplication.coverLetter && (
                 <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Carta de Presentación</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-2">Carta de Presentación</p>
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <p className="text-gray-900 whitespace-pre-line">{selectedApplication.coverLetter}</p>
                   </div>
@@ -2166,7 +2231,7 @@ const handleTestSentry = () => {
               {/* CV */}
               {selectedApplication.resumeUrl && (
                 <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Curriculum Vitae</label>
+                  <p className="block text-sm font-semibold text-gray-700 mb-2">Curriculum Vitae</p>
                   <button
                     onClick={() => handleDownloadCV(selectedApplication)}
                     className="w-full px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2 font-medium"
@@ -2178,7 +2243,7 @@ const handleTestSentry = () => {
 
               {/* Cambiar estado */}
               <div className="border-t pt-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</label>
+                <p className="block text-sm font-semibold text-gray-700 mb-2">Cambiar Estado</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <button
                     onClick={() => {
@@ -2287,6 +2352,8 @@ const handleTestSentry = () => {
                   <input
                     type="text"
                     id="title"
+                    name="title"
+                    autoComplete="off"
                     required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -2304,6 +2371,8 @@ const handleTestSentry = () => {
                     <input
                       type="text"
                       id="location"
+                      name="location"
+                      autoComplete="off"
                       required
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -2356,6 +2425,8 @@ const handleTestSentry = () => {
                   <input
                     type="text"
                     id="salary"
+                    name="salary"
+                    autoComplete="off"
                     value={formData.salary}
                     onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
@@ -2370,6 +2441,8 @@ const handleTestSentry = () => {
                   </label>
                   <textarea
                     id="description"
+                    name="description"
+                    autoComplete="off"
                     required
                     rows={4}
                     value={formData.description}
@@ -2386,6 +2459,8 @@ const handleTestSentry = () => {
                   </label>
                   <textarea
                     id="requirements"
+                    name="requirements"
+                    autoComplete="off"
                     rows={4}
                     value={formData.requirements}
                     onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
@@ -2401,6 +2476,8 @@ const handleTestSentry = () => {
                   </label>
                   <textarea
                     id="benefits"
+                    name="benefits"
+                    autoComplete="off"
                     rows={3}
                     value={formData.benefits}
                     onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}

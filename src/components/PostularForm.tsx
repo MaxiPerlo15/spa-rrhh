@@ -1,5 +1,5 @@
 'use client'
-import { useState, FormEvent } from 'react'
+import { useEffect, useMemo, useState, FormEvent } from 'react'
 import { UploadButton } from '@/lib/uploadthing'
 import { useToast } from '@/contexts/ToastContext'
 import { createApplication } from '@/lib/api/applications'
@@ -8,23 +8,34 @@ import * as Sentry from '@sentry/nextjs'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
 import {
-  RESUME_ALLOWED_CONTENT_TEXT,
   getResumeUploadErrorMessage
 } from '@/lib/uploadPolicy'
 
 interface PostularFormProps {
-  vacancyId: string
-  vacancyTitle: string
+  vacancyId?: string | null
+  vacancyTitle?: string
+  mode?: 'vacancy' | 'spontaneous'
   onClose: () => void
 }
 
-export default function PostularForm({ vacancyId, vacancyTitle, onClose }: PostularFormProps) {
+export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }: PostularFormProps) {
+  const resolvedMode = mode ?? (vacancyId ? 'vacancy' : 'spontaneous')
+  const effectiveVacancyTitle = vacancyTitle ?? 'Vacante'
+  const resolvedSubtitle =
+    resolvedMode === 'vacancy'
+      ? 'Completa el formulario para postularte a este puesto.\nNuestro equipo revisará tu perfil y se contactará si tu experiencia coincide con el puesto.'
+      : 'Envíanos tu CV y lo tendremos en cuenta para futuras oportunidades laborales que se adapten a tu experiencia y habilidades.'
+  const resolvedHeading =
+    resolvedMode === 'vacancy'
+      ? `Postulación para ${effectiveVacancyTitle}`
+      : '¿No encontrás una vacante que se ajuste a tu perfil?'
   const { showSuccess, showError, showInfo } = useToast()
   const [formData, setFormData] = useState({
     candidateName: '',
     email: '',
     phone: '',
-    coverLetter: ''
+    coverLetter: '',
+    acceptedPrivacy: false
   })
   const [resumeInfo, setResumeInfo] = useState<{
     url: string
@@ -37,6 +48,10 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
+  const draftStorageKey = useMemo(
+    () => `postular_form_draft:${vacancyId ?? 'spontaneous'}`,
+    [vacancyId]
+  )
 
   const validateField = (name: string, value: string) => {
     if (name === 'candidateName' && !value.trim()) return 'El nombre es obligatorio.'
@@ -53,11 +68,71 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     return ''
   }
 
+  const formatPhoneMask = (rawValue: string) => {
+    const digitsOnly = rawValue.replace(/\D/g, '')
+    let localDigits = digitsOnly
+
+    if (localDigits.startsWith('549')) {
+      localDigits = localDigits.slice(3)
+    } else if (localDigits.startsWith('54')) {
+      localDigits = localDigits.slice(2)
+    } else if (localDigits.startsWith('9')) {
+      localDigits = localDigits.slice(1)
+    }
+
+    localDigits = localDigits.slice(0, 10)
+
+    if (!localDigits) return ''
+    if (localDigits.length <= 2) return `+54 9 ${localDigits}`
+    if (localDigits.length <= 6) return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2)}`
+    return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2, 6)}-${localDigits.slice(6)}`
+  }
+
   const closeWithAnimation = () => {
     if (isClosing) return
     setIsClosing(true)
     setTimeout(onClose, 220)
   }
+
+  useEffect(() => {
+    try {
+      const serializedDraft = window.localStorage.getItem(draftStorageKey)
+      if (!serializedDraft) return
+
+      const parsedDraft = JSON.parse(serializedDraft) as Partial<typeof formData>
+      setFormData((prev) => ({
+        candidateName: typeof parsedDraft.candidateName === 'string' ? parsedDraft.candidateName : prev.candidateName,
+        email: typeof parsedDraft.email === 'string' ? parsedDraft.email : prev.email,
+        phone: typeof parsedDraft.phone === 'string' ? parsedDraft.phone : prev.phone,
+        coverLetter: typeof parsedDraft.coverLetter === 'string' ? parsedDraft.coverLetter : prev.coverLetter,
+        acceptedPrivacy:
+          typeof parsedDraft.acceptedPrivacy === 'boolean' ? parsedDraft.acceptedPrivacy : prev.acceptedPrivacy
+      }))
+    } catch {
+      window.localStorage.removeItem(draftStorageKey)
+    }
+  }, [draftStorageKey])
+
+  useEffect(() => {
+    window.localStorage.setItem(draftStorageKey, JSON.stringify(formData))
+  }, [draftStorageKey, formData])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSubmitting) {
+        setIsClosing((prev) => {
+          if (prev) return prev
+          setTimeout(onClose, 220)
+          return true
+        })
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [isSubmitting, onClose])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -65,10 +140,13 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     const nextErrors = {
       candidateName: validateField('candidateName', formData.candidateName),
       email: validateField('email', formData.email),
-      phone: validateField('phone', formData.phone)
+      phone: validateField('phone', formData.phone),
+      acceptedPrivacy: formData.acceptedPrivacy
+        ? ''
+        : 'Debes aceptar la política de privacidad para continuar.'
     }
     setFieldErrors(nextErrors)
-    setTouched({ candidateName: true, email: true, phone: true })
+    setTouched({ candidateName: true, email: true, phone: true, acceptedPrivacy: true })
 
     if (nextErrors.candidateName || nextErrors.email || nextErrors.phone) {
       showError('Revisa los campos marcados para continuar.')
@@ -89,10 +167,11 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
 
     try {
       await createApplication({
-        vacancyId,
+        ...(vacancyId ? { vacancyId } : {}),
         candidateName: formData.candidateName,
         email: formData.email,
         phone: formData.phone,
+        acceptedPrivacy: formData.acceptedPrivacy,
         resumeUrl: resumeInfo.url,
         resumeFileName: resumeInfo.name,
         resumeKey: resumeInfo.key,
@@ -100,7 +179,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         captchaToken
       })
 
-      showSuccess(`✅ Postulación enviada exitosamente para ${vacancyTitle}`)
+      showSuccess(`✅ Postulación enviada exitosamente para ${effectiveVacancyTitle}`)
+      window.localStorage.removeItem(draftStorageKey)
       setTimeout(() => {
         closeWithAnimation()
       }, 2000)
@@ -117,10 +197,10 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
       Sentry.captureException(error,{
         tags: {
           component: 'PostularForm',
-          vacancy_id: vacancyId
+          vacancy_id: vacancyId ?? 'spontaneous'
         },
         extra: {
-          vacancyTitle,
+          vacancyTitle: effectiveVacancyTitle,
           candidateDomain: formData.email.includes('@') ? formData.email.split('@')[1] : 'invalid_email'
         }
       })
@@ -130,15 +210,17 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextValue = e.target.name === 'phone' ? formatPhoneMask(e.target.value) : e.target.value
+
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: nextValue
     }))
 
     if (touched[e.target.name]) {
       setFieldErrors(prev => ({
         ...prev,
-        [e.target.name]: validateField(e.target.name, e.target.value)
+        [e.target.name]: validateField(e.target.name, nextValue)
       }))
     }
   }
@@ -148,6 +230,19 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
     setFieldErrors(prev => ({
       ...prev,
       [e.target.name]: validateField(e.target.name, e.target.value)
+    }))
+  }
+
+  const handlePrivacyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const acceptedPrivacy = event.target.checked
+    setFormData((prev) => ({
+      ...prev,
+      acceptedPrivacy
+    }))
+    setTouched((prev) => ({ ...prev, acceptedPrivacy: true }))
+    setFieldErrors((prev) => ({
+      ...prev,
+      acceptedPrivacy: acceptedPrivacy ? '' : 'Debes aceptar la política de privacidad para continuar.'
     }))
   }
 
@@ -164,8 +259,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Postularme</h2>
-            <p className="text-gray-600 mt-1">{vacancyTitle}</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{resolvedHeading}</h2>
+            <p className="text-gray-600 mt-1 whitespace-pre-line">{resolvedSubtitle}</p>
           </div>
           <button
             onClick={closeWithAnimation}
@@ -189,6 +284,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               type="text"
               id="candidateName"
               name="candidateName"
+              autoComplete="name"
               value={formData.candidateName}
               onChange={handleChange}
               onBlur={handleBlur}
@@ -211,6 +307,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               type="email"
               id="email"
               name="email"
+              autoComplete="email"
               value={formData.email}
               onChange={handleChange}
               onBlur={handleBlur}
@@ -233,10 +330,13 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
               type="tel"
               id="phone"
               name="phone"
+              inputMode="tel"
+              autoComplete="tel"
               value={formData.phone}
               onChange={handleChange}
               onBlur={handleBlur}
               required
+              placeholder="+54 9 11 1234-5678"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 transition-colors ${
                 fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
               }`}
@@ -248,9 +348,9 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
 
           {/* Upload CV */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <p className="block text-sm font-medium text-gray-700 mb-2">
               Currículum Vitae (PDF) *
-            </label>
+            </p>
             {!resumeInfo ? (
               <UploadButton
                 endpoint="resumeUploader"
@@ -261,10 +361,10 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
                 }}
                 content={{
                   button({ isUploading }) {
-                    return isUploading ? 'Subiendo CV...' : 'Seleccionar CV (PDF)'
+                    return isUploading ? 'Subiendo CV...' : 'Subir CV'
                   },
                   allowedContent() {
-                    return RESUME_ALLOWED_CONTENT_TEXT
+                    return 'Formato PDF • Máximo 4MB'
                   }
                 }}
                 onClientUploadComplete={(res) => {
@@ -311,24 +411,49 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             <textarea
               id="coverLetter"
               name="coverLetter"
+              autoComplete={resolvedMode === 'vacancy' ? 'off' : 'on'}
               value={formData.coverLetter}
               onChange={handleChange}
               rows={4}
-              placeholder="Cuéntanos por qué eres el candidato ideal para esta posición..."
+              placeholder={
+                resolvedMode === 'vacancy'
+                  ? 'Cuéntanos por qué eres el candidato ideal para esta posición...'
+                  : 'Cuéntanos brevemente tu experiencia o el tipo de puesto que buscas...'
+              }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-gray-900"
             />
           </div>
 
           {/* Botones */}
           <TurnstileWidget action="application_form" onTokenChange={setCaptchaToken} />
-          <p className="text-xs leading-relaxed text-gray-500">
-            Al enviar tu postulación, aceptas el tratamiento de tus datos para fines de selección y contacto
-            profesional. Puedes consultar más detalles en nuestra{' '}
-            <a href="/privacy" className="text-primary-500 hover:text-primary-600">
-              Política de Privacidad
-            </a>
-            .
-          </p>
+          <div className="space-y-2">
+            <label htmlFor="application-accepted-privacy" className="flex items-start gap-3 text-sm text-gray-700">
+              <input
+                id="application-accepted-privacy"
+                name="acceptedPrivacy"
+                type="checkbox"
+                checked={formData.acceptedPrivacy}
+                onChange={handlePrivacyChange}
+                aria-invalid={touched.acceptedPrivacy && Boolean(fieldErrors.acceptedPrivacy)}
+                className="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+              />
+              <span>
+                Acepto la{' '}
+                <a
+                  href="/privacy"
+                  className="font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Política de Privacidad
+                </a>{' '}
+                y el tratamiento de mis datos personales.
+              </span>
+            </label>
+            {touched.acceptedPrivacy && fieldErrors.acceptedPrivacy && (
+              <p className="field-feedback-enter text-sm text-red-600">{fieldErrors.acceptedPrivacy}</p>
+            )}
+          </div>
 
           <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-4">
             <button
@@ -340,10 +465,12 @@ export default function PostularForm({ vacancyId, vacancyTitle, onClose }: Postu
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !resumeInfo || (captchaEnabled && !captchaToken)}
+              disabled={
+                isSubmitting || !resumeInfo || !formData.acceptedPrivacy || (captchaEnabled && !captchaToken)
+              }
               className="btn-motion w-full sm:flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Enviando...' : 'Enviar Postulación'}
+              {isSubmitting ? 'Enviando...' : 'Enviar CV'}
             </button>
           </div>
         </form>

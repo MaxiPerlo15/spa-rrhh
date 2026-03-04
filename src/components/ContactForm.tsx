@@ -15,7 +15,8 @@ export default function ContactForm() {
     email: '',
     phone: '',
     subject: '',
-    message: ''
+    message: '',
+    acceptedPrivacy: false
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -84,10 +85,20 @@ export default function ContactForm() {
       phone: validateField('phone', formData.phone),
       subject: validateField('subject', formData.subject),
       message: validateField('message', formData.message),
+      acceptedPrivacy: formData.acceptedPrivacy
+        ? ''
+        : 'Debes aceptar la política de privacidad para continuar.',
     }
     setFieldErrors(nextErrors)
-    setTouched({ name: true, email: true, phone: true, subject: true, message: true })
-    if (nextErrors.name || nextErrors.email || nextErrors.phone || nextErrors.subject || nextErrors.message) {
+    setTouched({ name: true, email: true, phone: true, subject: true, message: true, acceptedPrivacy: true })
+    if (
+      nextErrors.name ||
+      nextErrors.email ||
+      nextErrors.phone ||
+      nextErrors.subject ||
+      nextErrors.message ||
+      nextErrors.acceptedPrivacy
+    ) {
       showError('Revisa los campos marcados para continuar.')
       return
     }
@@ -104,6 +115,7 @@ export default function ContactForm() {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        acceptedPrivacy: formData.acceptedPrivacy,
         subject: formData.subject,
         message: formData.message,
         captchaToken
@@ -117,7 +129,8 @@ export default function ContactForm() {
         email: '',
         phone: '',
         subject: '',
-        message: ''
+        message: '',
+        acceptedPrivacy: false
       })
       setCaptchaToken('')
 
@@ -179,13 +192,14 @@ export default function ContactForm() {
               type="text"
               id="name"
               name="name"
+              autoComplete="name"
               required
               value={formData.name}
               onChange={handleInputChange}
               onBlur={handleBlur}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
                 fieldErrors.name ? 'border-red-400' : 'border-gray-300'
-              }`}
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="Juan Pérez"
             />
             {touched.name && fieldErrors.name && (
@@ -201,13 +215,14 @@ export default function ContactForm() {
               type="email"
               id="email"
               name="email"
+              autoComplete="email"
               required
               value={formData.email}
               onChange={handleInputChange}
               onBlur={handleBlur}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
                 fieldErrors.email ? 'border-red-400' : 'border-gray-300'
-              }`}
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="juan@ejemplo.com"
             />
             {touched.email && fieldErrors.email && (
@@ -226,13 +241,14 @@ export default function ContactForm() {
               type="tel"
               id="phone"
               name="phone"
-              inputMode="numeric"
+              inputMode="tel"
+              autoComplete="tel"
               value={formData.phone}
               onChange={handleInputChange}
               onBlur={handleBlur}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
                 fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
-              }`}
+              } text-gray-900 placeholder:text-gray-600`}
               placeholder="+54 9 11 1234-5678"
             />
             {touched.phone && fieldErrors.phone && (
@@ -248,13 +264,14 @@ export default function ContactForm() {
               type="text"
               id="subject"
               name="subject"
+              autoComplete="off"
               required
               value={formData.subject}
               onChange={handleInputChange}
               onBlur={handleBlur}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
                 fieldErrors.subject ? 'border-red-400' : 'border-gray-300'
-              }`}
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="Consulta sobre servicios"
             />
             {touched.subject && fieldErrors.subject && (
@@ -271,6 +288,7 @@ export default function ContactForm() {
           <textarea
             id="message"
             name="message"
+            autoComplete="off"
             required
             value={formData.message}
             onChange={handleInputChange}
@@ -278,7 +296,7 @@ export default function ContactForm() {
             rows={6}
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none ${
               fieldErrors.message ? 'border-red-400' : 'border-gray-300'
-            }`}
+            } text-gray-900 placeholder:text-gray-500`}
             placeholder="Escribe tu consulta aquí..."
           />
           {touched.message && fieldErrors.message && (
@@ -288,18 +306,48 @@ export default function ContactForm() {
 
         {/* Botón submit */}
         <TurnstileWidget action="contact_form" onTokenChange={setCaptchaToken} />
-        <p className="text-xs leading-relaxed text-gray-500">
-          Al enviar este formulario, aceptas que tratemos tus datos para responder tu consulta.
-          Más información en nuestra{' '}
-          <a href="/privacy" className="text-primary-500 hover:text-primary-600">
-            Política de Privacidad
-          </a>
-          .
-        </p>
+        <div className="space-y-2">
+          <label htmlFor="contact-accepted-privacy" className="flex items-start gap-3 text-sm text-gray-700">
+            <input
+              id="contact-accepted-privacy"
+              name="acceptedPrivacy"
+              type="checkbox"
+              checked={formData.acceptedPrivacy}
+              onChange={(event) => {
+                const acceptedPrivacy = event.target.checked
+                setFormData((prev) => ({ ...prev, acceptedPrivacy }))
+                setTouched((prev) => ({ ...prev, acceptedPrivacy: true }))
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  acceptedPrivacy: acceptedPrivacy
+                    ? ''
+                    : 'Debes aceptar la política de privacidad para continuar.'
+                }))
+              }}
+              aria-invalid={touched.acceptedPrivacy && Boolean(fieldErrors.acceptedPrivacy)}
+              className="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            />
+            <span>
+              Acepto la{' '}
+              <a
+                href="/privacy"
+                className="font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Política de Privacidad
+              </a>{' '}
+              y el tratamiento de mis datos personales.
+            </span>
+          </label>
+          {touched.acceptedPrivacy && fieldErrors.acceptedPrivacy && (
+            <p className="field-feedback-enter text-sm text-red-600">{fieldErrors.acceptedPrivacy}</p>
+          )}
+        </div>
 
         <button
           type="submit"
-          disabled={loading || (captchaEnabled && !captchaToken)}
+          disabled={loading || !formData.acceptedPrivacy || (captchaEnabled && !captchaToken)}
           className="btn-motion w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {loading ? 'Enviando...' : 'Enviar Consulta'}

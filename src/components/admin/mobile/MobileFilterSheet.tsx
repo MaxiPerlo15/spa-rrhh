@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export type FilterOption = {
   value: string
@@ -83,67 +84,70 @@ export default function MobileFilterSheet({
         </span>
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-[95]">
-          <button
-            type="button"
-            aria-label={`Cerrar selector de ${label}`}
-            onClick={close}
-            className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
-          />
-          <div
-            id={dialogId}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className="absolute bottom-0 left-0 right-0 rounded-t-3xl border border-gray-200 bg-white shadow-2xl"
-          >
-            <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-gray-300" />
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
-              <h3 id={titleId} className="text-sm font-semibold text-gray-900">
-                {label}
-              </h3>
+      {typeof window !== 'undefined' && isOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[95]">
               <button
-                ref={closeButtonRef}
                 type="button"
+                aria-label={`Cerrar selector de ${label}`}
                 onClick={close}
-                className="min-h-11 min-w-11 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+                className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+              />
+              <div
+                id={dialogId}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="absolute bottom-0 left-0 right-0 rounded-t-3xl border border-gray-200 bg-white shadow-2xl"
               >
-                Cerrar
-              </button>
-            </div>
+                <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-gray-300" />
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+                  <h3 id={titleId} className="text-sm font-semibold text-gray-900">
+                    {label}
+                  </h3>
+                  <button
+                    ref={closeButtonRef}
+                    type="button"
+                    onClick={close}
+                    className="min-h-11 min-w-11 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+                  >
+                    Cerrar
+                  </button>
+                </div>
 
-            <div className="max-h-[min(48vh,360px)] overflow-y-auto px-2 py-2">
-              <div role="listbox" aria-label={label} className="space-y-1">
-                {options.map((option) => {
-                  const isSelected = option.value === value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => handleSelect(option.value)}
-                      className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
-                        isSelected
-                          ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-200'
-                          : 'text-gray-800 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                      {isSelected ? (
-                        <span aria-hidden="true" className="text-primary-700">
-                          ✓
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
+                <div className="max-h-[min(48vh,360px)] overflow-y-auto px-2 py-2">
+                  <div role="listbox" aria-label={label} className="space-y-1">
+                    {options.map((option) => {
+                      const isSelected = option.value === value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => handleSelect(option.value)}
+                          className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+                            isSelected
+                              ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-200'
+                              : 'text-gray-800 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{option.label}</span>
+                          {isSelected ? (
+                            <span aria-hidden="true" className="text-primary-700">
+                              ✓
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </div>,
+            document.body
+          )
+        : null}
     </>
   )
 }

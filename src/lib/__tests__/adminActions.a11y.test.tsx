@@ -95,6 +95,8 @@ describe('Acciones admin con etiquetas accesibles contextuales', () => {
         onDeleteApplication={vi.fn<(applicationId: string, candidateName: string) => void>()}
         pendingApplicationStatusId={null}
         pendingDeleteApplicationId={null}
+        onExportCsv={vi.fn<() => void>()}
+        isExportingCsv={false}
       />
     )
 

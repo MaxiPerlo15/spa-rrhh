@@ -167,6 +167,7 @@ export default function VacantesPage() {
                 id="jobs-search"
                 name="jobs_search"
                 type="text"
+                autoComplete="off"
                 placeholder="Buscar por título, descripción o ubicación..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

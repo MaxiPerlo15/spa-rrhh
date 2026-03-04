@@ -132,15 +132,15 @@ export default function AdminSettingsSection({
           </div>
           <div className="rounded-lg border border-gray-200 p-4 md:col-span-2 space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase">Preferencias de notificaciones</p>
-            <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+            <div className="flex items-center justify-between gap-3 text-sm text-gray-700">
               <span>Habilitar notificaciones del panel</span>
               <ToggleSwitch
                 checked={settingsForm.notificationsEnabled}
                 onChange={(next) => setSettingsForm((prev) => ({ ...prev, notificationsEnabled: next }))}
                 ariaLabel="Habilitar notificaciones del panel"
               />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+            </div>
+            <div className="flex items-center justify-between gap-3 text-sm text-gray-700">
               <span>Nuevas postulaciones</span>
               <ToggleSwitch
                 checked={settingsForm.notifyNewApplications}
@@ -148,8 +148,8 @@ export default function AdminSettingsSection({
                 disabled={!settingsForm.notificationsEnabled}
                 ariaLabel="Nuevas postulaciones"
               />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+            </div>
+            <div className="flex items-center justify-between gap-3 text-sm text-gray-700">
               <span>Nuevos contactos</span>
               <ToggleSwitch
                 checked={settingsForm.notifyNewContacts}
@@ -157,8 +157,8 @@ export default function AdminSettingsSection({
                 disabled={!settingsForm.notificationsEnabled}
                 ariaLabel="Nuevos contactos"
               />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+            </div>
+            <div className="flex items-center justify-between gap-3 text-sm text-gray-700">
               <span>Alertas de seguridad</span>
               <ToggleSwitch
                 checked={settingsForm.notifySecurityAlerts}
@@ -166,7 +166,7 @@ export default function AdminSettingsSection({
                 disabled={!settingsForm.notificationsEnabled}
                 ariaLabel="Alertas de seguridad"
               />
-            </label>
+            </div>
             <div className="pt-2 flex justify-end">
               <button type="button" onClick={onSaveSettings} disabled={settingsSaving || !settingsLoaded} className="min-h-11 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
                 {settingsSaving ? 'Guardando...' : 'Guardar configuración'}

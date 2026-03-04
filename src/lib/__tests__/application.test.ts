@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getApplications,
@@ -5,6 +7,7 @@ import {
   createApplication,
   updateApplicationStatus,
   deleteApplication,
+  downloadApplicationsCsv,
   type Application
 } from '../api/applications'
 
@@ -65,6 +68,34 @@ describe('Applications API Service', () => {
       phone: '123'
     })
     expect(result).toEqual(mockApp)
+  })
+
+  it('createApplication permite enviar postulación espontánea sin vacancyId', async () => {
+    const mockApp: Application = {
+      id: '2',
+      candidateName: 'Ana',
+      email: 'ana@a.com',
+      phone: '123',
+      status: 'PENDING',
+      submittedAt: '',
+      vacancy: undefined
+    }
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockApp)
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createApplication({
+      candidateName: 'Ana',
+      email: 'ana@a.com',
+      phone: '123'
+    })
+
+    expect(result).toEqual(mockApp)
+    expect(fetchMock).toHaveBeenCalledOnce()
   })
 
   it('createApplication lanza error si la respuesta no es ok', async () => {
@@ -129,5 +160,45 @@ describe('Applications API Service', () => {
     ))
 
     await expect(deleteApplication('1')).rejects.toThrow('Error al eliminar la postulación')
+  })
+
+  it('downloadApplicationsCsv descarga archivo con los filtros actuales', async () => {
+    const createObjectURL = vi.fn(() => 'blob:mock-url')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true })
+
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild')
+    const clickMock = vi.fn()
+    const realAnchor = document.createElement('a')
+    vi.spyOn(realAnchor, 'click').mockImplementation(clickMock)
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'a') return realAnchor
+      return originalCreateElement(tagName)
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['test']))
+        })
+      )
+    )
+
+    await downloadApplicationsCsv({
+      search: 'ana',
+      status: 'PENDING',
+      vacancyId: 'cmc7q8v1r0000v5r4f9k0m2n3',
+      sortBy: 'submittedAt',
+      sortDirection: 'desc'
+    })
+
+    expect(clickMock).toHaveBeenCalled()
+    expect(createObjectURL).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalled()
+    appendChildSpy.mockRestore()
   })
 })

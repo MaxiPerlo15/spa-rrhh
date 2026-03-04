@@ -65,6 +65,7 @@ export default function ForgotPasswordPage() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
