@@ -14,7 +14,7 @@ export default function Servicios() {
           <h2 className={`font-display text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${isVisible ? 'is-visible' : ''}`}>
             Nuestros <span className="text-primary-500 inline-block hover:scale-110 transition-transform duration-300">Servicios</span>
           </h2>
-          <p className={`text-lg text-gray-600 leading-relaxed animate-on-scroll reveal-delay-2 ${isVisible ? 'is-visible' : ''}`}>
+          <p className={`text-lg text-gray-600 leading-relaxed animate-on-scroll reveal-delay-2 max-w-3xl mx-auto text-left ${isVisible ? 'is-visible' : ''}`}>
             Ofrecemos soluciones integrales en Recursos Humanos para impulsar el crecimiento 
             de tu organización y el desarrollo de tu equipo.
           </p>

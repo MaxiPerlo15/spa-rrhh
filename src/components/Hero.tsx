@@ -117,11 +117,11 @@ export default function Hero({ onOpenSpontaneousApplication }: HeroProps) {
             con <span className="text-yellow-400 inline-block hover:scale-110 transition-transform duration-300">Oportunidades</span>
           </h1>
           
-          <p className="text-base sm:text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
+          <p className="text-base sm:text-xl md:text-2xl text-white/95 max-w-3xl mx-auto text-left sm:text-left drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
             Somos una consultora de Recursos Humanos especializada en selección y desarrollo profesional.
             Ayudamos a empresas a encontrar el talento adecuado y a profesionales a impulsar su carrera.
           </p>
-          <p className="text-sm sm:text-base text-white/90 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <p className="text-sm sm:text-base text-white/90 max-w-2xl mx-auto text-left sm:text-left animate-fade-in" style={{ animationDelay: '0.2s' }}>
             Consultora de Recursos Humanos en Las Varillas, Córdoba.
           </p>
 

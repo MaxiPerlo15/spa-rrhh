@@ -193,7 +193,7 @@ export default function Home() {
               <h2 className={`text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg animate-on-scroll ${nosotrosVisible ? 'is-visible' : ''}`}>
                 Sobre <span className="text-primary-500 inline-block hover:scale-105 transition-transform duration-200">Nosotros</span>
               </h2>
-              <p className={`text-lg text-white/95 leading-relaxed drop-shadow-md animate-on-scroll reveal-delay-2 ${nosotrosVisible ? 'is-visible' : ''}`}>
+              <p className={`text-lg text-white/95 leading-relaxed drop-shadow-md animate-on-scroll reveal-delay-2 max-w-3xl mx-auto text-left ${nosotrosVisible ? 'is-visible' : ''}`}>
                 Somos una consultora de Recursos Humanos de la localidad de Las Varillas, Córdoba
                 dedicada a conectar talento con oportunidades laborales,
               </p>
@@ -228,7 +228,7 @@ export default function Home() {
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
                 Ofertas laborales <span className="text-primary-500 inline-block hover:scale-110 transition-transform duration-300">Disponibles</span>
               </h2>
-              <p className="text-lg text-gray-600 mb-6">
+              <p className="text-lg text-gray-600 mb-6 max-w-3xl mx-auto text-left">
                 Descubre oportunidades profesionales que se ajustan a tu perfil. 
                 Todas nuestras vacantes son verificadas y provienen de empresas de primer nivel.
               </p>
@@ -319,7 +319,7 @@ export default function Home() {
               <h2 className={`text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
                 Ponte en <span className="text-primary-500 inline-block hover:scale-105 transition-transform duration-200">Contacto</span>
               </h2>
-              <p className={`text-lg text-gray-600 animate-on-scroll reveal-delay-2 ${contactoVisible ? 'is-visible' : ''}`}>
+              <p className={`text-lg text-gray-600 animate-on-scroll reveal-delay-2 max-w-3xl mx-auto text-left ${contactoVisible ? 'is-visible' : ''}`}>
                 ¿Tienes alguna consulta? Completa el formulario y nos comunicaremos contigo a la brevedad. 
                 Estamos aquí para ayudarte.
               </p>

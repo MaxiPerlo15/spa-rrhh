@@ -101,7 +101,7 @@ export default function Empresas() {
           <h2 className="font-display text-4xl md:text-5xl font-bold text-white mb-4">
             Empresas que Confían en Nosotros
           </h2>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-300 max-w-2xl mx-auto text-left">
             Empresas de distintos sectores confían en nuestra experiencia para encontrar talento calificado.
           </p>
         </div>
