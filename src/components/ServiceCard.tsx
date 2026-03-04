@@ -12,7 +12,7 @@ interface ServiceCardProps {
 export default function ServiceCard({ title, description, imageUrl, isVisible, delayMs }: ServiceCardProps) {
   return (
     <article 
-      className={`group card-lift bg-white rounded-2xl shadow-card overflow-hidden hover:shadow-2xl hover:scale-[1.03] animate-on-scroll ${
+      className={`group card-lift bg-white rounded-2xl shadow-card overflow-hidden hover:-translate-y-1 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 animate-on-scroll ${
         isVisible ? 'is-visible' : ''
       }`}
       style={{ transitionDelay: `${delayMs}ms` }}
@@ -23,6 +23,8 @@ export default function ServiceCard({ title, description, imageUrl, isVisible, d
           src={imageUrl}
           alt={title}
           fill
+          loading="eager"
+          fetchPriority="high"
           className="object-cover transition-transform duration-200 group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />

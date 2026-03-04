@@ -4,7 +4,11 @@ import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
 
-export default function Hero() {
+interface HeroProps {
+  onOpenSpontaneousApplication?: () => void
+}
+
+export default function Hero({ onOpenSpontaneousApplication }: HeroProps) {
   const [scrollY, setScrollY] = useState(0)
   const [stats, setStats] = useState({
     candidates: 0,
@@ -114,8 +118,11 @@ export default function Hero() {
           </h1>
           
           <p className="text-base sm:text-xl md:text-2xl text-white/95 max-w-3xl mx-auto drop-shadow-md animate-fade-in" style={{ animationDelay: '0.14s' }}>
-            Somos una consultora especializada en Recursos Humanos que acompaña a empresas 
-            y profesionales en su crecimiento. Encuentra tu próxima oportunidad laboral con nosotros.
+            Somos una consultora de Recursos Humanos especializada en selección y desarrollo profesional.
+            Ayudamos a empresas a encontrar el talento adecuado y a profesionales a impulsar su carrera.
+          </p>
+          <p className="text-sm sm:text-base text-white/90 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            Consultora de Recursos Humanos en Las Varillas, Córdoba.
           </p>
 
           {/* CTAs */}
@@ -124,14 +131,20 @@ export default function Hero() {
               onClick={() => scrollToSection('#vacantes')}
               className="btn-motion group relative w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-primary-600 text-white font-semibold text-base sm:text-lg rounded-lg shadow-[0_14px_38px_-18px_rgba(0,68,137,0.85)] hover:bg-primary-700 hover:shadow-[0_16px_40px_-18px_rgba(0,51,102,0.9)] overflow-hidden"
             >
-              <span className="relative z-10">Ver Vacantes</span>
+              <span className="relative z-10">Ver Ofertas Laborales</span>
               <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
             </button>
             <button
-              onClick={() => scrollToSection('#contacto')}
+              onClick={() => {
+                if (onOpenSpontaneousApplication) {
+                  onOpenSpontaneousApplication()
+                  return
+                }
+                scrollToSection('#contacto')
+              }}
               className="btn-motion group w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-white/10 text-white font-semibold text-base sm:text-lg rounded-lg border-2 border-white/60 hover:bg-white/16 hover:border-white"
             >
-              Contactanos
+              Enviar CV
             </button>
           </div>
 

@@ -53,14 +53,14 @@ export default function VacancyCard({ id, title, description, location, workday,
     if (Number.isNaN(publishedTime)) return null
     const diffMs = RENDER_TIME_REFERENCE_MS - publishedTime
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-    if (diffDays < 2) return 'Publicado recientemente'
+    if (diffDays < 2) return 'Nueva'
     return `Hace ${diffDays} días`
   }
 
   const publishedTag = getPublishedTag()
 
   return (
-    <div className="group card-lift bg-white rounded-xl shadow-sm p-6 hover:shadow-xl border border-gray-200 hover:border-primary-400 transform-gpu">
+    <div className="group card-lift bg-white rounded-xl shadow-md p-6 hover:shadow-lg border border-blue-400 hover:translate-y-[-4px] transform-gpu transition-all duration-200">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         {/* Información principal */}
         <div className="flex-1">
@@ -74,7 +74,7 @@ export default function VacancyCard({ id, title, description, location, workday,
               {modalityLabels[modality]}
             </span>
             {publishedTag && (
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                 {publishedTag}
               </span>
             )}
@@ -152,7 +152,7 @@ export default function VacancyCard({ id, title, description, location, workday,
         <div className="md:ml-6 shrink-0">
           <button
             onClick={() => onApply(id, title)}
-            className="btn-motion relative w-full md:w-auto px-10 py-3.5 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
+            className="btn-motion relative w-full md:w-auto px-10 py-3.5 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect transition-all duration-200"
           >
             Postularme
           </button>

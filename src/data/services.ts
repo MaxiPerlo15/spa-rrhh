@@ -9,25 +9,25 @@ export const services: Service[] = [
   {
     id: 1,
     title: "Entrevistas Virtuales",
-    description: "Realizamos entrevistas remotas profesionales que permiten evaluar candidatos de manera eficiente, ahorrando tiempo y ampliando el alcance geográfico en los procesos de selección.",
+    description: "Realizamos entrevistas virtuales ágiles para evaluar mejor a cada candidato y acelerar tus procesos de selección.",
     imageUrl: "/servicio1.webp"
   },
   {
     id: 2,
     title: "Comunicación Organizacional",
-    description: "Diseñamos e implementamos estrategias de comunicación interna que fortalecen la cultura organizacional, mejoran el clima laboral y alinean a todos los equipos con los objetivos de la empresa.",
+    description: "Diseñamos estrategias de comunicación interna que alinean equipos, fortalecen la cultura y mejoran el clima laboral.",
     imageUrl: "/servicio3.webp"
   },
   {
     id: 3,
     title: "Evaluación de Desempeño",
-    description: "Implementamos sistemas de evaluación objetivos que permiten medir el rendimiento, identificar fortalezas y áreas de mejora en tu equipo de trabajo, impulsando el desarrollo profesional.",
+    description: "Implementamos evaluaciones objetivas para medir rendimiento, detectar mejoras y potenciar el desarrollo profesional.",
     imageUrl: "/servicio2.webp"
   },
   {
     id: 4,
     title: "Cultura Organizacional",
-    description: "Trabajamos en el desarrollo y fortalecimiento de la cultura empresarial, alineando valores, comportamientos y prácticas para crear un ambiente laboral positivo y productivo.",
+    description: "Fortalecemos la cultura de tu empresa alineando valores y prácticas para construir equipos sólidos y productivos.",
     imageUrl: "/servicio4.webp"
   }
 ]

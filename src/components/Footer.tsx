@@ -39,11 +39,10 @@ export default function Footer() {
               <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">RH</span>
               </div>
-              <span className="text-xl font-semibold">Consultora RRHH</span>
+              <span className="text-xl font-semibold">Consultora Meinardi & Perlo</span>
             </div>
             <p className="text-gray-400 leading-relaxed mb-4">
-              Conectamos talento con oportunidades. Especialistas en recursos humanos 
-              comprometidos con la excelencia y el desarrollo profesional.
+              Las Varillas, Córdoba – Argentina
             </p>
           </div>
 

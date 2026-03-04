@@ -9,9 +9,9 @@ interface FounderCardProps {
 
 export default function FounderCard({ name, role, description, imageUrl }: FounderCardProps) {
   return (
-    <div className="group bg-white rounded-2xl shadow-card p-8 hover:shadow-2xl transition-all duration-500 text-center transform hover:-translate-y-2 hover:scale-105">
+    <div className="group bg-white rounded-2xl shadow-card p-8 hover:shadow-2xl transition-all duration-500 text-left transform hover:-translate-y-2 hover:scale-105">
       {/* Imagen cuadrada con bordes redondeados */}
-      <div className="relative w-48 h-48 mx-auto mb-6 transform group-hover:scale-110 transition-transform duration-500">
+      <div className="relative w-48 h-48 mb-6 transform group-hover:scale-110 transition-transform duration-500">
         <div className="absolute inset-0 bg-primary-100 rounded-2xl group-hover:bg-primary-200 transition-colors duration-500"></div>
         <div className="relative w-full h-full rounded-2xl overflow-hidden border-4 border-white shadow-md group-hover:shadow-xl transition-shadow duration-500">
           {imageUrl && imageUrl.startsWith('/') ? (

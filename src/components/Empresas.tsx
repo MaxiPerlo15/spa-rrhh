@@ -102,7 +102,7 @@ export default function Empresas() {
             Empresas que Confían en Nosotros
           </h2>
           <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            Colaboramos con las mejores organizaciones para encontrar el talento que impulsa su crecimiento
+            Empresas de distintos sectores confían en nuestra experiencia para encontrar talento calificado.
           </p>
         </div>
 
@@ -148,6 +148,7 @@ export default function Empresas() {
                         src={company.logoImage}
                         alt={`${company.name} logo`}
                         fill
+                        sizes="128px"
                         className="object-contain"
                       />
                     </div>
