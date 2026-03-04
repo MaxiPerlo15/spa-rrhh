@@ -284,7 +284,7 @@ export default function VacantesPage() {
       {/* Lista de Vacantes */}
       <section className="section-padding">
         <div className="container-custom">
-          <div className={`results-transition flex flex-col gap-4 max-w-5xl mx-auto ${isFiltering ? 'is-filtering' : ''}`}>
+          <div className={`results-transition flex flex-col gap-[22px] sm:gap-4 max-w-5xl mx-auto ${isFiltering ? 'is-filtering' : ''}`}>
             {loading ? (
               <>
                 {[1, 2, 3].map((item) => (
@@ -337,6 +337,7 @@ export default function VacantesPage() {
                       salary={vacancy.salary}
                       requirements={vacancy.requirements}
                       benefits={vacancy.benefits}
+                      createdAt={vacancy.createdAt}
                       onApply={handleApply}
                     />
                   </div>

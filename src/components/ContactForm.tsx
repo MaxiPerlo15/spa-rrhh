@@ -24,6 +24,26 @@ export default function ContactForm() {
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
+  const formatPhoneMask = (rawValue: string) => {
+    const digitsOnly = rawValue.replace(/\D/g, '')
+    let localDigits = digitsOnly
+
+    if (localDigits.startsWith('549')) {
+      localDigits = localDigits.slice(3)
+    } else if (localDigits.startsWith('54')) {
+      localDigits = localDigits.slice(2)
+    } else if (localDigits.startsWith('9')) {
+      localDigits = localDigits.slice(1)
+    }
+
+    localDigits = localDigits.slice(0, 10)
+
+    if (!localDigits) return ''
+    if (localDigits.length <= 2) return `+54 9 ${localDigits}`
+    if (localDigits.length <= 6) return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2)}`
+    return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2, 6)}-${localDigits.slice(6)}`
+  }
+
   const validateField = (name: string, value: string) => {
     if (['name', 'subject', 'message'].includes(name) && !value.trim()) return 'Este campo es obligatorio.'
     if (name === 'email') {
@@ -41,10 +61,11 @@ export default function ContactForm() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const nextValue = name === 'phone' ? formatPhoneMask(value) : value
+    setFormData(prev => ({ ...prev, [name]: nextValue }))
 
     if (touched[name]) {
-      setFieldErrors(prev => ({ ...prev, [name]: validateField(name, value) }))
+      setFieldErrors(prev => ({ ...prev, [name]: validateField(name, nextValue) }))
     }
   }
 
@@ -205,13 +226,14 @@ export default function ContactForm() {
               type="tel"
               id="phone"
               name="phone"
+              inputMode="numeric"
               value={formData.phone}
               onChange={handleInputChange}
               onBlur={handleBlur}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
                 fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
               }`}
-              placeholder="+54 11 1234-5678"
+              placeholder="+54 9 11 1234-5678"
             />
             {touched.phone && fieldErrors.phone && (
               <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.phone}</p>
@@ -280,7 +302,7 @@ export default function ContactForm() {
           disabled={loading || (captchaEnabled && !captchaToken)}
           className="btn-motion w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
-          {loading ? 'Enviando...' : 'Enviar Mensaje'}
+          {loading ? 'Enviando...' : 'Enviar Consulta'}
         </button>
       </form>
     </div>

@@ -32,7 +32,7 @@ describe('AdminHeader mobile a11y', () => {
     })
   })
 
-  it('expone botones críticos con nombres accesibles y estado expandido del menú', async () => {
+  it('expone botones críticos con nombres accesibles y estado expandido de ayuda', async () => {
     render(
       <AdminHeader
         activeTab="vacancies"
@@ -56,11 +56,11 @@ describe('AdminHeader mobile a11y', () => {
       expect(screen.getAllByRole('button', { name: 'Notificaciones del panel' }).length).toBeGreaterThan(0)
     })
 
-    const menuButton = screen.getByRole('button', { name: 'Abrir menú de acciones' })
-    expect(menuButton.getAttribute('aria-expanded')).toBe('false')
+    const helpButton = screen.getAllByRole('button', { name: 'Ayuda del panel' })[1]!
+    expect(helpButton.getAttribute('aria-expanded')).toBe('false')
 
-    fireEvent.click(menuButton)
-    expect(menuButton.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(helpButton)
+    expect(helpButton.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('abre el panel de notificaciones con semántica de diálogo', async () => {

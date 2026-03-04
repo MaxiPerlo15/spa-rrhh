@@ -169,7 +169,7 @@ export default function AdminContactsSection({
       </div>
 
       <div data-tour="contacts-table" className={`ds-surface overflow-hidden ${getTourClass('contacts-table')}`}>
-        <div className="md:hidden p-4 space-y-3">
+        <div className="md:hidden p-4 space-y-[18px]">
           {paginatedContacts.length > 0 && (
             <p className="text-xs text-gray-500">Desliza cada contacto hacia la izquierda para acciones rápidas.</p>
           )}
@@ -277,7 +277,7 @@ export default function AdminContactsSection({
                   const isDeleting = pendingDeleteContactId === contact.id
                   const isRowBusy = isStatusUpdating || isDeleting
                   return (
-                  <tr key={contact.id} className="hover:bg-gray-50">
+                  <tr key={contact.id} className="hover:bg-slate-50 transition-colors duration-200">
                     <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{contact.name}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{contact.email}</td>
                     <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{contact.subject}</td>

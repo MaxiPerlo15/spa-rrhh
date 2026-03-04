@@ -25,6 +25,7 @@ interface Vacancy {
   salary?: string
   requirements?: string
   benefits?: string
+  createdAt?: string
 }
 
 export default function Home() {
@@ -84,7 +85,8 @@ export default function Home() {
         modality: vacancy.modality as Vacancy['modality'],
         salary: vacancy.salary,
         requirements: vacancy.requirements,
-        benefits: vacancy.benefits
+        benefits: vacancy.benefits,
+        createdAt: vacancy.createdAt
       }))
       setVacancies(normalized)
     } catch (error) {
@@ -218,19 +220,10 @@ export default function Home() {
                 Descubre oportunidades profesionales que se ajustan a tu perfil. 
                 Todas nuestras vacantes son verificadas y provienen de empresas de primer nivel.
               </p>
-              <a
-                href="/ofertas-laborales"
-                className="btn-motion inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 shadow-lg hover:shadow-xl"
-              >
-                Ver todas las ofertas laborales
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </a>
             </div>
 
             {/* Lista de vacantes (mostrar solo las primeras 3) */}
-            <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+            <div className="flex flex-col gap-[22px] sm:gap-4 max-w-5xl mx-auto">
               {loading ? (
                 <div className="text-center py-12">
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
@@ -261,6 +254,7 @@ export default function Home() {
                       salary={vacancy.salary}
                       requirements={vacancy.requirements}
                       benefits={vacancy.benefits}
+                      createdAt={vacancy.createdAt}
                       onApply={handleApply}
                     />
                   ))}

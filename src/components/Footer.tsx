@@ -45,11 +45,6 @@ export default function Footer() {
               Conectamos talento con oportunidades. Especialistas en recursos humanos 
               comprometidos con la excelencia y el desarrollo profesional.
             </p>
-            <p className="text-sm text-gray-500">
-              © {currentYear} Consultora RRHH.
-              <br />
-              Todos los derechos reservados.
-            </p>
           </div>
 
           {/* Columna 2: Links rápidos */}
@@ -159,6 +154,9 @@ export default function Footer() {
 
         {/* Separador */}
         <div className="border-t border-gray-800 pt-8">
+          <p className="text-center text-sm text-gray-500">
+            © {currentYear} Consultora RRHH. Todos los derechos reservados.
+          </p>
         </div>
       </div>
     </footer>

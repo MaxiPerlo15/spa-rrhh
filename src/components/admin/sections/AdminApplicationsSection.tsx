@@ -212,7 +212,7 @@ export default function AdminApplicationsSection({
       </div>
 
       <div className="ds-surface overflow-hidden">
-        <div className="md:hidden p-4 space-y-3">
+        <div className="md:hidden p-4 space-y-[18px]">
           {paginatedApplications.length > 0 && (
             <p className="text-xs text-gray-500">Desliza cada postulación hacia la izquierda para acciones rápidas.</p>
           )}
@@ -335,7 +335,7 @@ export default function AdminApplicationsSection({
                   const isDeleting = pendingDeleteApplicationId === application.id
                   const isRowBusy = isStatusUpdating || isDeleting
                   return (
-                  <tr key={application.id} className="hover:bg-gray-50">
+                  <tr key={application.id} className="hover:bg-slate-50 transition-colors duration-200">
                     <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{application.candidateName}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{application.email}</td>
                     <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">{application.vacancy.title}</td>

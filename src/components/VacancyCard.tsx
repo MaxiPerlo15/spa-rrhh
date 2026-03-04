@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+const RENDER_TIME_REFERENCE_MS = Date.now()
+
 interface VacancyCardProps {
   id: string
   title: string
@@ -12,10 +14,11 @@ interface VacancyCardProps {
   salary?: string
   requirements?: string
   benefits?: string
+  createdAt?: string
   onApply: (id: string, title: string) => void
 }
 
-export default function VacancyCard({ id, title, description, location, workday, modality, salary, requirements, benefits, onApply }: VacancyCardProps) {
+export default function VacancyCard({ id, title, description, location, workday, modality, salary, requirements, benefits, createdAt, onApply }: VacancyCardProps) {
   const [showDetails, setShowDetails] = useState(false)
 
   const workdayLabels = {
@@ -44,6 +47,18 @@ export default function VacancyCard({ id, title, description, location, workday,
     'HYBRID': 'bg-indigo-100 text-indigo-700'
   }
 
+  const getPublishedTag = () => {
+    if (!createdAt) return null
+    const publishedTime = new Date(createdAt).getTime()
+    if (Number.isNaN(publishedTime)) return null
+    const diffMs = RENDER_TIME_REFERENCE_MS - publishedTime
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays < 2) return 'Publicado recientemente'
+    return `Hace ${diffDays} días`
+  }
+
+  const publishedTag = getPublishedTag()
+
   return (
     <div className="group card-lift bg-white rounded-xl shadow-sm p-6 hover:shadow-xl border border-gray-200 hover:border-primary-400 transform-gpu">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -58,6 +73,11 @@ export default function VacancyCard({ id, title, description, location, workday,
             <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-transform duration-200 group-hover:scale-105 ${modalityBadgeColors[modality]}`}>
               {modalityLabels[modality]}
             </span>
+            {publishedTag && (
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                {publishedTag}
+              </span>
+            )}
             {salary && (
               <span className="text-sm text-gray-600 font-medium">
                 {salary}
@@ -120,9 +140,10 @@ export default function VacancyCard({ id, title, description, location, workday,
             <button
               onClick={() => setShowDetails(!showDetails)}
               title={showDetails ? 'Ver menos' : 'Ver más detalles'}
-              className="btn-motion mt-4 text-primary-500 hover:text-primary-600 font-bold text-xl flex items-center gap-1"
+              className="btn-motion mt-4 text-primary-500 hover:text-primary-600 font-semibold text-base flex items-center gap-2"
             >
-              <span>{showDetails ? '−' : '+'}</span>
+              <span className="text-xl leading-none">{showDetails ? '−' : '+'}</span>
+              <span>{showDetails ? 'Ver menos detalles' : 'Ver más detalles'}</span>
             </button>
           )}
         </div>
@@ -131,7 +152,7 @@ export default function VacancyCard({ id, title, description, location, workday,
         <div className="md:ml-6 shrink-0">
           <button
             onClick={() => onApply(id, title)}
-            className="btn-motion relative w-full md:w-auto px-8 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
+            className="btn-motion relative w-full md:w-auto px-10 py-3.5 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
           >
             Postularme
           </button>

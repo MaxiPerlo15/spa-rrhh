@@ -161,7 +161,7 @@ export default function AdminVacanciesSection({
         </div>
       </div>
 
-      <div className="md:hidden p-4 space-y-3">
+      <div className="md:hidden p-4 space-y-[18px]">
         {paginatedVacancies.length > 0 && (
           <p className="text-xs text-gray-500">Desliza cada vacante hacia la izquierda para ver acciones rápidas.</p>
         )}
@@ -268,7 +268,7 @@ export default function AdminVacanciesSection({
               const isDeleting = pendingDeleteVacancyId === vacancy.id
               const isRowBusy = isToggling || isDeleting
               return (
-                <tr key={vacancy.id} className="hover:bg-gray-50">
+                <tr key={vacancy.id} className="hover:bg-slate-50 transition-colors duration-200">
                   <td className="px-4 sm:px-6 py-4 text-sm font-medium text-gray-900">{vacancy.title}</td>
                   <td className="px-4 sm:px-6 py-4 text-sm text-gray-600">{vacancy.location}</td>
                   <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
