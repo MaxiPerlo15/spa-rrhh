@@ -99,7 +99,7 @@ model Vacancy {
 
 model Application {
   id             String            @id @default(cuid())
-  vacancyId      String
+  vacancyId      String?
   candidateName  String
   email          String
   phone          String
@@ -111,11 +111,10 @@ model Application {
   updatedAt      DateTime          @updatedAt
   resumeKey      String?
   resumeUrl      String?
-  vacancy        Vacancy           @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  vacancy        Vacancy?          @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
 
   @@index([vacancyId, status])
   @@index([email])
-  @@index([vacancyId, personKey])
   @@index([personKey, submittedAt])
 }
 

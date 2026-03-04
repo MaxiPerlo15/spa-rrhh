@@ -115,10 +115,13 @@ export const applicationsListQuerySchema = z.object({
 })
 
 export const createApplicationSchema = z.object({
-  vacancyId: z.string().cuid('vacancyId inválido'),
+  vacancyId: z.string().cuid('vacancyId inválido').optional(),
   candidateName: nonEmptyString,
   email: emailSchema,
   phone: requiredPhoneSchema,
+  acceptedPrivacy: z.boolean().refine((value) => value === true, {
+    message: 'Debes aceptar la política de privacidad para continuar'
+  }),
   resumeUrl: z.string().url('resumeUrl inválido').optional(),
   resumeFileName: optionalTrimmedString,
   resumeKey: optionalTrimmedString,
@@ -138,6 +141,9 @@ export const createContactSchema = z.object({
   name: nonEmptyString,
   email: emailSchema,
   phone: optionalPhoneSchema,
+  acceptedPrivacy: z.boolean().refine((value) => value === true, {
+    message: 'Debes aceptar la política de privacidad para continuar'
+  }),
   subject: nonEmptyString,
   message: nonEmptyString,
   captchaToken: optionalTrimmedString

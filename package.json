@@ -22,6 +22,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:report": "playwright show-report",
     "audit:purge": "node scripts/purge-admin-audit.mjs",
+    "cv:purge": "node scripts/purge-cv-retention.mjs",
     "env:check": "dotenv -e .env -- tsx scripts/check-env.ts",
     "env:check:prod": "dotenv -e .env -- tsx scripts/check-env.ts --prod",
     "predeploy:check": "npm run env:check:prod && npm run test:e2e:matrix && npm run build",

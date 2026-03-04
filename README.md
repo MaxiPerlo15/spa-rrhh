@@ -203,6 +203,9 @@ Para hardening y respuesta a incidentes:
 - [docs/SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md)
 - [docs/INCIDENT-RUNBOOK.md](docs/INCIDENT-RUNBOOK.md)
 
+Documentación académica formal (IEEE 29148 + UML/C4):
+- [docs/academic/README.md](docs/academic/README.md)
+
 ### 5. Ejecutar el servidor de desarrollo
 ```bash
 npm run dev

@@ -130,23 +130,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar que la vacante existe y está activa
-    const vacancy = await prisma.vacancy.findUnique({
-      where: { id: vacancyId }
-    })
+    let vacancyTitleForNotification = 'Postulación espontánea'
+    if (vacancyId) {
+      // Verificar que la vacante existe y está activa solo cuando se envía vacancyId.
+      const vacancy = await prisma.vacancy.findUnique({
+        where: { id: vacancyId }
+      })
 
-    if (!vacancy) {
-      return NextResponse.json(
-        { error: 'Vacante no encontrada' },
-        { status: 404 }
-      )
-    }
+      if (!vacancy) {
+        return NextResponse.json(
+          { error: 'Vacante no encontrada' },
+          { status: 404 }
+        )
+      }
 
-    if (vacancy.status !== 'ACTIVE') {
-      return NextResponse.json(
-        { error: 'Esta vacante ya no está activa' },
-        { status: 400 }
-      )
+      if (vacancy.status !== 'ACTIVE') {
+        return NextResponse.json(
+          { error: 'Esta vacante ya no está activa' },
+          { status: 400 }
+        )
+      }
+
+      vacancyTitleForNotification = vacancy.title
     }
 
     const personKey = buildPersonKey(email, phone)
@@ -156,7 +161,7 @@ export async function POST(request: NextRequest) {
     try {
       const recentDuplicate = await prisma.application.findFirst({
         where: {
-          vacancyId,
+          ...(vacancyId ? { vacancyId } : { vacancyId: null }),
           personKey,
           submittedAt: {
             gte: duplicateWindowStart
@@ -207,14 +212,14 @@ export async function POST(request: NextRequest) {
 
     // Enviar notificación al admin (no bloqueante)
     sendNewApplicationEmail({
-      vacancyTitle: vacancy.title,
+      vacancyTitle: vacancyTitleForNotification,
       applicantName: candidateName,
       applicantEmail: email,
       applicantPhone: phone,
       message: coverLetter
     }).catch(error => {
       logger.error('Error al enviar email de notificación', error, {
-        vacancyTitle: vacancy.title,
+        vacancyTitle: vacancyTitleForNotification,
         applicationEmail: email
       })
     })

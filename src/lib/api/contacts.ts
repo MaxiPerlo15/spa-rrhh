@@ -20,6 +20,7 @@ export interface CreateContactData {
   name: string
   email: string
   phone: string
+  acceptedPrivacy?: boolean
   subject: string
   message: string
   captchaToken?: string

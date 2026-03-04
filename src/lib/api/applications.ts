@@ -16,22 +16,31 @@ export interface Application {
   coverLetter?: string
   status: 'PENDING' | 'REVIEWING' | 'INTERVIEWED' | 'ACCEPTED' | 'REJECTED'
   submittedAt: string
-  vacancy: {
+  vacancy?: {
     id: string
     title: string
   }
 }
 
 export interface CreateApplicationData {
-  vacancyId: string
+  vacancyId?: string
   candidateName: string
   email: string
   phone: string
+  acceptedPrivacy?: boolean
   resumeUrl?: string
   resumeFileName?: string
   resumeKey?: string
   coverLetter?: string
   captchaToken?: string
+}
+
+export interface ApplicationsExportFilters {
+  search?: string
+  status?: string
+  vacancyId?: string
+  sortBy?: 'submittedAt' | 'candidateName' | 'status'
+  sortDirection?: 'asc' | 'desc'
 }
 
 type ApiValidationError = {
@@ -127,4 +136,31 @@ export async function deleteApplication(id: string): Promise<void> {
   if (!response.ok) {
     throw new Error('Error al eliminar la postulación')
   }
+}
+
+export async function downloadApplicationsCsv(filters: ApplicationsExportFilters): Promise<void> {
+  const params = new URLSearchParams()
+  if (filters.search) params.set('search', filters.search)
+  if (filters.status && filters.status !== 'all') params.set('status', filters.status)
+  if (filters.vacancyId && filters.vacancyId !== 'all') params.set('vacancyId', filters.vacancyId)
+  if (filters.sortBy) params.set('sortBy', filters.sortBy)
+  if (filters.sortDirection) params.set('sortDirection', filters.sortDirection)
+
+  const query = params.toString() ? `?${params.toString()}` : ''
+  const response = await apiFetch(`/api/applications/export${query}`)
+
+  if (!response.ok) {
+    throw new Error('Error al exportar postulaciones')
+  }
+
+  const blob = await response.blob()
+  const date = new Date().toISOString().slice(0, 10)
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = `postulaciones-${date}.csv`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(objectUrl)
 }
