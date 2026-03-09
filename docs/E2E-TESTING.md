@@ -10,7 +10,9 @@ Los tests E2E simulan interacciones reales de usuarios en la aplicación complet
 tests/e2e/
 ├── auth.spec.ts          # Tests de autenticación admin
 ├── vacancies.spec.ts     # Tests CRUD de vacantes
-└── applications.spec.ts  # Tests de postulación
+├── applications.spec.ts  # Tests de postulación pública
+├── qa-matrix.spec.ts     # Smoke transversal desktop + mobile
+└── mobile-critical-flows.spec.ts # Flujos críticos mobile (MIS-123)
 ```
 
 ### Cobertura de Tests
@@ -44,6 +46,13 @@ tests/e2e/
 - ✅ Mostrar detalles de vacante
 - ✅ Cerrar modal
 
+#### 4. Flujos críticos mobile (`mobile-critical-flows.spec.ts`)
+- ✅ Login/logout admin en viewport mobile
+- ✅ Navegación por módulos (Vacantes, Postulaciones, Contactos, Configuración)
+- ✅ Notificaciones del panel en mobile
+- ✅ Cobertura mobile de vacantes, postulaciones y contactos (filtros/controles clave)
+- ✅ Onboarding mobile: apertura, avance, cierre y retorno
+
 ## Ejecutar Tests
 
 ### Prerequisitos
@@ -61,6 +70,9 @@ npx playwright install chromium
 ```bash
 # Ejecutar todos los tests E2E (headless)
 npm run test:e2e
+
+# Ejecutar cobertura crítica mobile (MIS-123)
+npm run test:e2e:mobile
 
 # Ejecutar con UI interactiva (recomendado para desarrollo)
 npm run test:e2e:ui
