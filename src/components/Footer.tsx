@@ -1,11 +1,32 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { markInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
+
 export default function Footer() {
   const currentYear = new Date().getFullYear()
+  const pathname = usePathname()
+  const isHomePage = pathname === '/'
 
-  const scrollToSection = (sectionId: string) => {
-    const element = document.querySelector(sectionId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const handleSectionNavigation = (sectionId: string) => {
+    const normalizedHash = `#${sectionId.replace('#', '')}`
+
+    if (!isHomePage) {
+      markInternalHashNavigationIntent()
+      window.location.assign(`/${normalizedHash}`)
+      return
     }
+
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
+    }
+
+    window.history.replaceState(null, '', `/${normalizedHash}`)
+    window.setTimeout(() => {
+      scrollToHashWithOffset(normalizedHash, 'smooth')
+    }, 0)
   }
 
   return (
@@ -18,16 +39,10 @@ export default function Footer() {
               <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">RH</span>
               </div>
-              <span className="text-xl font-semibold">Consultora RRHH</span>
+              <span className="text-xl font-semibold">Consultora Meinardi & Perlo</span>
             </div>
             <p className="text-gray-400 leading-relaxed mb-4">
-              Conectamos talento con oportunidades. Especialistas en recursos humanos 
-              comprometidos con la excelencia y el desarrollo profesional.
-            </p>
-            <p className="text-sm text-gray-500">
-              © {currentYear} Consultora RRHH.
-              <br />
-              Todos los derechos reservados.
+              Las Varillas, Córdoba – Argentina
             </p>
           </div>
 
@@ -38,7 +53,7 @@ export default function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => scrollToSection('#inicio')}
+                  onClick={() => handleSectionNavigation('inicio')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                   aria-label="Ir a la sección Inicio"
                 >
@@ -47,7 +62,8 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#nosotros')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('nosotros')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Nosotros
@@ -55,15 +71,17 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#vacantes')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('servicios')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
-                  Oportunidades Laborales
+                  Servicios
                 </button>
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#empresas')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('empresas')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Empresas
@@ -71,11 +89,14 @@ export default function Footer() {
               </li>
               <li>
                 <button
-                  onClick={() => scrollToSection('#contacto')}
+                  type="button"
+                  onClick={() => handleSectionNavigation('contacto')}
                   className="text-gray-400 hover:text-primary-400 transition-colors"
                 >
                   Contacto
                 </button>
+              </li>
+              <li>
               </li>
             </ul>
           </div>
@@ -132,6 +153,9 @@ export default function Footer() {
 
         {/* Separador */}
         <div className="border-t border-gray-800 pt-8">
+          <p className="text-center text-sm text-gray-500">
+            © {currentYear} Consultora RRHH. Todos los derechos reservados.
+          </p>
         </div>
       </div>
     </footer>

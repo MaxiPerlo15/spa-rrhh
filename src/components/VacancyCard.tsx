@@ -1,36 +1,86 @@
+'use client'
+
+import { useState } from 'react'
+
 interface VacancyCardProps {
   id: string
   title: string
   description: string
   location: string
-  type: 'full-time' | 'part-time' | 'freelance'
+  workday: 'FULL_TIME' | 'PART_TIME' | 'PROJECT_BASED' | 'INTERNSHIP'
+  modality: 'ON_SITE' | 'REMOTE' | 'HYBRID'
   salary?: string
+  requirements?: string
+  benefits?: string
+  createdAt?: string
   onApply: (id: string, title: string) => void
 }
 
-export default function VacancyCard({ id, title, description, location, type, salary, onApply }: VacancyCardProps) {
-  const typeLabels = {
-    'full-time': 'Tiempo Completo',
-    'part-time': 'Medio Tiempo',
-    'freelance': 'Freelance'
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+export function getVacancyPublishedLabel(createdAt?: string) {
+  if (!createdAt) return null
+
+  const publishedTime = new Date(createdAt).getTime()
+  if (Number.isNaN(publishedTime)) return null
+
+  const diffMs = Date.now() - publishedTime
+  const diffDays = Math.floor(diffMs / DAY_IN_MS)
+
+  if (diffDays < 2) return 'Nueva'
+  return `Hace ${diffDays} días`
+}
+
+export default function VacancyCard({ id, title, description, location, workday, modality, salary, requirements, benefits, createdAt, onApply }: VacancyCardProps) {
+  const [showDetails, setShowDetails] = useState(false)
+
+  const workdayLabels = {
+    'FULL_TIME': 'Jornada Completa',
+    'PART_TIME': 'Media Jornada',
+    'PROJECT_BASED': 'Por Proyecto',
+    'INTERNSHIP': 'Pasantía'
   }
 
-  const typeBadgeColors = {
-    'full-time': 'bg-primary-100 text-primary-700',
-    'part-time': 'bg-yellow-100 text-yellow-700',
-    'freelance': 'bg-purple-100 text-purple-700'
+  const modalityLabels = {
+    'ON_SITE': 'Presencial',
+    'REMOTE': 'Remoto',
+    'HYBRID': 'Híbrido'
   }
+
+  const workdayBadgeColors = {
+    'FULL_TIME': 'bg-primary-100 text-primary-700',
+    'PART_TIME': 'bg-yellow-100 text-yellow-700',
+    'PROJECT_BASED': 'bg-purple-100 text-purple-700',
+    'INTERNSHIP': 'bg-green-100 text-green-700'
+  }
+
+  const modalityBadgeColors = {
+    'ON_SITE': 'bg-blue-100 text-blue-700',
+    'REMOTE': 'bg-teal-100 text-teal-700',
+    'HYBRID': 'bg-indigo-100 text-indigo-700'
+  }
+
+  const publishedTag = getVacancyPublishedLabel(createdAt)
 
   return (
-    <div className="group bg-white rounded-xl shadow-sm p-6 hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-primary-400 hover:scale-[1.02] transform">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="group card-lift bg-white rounded-xl shadow-md p-6 hover:shadow-lg border border-blue-400 hover:translate-y-[-4px] transform-gpu transition-all duration-200">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         {/* Información principal */}
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-3">
-            {/* Badge del tipo */}
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${typeBadgeColors[type]}`}>
-              {typeLabels[type]}
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            {/* Badge de jornada */}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-transform duration-200 group-hover:scale-105 ${workdayBadgeColors[workday]}`}>
+              {workdayLabels[workday]}
             </span>
+            {/* Badge de modalidad */}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-transform duration-200 group-hover:scale-105 ${modalityBadgeColors[modality]}`}>
+              {modalityLabels[modality]}
+            </span>
+            {publishedTag && (
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                {publishedTag}
+              </span>
+            )}
             {salary && (
               <span className="text-sm text-gray-600 font-medium">
                 {salary}
@@ -52,17 +102,60 @@ export default function VacancyCard({ id, title, description, location, type, sa
             <span className="text-sm font-medium">{location}</span>
           </div>
 
-          {/* Descripción resumida */}
-          <p className="text-gray-600 leading-relaxed line-clamp-2">
+          {/* Descripción */}
+          <p className="text-gray-600 leading-relaxed whitespace-pre-line">
             {description}
           </p>
+
+          {/* Detalles expandibles */}
+          {showDetails && (
+            <div className="mt-6 space-y-4 animate-fade-in">
+              {/* Requisitos */}
+              {requirements && (
+                <div className="border-t pt-4">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Requisitos
+                  </h4>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{requirements}</p>
+                </div>
+              )}
+
+              {/* Beneficios */}
+              {benefits && (
+                <div className="border-t pt-4">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                    Beneficios
+                  </h4>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{benefits}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botón Ver más detalles / Ver menos */}
+          {(requirements || benefits) && (
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              title={showDetails ? 'Ver menos' : 'Ver más detalles'}
+              className="btn-motion mt-4 text-primary-500 hover:text-primary-600 font-semibold text-base flex items-center gap-2"
+            >
+              <span className="text-xl leading-none">{showDetails ? '−' : '+'}</span>
+              <span>{showDetails ? 'Ver menos detalles' : 'Ver más detalles'}</span>
+            </button>
+          )}
         </div>
 
         {/* Botón "Postularme" */}
         <div className="md:ml-6 shrink-0">
           <button
             onClick={() => onApply(id, title)}
-            className="relative w-full md:w-auto px-8 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect"
+            className="btn-motion relative w-full md:w-auto px-10 py-3.5 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 hover:shadow-2xl whitespace-nowrap overflow-hidden group-hover:scale-105 shine-effect transition-all duration-200"
           >
             Postularme
           </button>

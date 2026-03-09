@@ -1,0 +1,398 @@
+'use client'
+import { useState, useEffect } from 'react'
+import Script from 'next/script'
+import NavBar from '@/components/NavBar'
+import Hero from '@/components/Hero'
+import FounderCard from '@/components/FounderCard'
+import Servicios from '@/components/Servicios'
+import VacancyCard from '@/components/VacancyCard'
+import PostularForm from '@/components/PostularForm'
+import ContactForm from '@/components/ContactForm'
+import Empresas from '@/components/Empresas'
+import Footer from '@/components/Footer'
+import { useScrollAnimation } from '@/hooks/useScrollAnimation'
+import { scrollToHashWithOffset } from '@/lib/hashScroll'
+import { consumeInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
+import { getVacancies } from '@/lib/api/vacancies'
+
+interface Vacancy {
+  id: string
+  title: string
+  description: string
+  location: string
+  workday: 'FULL_TIME' | 'PART_TIME' | 'PROJECT_BASED' | 'INTERNSHIP'
+  modality: 'ON_SITE' | 'REMOTE' | 'HYBRID'
+  salary?: string
+  requirements?: string
+  benefits?: string
+  createdAt?: string
+}
+
+export default function Home() {
+  const [selectedApplicationTarget, setSelectedApplicationTarget] = useState<{
+    mode: 'vacancy' | 'spontaneous'
+    vacancyId?: string | null
+    vacancyTitle?: string
+  } | null>(null)
+  const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  
+  // Refs para animaciones de scroll
+  const { ref: nosotrosRef, isVisible: nosotrosVisible } = useScrollAnimation<HTMLElement>()
+  const { ref: vacantesRef, isVisible: vacantesVisible } = useScrollAnimation<HTMLElement>()
+  const { ref: contactoRef, isVisible: contactoVisible } = useScrollAnimation<HTMLElement>()
+
+  // Cargar vacantes desde la API
+  useEffect(() => {
+    fetchVacancies()
+  }, [])
+
+  // Manejar scroll a sección cuando se carga la página con hash
+  useEffect(() => {
+    const hash = window.location.hash
+    const hasInternalNavigationIntent = consumeInternalHashNavigationIntent()
+
+    // MIS-101: en cargas de landing con hash, normalizar a "/" excepto cuando
+    // venimos de otra página interna (ej. /ofertas-laborales -> /#contacto).
+    if (hash && !hasInternalNavigationIntent) {
+      window.history.replaceState(null, '', '/')
+      window.scrollTo({ top: 0, behavior: 'auto' })
+      return
+    }
+
+    if (hash) {
+      requestAnimationFrame(() => {
+        scrollToHashWithOffset(hash, 'auto')
+      })
+    }
+
+    const onHashChange = () => {
+      scrollToHashWithOffset(window.location.hash, 'smooth')
+    }
+
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  const fetchVacancies = async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const data = await getVacancies()
+      const normalized = data.map((vacancy) => ({
+        id: vacancy.id,
+        title: vacancy.title,
+        description: vacancy.description ?? '',
+        location: vacancy.location,
+        workday: vacancy.workday as Vacancy['workday'],
+        modality: vacancy.modality as Vacancy['modality'],
+        salary: vacancy.salary,
+        requirements: vacancy.requirements,
+        benefits: vacancy.benefits,
+        createdAt: vacancy.createdAt
+      }))
+      setVacancies(normalized)
+    } catch (error) {
+      console.error('Error al cargar vacantes:', error)
+      setLoadError(error instanceof Error ? error.message : 'Ocurrió un error al cargar vacantes.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApply = (id: string, title: string) => {
+    setSelectedApplicationTarget({ mode: 'vacancy', vacancyId: id, vacancyTitle: title })
+  }
+
+  const handleOpenSpontaneousApplication = () => {
+    setSelectedApplicationTarget({
+      mode: 'spontaneous',
+      vacancyId: null,
+      vacancyTitle: 'Postulación espontánea'
+    })
+  }
+
+  const closeModal = () => {
+    setSelectedApplicationTarget(null)
+  }
+
+  return (
+    <div className="min-h-screen bg-linear-to-b from-primary-200 via-white to-gray-900">
+      {/* Schema.org para SEO */}
+      <Script
+        id="schema-org"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ProfessionalService",
+            "name": "Meinardi&Perlo RRHH",
+            "description": "Consultora de Recursos Humanos en Las Varillas, Córdoba. Selección de personal, búsqueda laboral y desarrollo profesional.",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Las Varillas",
+              "addressRegion": "Córdoba",
+              "addressCountry": "AR"
+            },
+            "areaServed": {
+              "@type": "Place",
+              "name": "Argentina"
+            },
+            "url": "https://www.meinardiperlo.com",
+            "priceRange": "$$",
+            "hasOfferCatalog": {
+              "@type": "OfferCatalog",
+              "name": "Servicios de Recursos Humanos",
+              "itemListElement": [
+                {
+                  "@type": "Offer",
+                  "itemOffered": {
+                    "@type": "Service",
+                    "name": "Reclutamiento y Selección de Personal"
+                  }
+                },
+                {
+                  "@type": "Offer",
+                  "itemOffered": {
+                    "@type": "Service",
+                    "name": "Búsqueda de Empleos"
+                  }
+                }
+              ]
+            }
+          })
+        }}
+      />
+      
+      <NavBar />
+      
+      {/* Contenido principal */}
+      <main>
+        {/* Sección Hero */}
+        <Hero onOpenSpontaneousApplication={handleOpenSpontaneousApplication} />
+
+        {/* Sección Nosotros */}
+        <section ref={nosotrosRef} id="nosotros" className={`section-padding bg-gray-900 relative overflow-hidden animate-on-scroll ${nosotrosVisible ? 'is-visible' : ''}`}>
+          {/* Imagen de fondo con blur */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ 
+              backgroundImage: 'url(/instagram-trabajadores.webp)',
+              filter: 'blur(3px)',
+              transform: 'scale(1.1)'
+            }}
+          />
+          
+          {/* Overlay para mejorar legibilidad */}
+          <div className="absolute inset-0 bg-linear-to-b from-primary-900/85 via-primary-800/80 to-primary-900/85"></div>
+
+          <div className="container-custom relative z-10">
+            {/* Título y descripción de la consultora */}
+            <div className="text-center max-w-3xl mx-auto mb-16">
+              <h2 className={`text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg animate-on-scroll ${nosotrosVisible ? 'is-visible' : ''}`}>
+                Sobre <span className="text-primary-500 inline-block hover:scale-105 transition-transform duration-200">Nosotros</span>
+              </h2>
+              <p className={`text-lg text-white/95 leading-relaxed drop-shadow-md animate-on-scroll reveal-delay-2 max-w-3xl mx-auto text-left ${nosotrosVisible ? 'is-visible' : ''}`}>
+                Somos una consultora de Recursos Humanos de la localidad de Las Varillas, Córdoba
+                dedicada a conectar talento con oportunidades laborales,
+              </p>
+            </div>
+
+            {/* Cards de fundadoras */}
+            <div className={`grid md:grid-cols-2 gap-8 max-w-5xl mx-auto animate-on-scroll reveal-delay-3 ${nosotrosVisible ? 'is-visible' : ''}`}>
+              <FounderCard
+                name="María Soledad Perlo"
+                role="Fundadora"
+                description="Licenciada en Recursos Humanos graduada de la universidad IUA con más de 20 años de experiencia, especializada en reclutamiento y selección de personal. Apasionada por ayudar a las empresas a encontrar el talento adecuado para impulsar su crecimiento."
+                imageUrl=""
+              />
+              <FounderCard
+                name="Ayelen Meinardi"
+                role="Fundadora"
+                description="Licencida en Recursos Humanos gradua de la universidad UCES con más de 10 años de experiencia, especializada en desarrollo organizacional y gestión del talento. Comprometida con el crecimiento profesional de los individuos y el éxito de las organizaciones."
+                imageUrl="/logorrhh.webp"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Sección Servicios */}
+        <Servicios />
+
+        {/* Sección Vacantes */}
+        <section ref={vacantesRef} id="vacantes" className={`section-padding bg-secondary-100 animate-on-scroll ${vacantesVisible ? 'is-visible' : ''}`}>
+          <div className="container-custom">
+            {/* Título */}
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                Ofertas laborales <span className="text-primary-500 inline-block hover:scale-110 transition-transform duration-300">Disponibles</span>
+              </h2>
+              <p className="text-lg text-gray-600 mb-6 max-w-3xl mx-auto text-left">
+                Descubre oportunidades profesionales que se ajustan a tu perfil. 
+                Todas nuestras vacantes son verificadas y provienen de empresas de primer nivel.
+              </p>
+            </div>
+
+            {/* Lista de vacantes (mostrar solo las primeras 3) */}
+            <div className="flex flex-col gap-[22px] sm:gap-4 max-w-5xl mx-auto">
+              {loading ? (
+                <div className="text-left py-12">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+                  <p className="text-gray-600 mt-4">Cargando vacantes...</p>
+                </div>
+              ) : loadError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-6 py-8 text-left">
+                  <p className="text-red-700 font-medium">Ocurrió un error al cargar vacantes.</p>
+                  <p className="text-red-600 text-sm mt-2">{loadError}</p>
+                  <button
+                    onClick={fetchVacancies}
+                    className="mt-4 px-5 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : vacancies.length > 0 ? (
+                <>
+                  {vacancies.slice(0, 3).map((vacancy) => (
+                    <VacancyCard
+                      key={vacancy.id}
+                      id={vacancy.id}
+                      title={vacancy.title}
+                      description={vacancy.description}
+                      location={vacancy.location}
+                      workday={vacancy.workday}
+                      modality={vacancy.modality}
+                      salary={vacancy.salary}
+                      requirements={vacancy.requirements}
+                      benefits={vacancy.benefits}
+                      createdAt={vacancy.createdAt}
+                      onApply={handleApply}
+                    />
+                  ))}
+                  {vacancies.length > 3 && (
+                    <div className="text-center mt-8">
+                      <a
+                        href="/ofertas-laborales"
+                        className="btn-motion inline-flex items-center gap-2 px-8 py-4 bg-white text-primary-500 font-bold text-lg rounded-lg hover:bg-primary-50 border-2 border-primary-500 shadow-md hover:shadow-lg"
+                      >
+                        Ver todas las ofertas disponibles
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-left py-12">
+                  <p className="text-gray-600 text-lg">
+                    No hay ofertas laborales disponibles en este momento. 
+                    <br />
+                    Vuelve pronto para ver nuevas oportunidades.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Modal de postulación */}
+        {selectedApplicationTarget && (
+          <PostularForm
+            vacancyId={selectedApplicationTarget.vacancyId}
+            vacancyTitle={selectedApplicationTarget.vacancyTitle}
+            mode={selectedApplicationTarget.mode}
+            onClose={closeModal}
+          />
+        )}
+
+        {/* Sección Empresas */}
+          <Empresas />
+                
+
+        {/* Sección Contacto */}
+        <section ref={contactoRef} id="contacto" className={`section-padding bg-white animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
+          <div className="container-custom">
+            {/* Título y descripción */}
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <h2 className={`text-4xl md:text-5xl font-bold text-gray-900 mb-6 animate-on-scroll ${contactoVisible ? 'is-visible' : ''}`}>
+                Ponte en <span className="text-primary-500 inline-block hover:scale-105 transition-transform duration-200">Contacto</span>
+              </h2>
+              <p className={`text-lg text-gray-600 animate-on-scroll reveal-delay-2 max-w-3xl mx-auto text-left ${contactoVisible ? 'is-visible' : ''}`}>
+                ¿Tienes alguna consulta? Completa el formulario y nos comunicaremos contigo a la brevedad. 
+                Estamos aquí para ayudarte.
+              </p>
+            </div>
+
+            {/* Grid: Formulario e Información */}
+            <div className="grid lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
+              {/* Formulario de contacto */}
+              <div className="lg:col-span-2">
+                <ContactForm />
+              </div>
+
+              {/* Información de contacto */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Información de Contacto</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Nuestro equipo está disponible para responder tus consultas de lunes a viernes de 9:00 a 18:00 hs.
+                  </p>
+                </div>
+
+                {/* Email */}
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Email</p>
+                    <a href="mailto:mperloing@gmail.com" className="text-primary-500 hover:text-primary-600 transition-colors">
+                      <strong>Contactaténos</strong>
+                    </a>
+                  </div>
+                </div>
+
+                {/* WhatsApp */}
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">WhatsApp</p>
+                    <a href="https://wa.me/5493533418702" target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-700 transition-colors">
+                      <strong>Contactaténos</strong>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Instagram */}
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-6 h-6 text-pink-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Instagram</p>
+                    <a href="https://www.instagram.com/meinardiperlo.rrhh/" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors">
+                      <strong>Contactaténos</strong>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <Footer />
+    </div>
+  )
+}

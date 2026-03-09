@@ -1,36 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { logger } from '@/lib/logger'
+import { auditAdminAction } from '@/lib/adminAudit'
+import { normalizeLocation } from '@/lib/utils'
+import {
+  createVacancySchema,
+  formatValidationError,
+  vacanciesListQuerySchema
+} from '@/lib/apiValidation'
+import { toVacancyDto } from '@/lib/dto/vacancy'
 
-// GET /api/vacancies - Listar vacantes activas
+
+// GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const status = searchParams.get('status') || 'ACTIVE'
+    const queryValidation = vacanciesListQuerySchema.safeParse({
+      all: searchParams.get('all')?.toLowerCase()
+    })
+    if (!queryValidation.success) {
+      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+    }
+    const { all } = queryValidation.data // Para el admin dashboard
+    
+    // Solo admins pueden pedir todas las vacantes
+    if (all) {
+      const session = await auth()
+      if (!session || session.user?.role !== 'ADMIN') {
+        return NextResponse.json(
+          { error: 'No autorizado' },
+          { status: 401 }
+        )
+      }
+    }
 
     const vacancies = await prisma.vacancy.findMany({
-      where: {
-        status: status as 'ACTIVE' | 'CLOSED' | 'DRAFT'
-      },
+      where: all ? {} : { status: 'ACTIVE' },
       orderBy: {
         createdAt: 'desc'
       }
     })
 
-    // Transformar para compatibilidad con el frontend
-    const formattedVacancies = vacancies.map(v => ({
-      id: v.id,
-      title: v.title,
-      description: v.description,
-      location: v.location,
-      type: v.type.toLowerCase().replace('_', '-') as 'full-time' | 'part-time' | 'freelance',
-      salary: v.salary || undefined,
-      requirements: v.requirements || undefined,
-      benefits: v.benefits || undefined
-    }))
+    const formattedVacancies = vacancies.map(toVacancyDto)
 
     return NextResponse.json(formattedVacancies)
   } catch (error) {
-    console.error('Error al obtener vacantes:', error)
+    logger.error('Error al obtener vacantes', error)
     return NextResponse.json(
       { error: 'Error al obtener vacantes' },
       { status: 500 }
@@ -40,31 +56,41 @@ export async function GET(request: NextRequest) {
 
 // POST /api/vacancies - Crear nueva vacante (admin)
 export async function POST(request: NextRequest) {
+  let session = null as Awaited<ReturnType<typeof auth>>
   try {
-    const body = await request.json()
-    const { title, description, location, type, salary, requirements, benefits } = body
-
-    // Validaciones básicas
-    if (!title || !description || !location || !type) {
+    // Verificar autenticación
+    session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'vacancy.create',
+        resourceType: 'vacancy',
+        outcome: 'DENIED'
+      })
       return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
-        { status: 400 }
+        { error: 'No autorizado' },
+        { status: 401 }
       )
     }
 
-    // Convertir type del frontend al formato de la BD
-    const typeMap: Record<string, string> = {
-      'full-time': 'FULL_TIME',
-      'part-time': 'PART_TIME',
-      'freelance': 'FREELANCE'
+    const body = await request.json()
+    const bodyValidation = createVacancySchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
+    const { title, description, location, workday, modality, salary, requirements, benefits } = bodyValidation.data
 
     const vacancy = await prisma.vacancy.create({
       data: {
         title,
         description,
-        location,
-        type: typeMap[type] as 'FULL_TIME' | 'PART_TIME' | 'FREELANCE',
+        location: normalizeLocation(location),
+        workday,
+        modality,
         salary,
         requirements,
         benefits,
@@ -72,9 +98,38 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(vacancy, { status: 201 })
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session.user?.id,
+        email: session.user?.email
+      },
+      action: 'vacancy.create',
+      resourceType: 'vacancy',
+      resourceId: vacancy.id,
+      outcome: 'SUCCESS',
+      metadata: {
+        title: vacancy.title,
+        status: vacancy.status
+      }
+    })
+
+    return NextResponse.json(toVacancyDto(vacancy), { status: 201 })
   } catch (error) {
-    console.error('Error al crear vacante:', error)
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session?.user?.id,
+        email: session?.user?.email
+      },
+      action: 'vacancy.create',
+      resourceType: 'vacancy',
+      outcome: 'ERROR',
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
+    })
+    logger.error('Error al crear vacante', error)
     return NextResponse.json(
       { error: 'Error al crear vacante' },
       { status: 500 }

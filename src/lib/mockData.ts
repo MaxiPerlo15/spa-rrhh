@@ -135,13 +135,13 @@ export const mockFounders: Founder[] = [
     name: 'María García',
     role: 'Co-Fundadora & Directora de RRHH',
     description: 'Licenciada en Recursos Humanos con más de 15 años de experiencia en selección y desarrollo de talento. Especializada en gestión estratégica y consultoría organizacional.',
-    imageUrl: '/images/founder-1.jpg'
+    imageUrl: '/logorrhh.webp'
   },
   {
     id: '2',
     name: 'Laura Rodríguez',
     role: 'Co-Fundadora & Consultora Senior',
     description: 'Psicóloga Laboral con expertise en evaluación de competencias y coaching ejecutivo. Apasionada por el desarrollo profesional y el bienestar organizacional.',
-    imageUrl: '/images/founder-2.jpg'
+    imageUrl: '/logorrhh.webp'
   }
 ]

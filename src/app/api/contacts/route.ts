@@ -1,26 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ContactStatus } from '@prisma/client'
+import { auth } from '@/lib/auth'
+import { sendNewContactEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
+import {
+  contactsListQuerySchema,
+  createContactSchema,
+  formatValidationError
+} from '@/lib/apiValidation'
+import { getClientIp, rateLimit } from '@/lib/rateLimit'
+import { verifyTurnstileToken } from '@/lib/botProtection'
+import { toContactAdminDto } from '@/lib/dto/contact'
+import { buildPersonKey } from '@/lib/personIdentity'
+import { isMissingTableOrColumnError } from '@/lib/prismaError'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
-    const statusParam = searchParams.get('status')
+    const queryValidation = contactsListQuerySchema.safeParse({
+      status: searchParams.get('status') ?? undefined
+    })
+    if (!queryValidation.success) {
+      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+    }
+    const { status: statusParam } = queryValidation.data
 
     const where: { status?: ContactStatus } = {}
-    if (statusParam) where.status = statusParam as ContactStatus
+    if (statusParam) where.status = statusParam
 
     const contacts = await prisma.contact.findMany({
       where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        subject: true,
+        message: true,
+        status: true,
+        createdAt: true
+      },
       orderBy: {
         createdAt: 'desc'
       }
     })
 
-    return NextResponse.json(contacts)
+    return NextResponse.json(contacts.map(toContactAdminDto))
   } catch (error) {
-    console.error('Error al obtener contactos:', error)
+    logger.error('Error al obtener contactos', error)
     return NextResponse.json(
       { error: 'Error al obtener contactos' },
       { status: 500 }
@@ -32,39 +70,109 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, phone, subject, message } = body
+    const bodyValidation = createContactSchema.safeParse(body)
+    if (!bodyValidation.success) {
+      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+    }
+    const { name, email, phone, subject, message, captchaToken } = bodyValidation.data
 
-    // Validaciones
-    if (!name || !email || !phone || !subject || !message) {
+    const clientIp = getClientIp(request.headers)
+    const rateLimitResult = await rateLimit({
+      key: `contacts:${clientIp}`,
+      windowMs: 10 * 60 * 1000,
+      maxRequests: 5
+    })
+    if (!rateLimitResult.allowed) {
+      logger.warn('Rate limit bloqueó un contacto', {
+        ip: clientIp,
+        retryAfterSeconds: rateLimitResult.retryAfterSeconds
+      })
       return NextResponse.json(
-        { error: 'Todos los campos son requeridos' },
+        { error: `Demasiadas solicitudes. Intenta nuevamente en ${rateLimitResult.retryAfterSeconds}s.` },
+        { status: 429 }
+      )
+    }
+
+    const captchaVerification = await verifyTurnstileToken({
+      token: captchaToken,
+      remoteIp: clientIp,
+      action: 'contact_form'
+    })
+    if (!captchaVerification.success) {
+      logger.warn('Captcha inválido al crear contacto', {
+        ip: clientIp,
+        reason: captchaVerification.reason
+      })
+      return NextResponse.json(
+        { error: 'No se pudo verificar el captcha' },
         { status: 400 }
       )
     }
 
-    // Validar email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Email inválido' },
-        { status: 400 }
-      )
+    const personKey = buildPersonKey(email, phone)
+    const duplicateWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    let personKeyColumnAvailable = true
+
+    try {
+      const recentDuplicate = await prisma.contact.findFirst({
+        where: {
+          personKey,
+          subject,
+          createdAt: {
+            gte: duplicateWindowStart
+          }
+        },
+        select: { id: true }
+      })
+
+      if (recentDuplicate) {
+        return NextResponse.json(
+          {
+            error: 'Ya recibimos un contacto reciente con el mismo asunto desde estos datos.',
+            code: 'DUPLICATE_SUBMISSION'
+          },
+          { status: 409 }
+        )
+      }
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      personKeyColumnAvailable = false
+      logger.warn('No se pudo validar deduplicación de contactos por personKey: columna no disponible')
     }
 
     // Crear contacto
-    const contact = await prisma.contact.create({
-      data: {
-        name,
-        email,
-        phone,
-        subject,
-        message,
-        status: 'PENDING'
-      }
-    })
+    const baseContactData = {
+      name,
+      email,
+      phone,
+      subject,
+      message,
+      status: 'PENDING' as const
+    }
 
-    // TODO: Enviar email de confirmación
-    // TODO: Notificar al admin
+    let contact
+    try {
+      contact = await prisma.contact.create({
+        data: personKeyColumnAvailable ? { ...baseContactData, personKey } : baseContactData
+      })
+    } catch (error) {
+      if (!isMissingTableOrColumnError(error)) throw error
+      contact = await prisma.contact.create({
+        data: baseContactData
+      })
+    }
+
+    // Enviar notificación al admin (no bloqueante)
+    sendNewContactEmail({
+      name,
+      email,
+      phone,
+      company: subject,
+      message
+    }).catch(error => {
+      logger.error('Error al enviar email de notificación', error)
+      // No fallar la request si el email falla
+    })
 
     return NextResponse.json(
       { 
@@ -74,7 +182,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error al crear contacto:', error)
+    logger.error('Error al crear contacto', error)
     return NextResponse.json(
       { error: 'Error al enviar mensaje' },
       { status: 500 }

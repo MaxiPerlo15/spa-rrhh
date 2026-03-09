@@ -1,63 +1,162 @@
 'use client'
 import { useState, FormEvent } from 'react'
+import { useToast } from '@/contexts/ToastContext'
+import { createContact } from '@/lib/api/contacts'
+import { isApiRequestError } from '@/lib/api/errors'
+import * as Sentry from '@sentry/nextjs'
+import TurnstileWidget from '@/components/TurnstileWidget'
+import { getEmailValidationMessage, validateInternationalPhone } from '@/lib/formValidationPolicy'
+
 
 export default function ContactForm() {
+  const { showSuccess, showError, showInfo } = useToast()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     subject: '',
-    message: ''
+    message: '',
+    acceptedPrivacy: false
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
+
+  const formatPhoneMask = (rawValue: string) => {
+    const digitsOnly = rawValue.replace(/\D/g, '')
+    let localDigits = digitsOnly
+
+    if (localDigits.startsWith('549')) {
+      localDigits = localDigits.slice(3)
+    } else if (localDigits.startsWith('54')) {
+      localDigits = localDigits.slice(2)
+    } else if (localDigits.startsWith('9')) {
+      localDigits = localDigits.slice(1)
+    }
+
+    localDigits = localDigits.slice(0, 10)
+
+    if (!localDigits) return ''
+    if (localDigits.length <= 2) return `+54 9 ${localDigits}`
+    if (localDigits.length <= 6) return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2)}`
+    return `+54 9 ${localDigits.slice(0, 2)} ${localDigits.slice(2, 6)}-${localDigits.slice(6)}`
+  }
+
+  const validateField = (name: string, value: string) => {
+    if (['name', 'subject', 'message'].includes(name) && !value.trim()) return 'Este campo es obligatorio.'
+    if (name === 'email') {
+      if (!value.trim()) return 'Este campo es obligatorio.'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un email válido.'
+      const message = getEmailValidationMessage(value)
+      if (message) return message
+    }
+    if (name === 'phone' && value.trim()) {
+      const result = validateInternationalPhone(value, { required: false })
+      if (!result.isValid) return result.message || 'Ingresa un teléfono válido.'
+    }
+    return ''
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const nextValue = name === 'phone' ? formatPhoneMask(value) : value
+    setFormData(prev => ({ ...prev, [name]: nextValue }))
+
+    if (touched[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: validateField(name, nextValue) }))
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setTouched(prev => ({ ...prev, [name]: true }))
+    setFieldErrors(prev => ({ ...prev, [name]: validateField(name, value) }))
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+
+    const nextErrors = {
+      name: validateField('name', formData.name),
+      email: validateField('email', formData.email),
+      phone: validateField('phone', formData.phone),
+      subject: validateField('subject', formData.subject),
+      message: validateField('message', formData.message),
+      acceptedPrivacy: formData.acceptedPrivacy
+        ? ''
+        : 'Debes aceptar la política de privacidad para continuar.',
+    }
+    setFieldErrors(nextErrors)
+    setTouched({ name: true, email: true, phone: true, subject: true, message: true, acceptedPrivacy: true })
+    if (
+      nextErrors.name ||
+      nextErrors.email ||
+      nextErrors.phone ||
+      nextErrors.subject ||
+      nextErrors.message ||
+      nextErrors.acceptedPrivacy
+    ) {
+      showError('Revisa los campos marcados para continuar.')
+      return
+    }
+
+    if (captchaEnabled && !captchaToken) {
+      showError('Completa la verificación captcha para continuar.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      // Enviar a la API
-      const response = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          subject: formData.subject,
-          message: formData.message
-        })
+      await createContact({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        acceptedPrivacy: formData.acceptedPrivacy,
+        subject: formData.subject,
+        message: formData.message,
+        captchaToken
       })
-
-      if (!response.ok) {
-        throw new Error('Error al enviar el mensaje')
-      }
 
       // Mostrar éxito y resetear
       setSubmitted(true)
+      showSuccess('¡Mensaje enviado exitosamente! Te contactaremos pronto.')
       setFormData({
         name: '',
         email: '',
         phone: '',
         subject: '',
-        message: ''
+        message: '',
+        acceptedPrivacy: false
       })
+      setCaptchaToken('')
 
       // Ocultar mensaje de éxito después de 5 segundos
       setTimeout(() => {
         setSubmitted(false)
       }, 5000)
     } catch (error) {
-      console.error('Error al enviar mensaje:', error)
-      alert('Hubo un error al enviar tu mensaje. Por favor intenta nuevamente.')
+      if (isApiRequestError(error) && error.status === 409 && error.code === 'DUPLICATE_SUBMISSION') {
+        showInfo(error.message)
+        return
+      }
+      const message = error instanceof Error
+        ? error.message
+        : 'Error al enviar el mensaje. Por favor, intenta nuevamente.'
+      showError(message)
+      
+      Sentry.captureException(error, {
+        tags: {
+          component: 'ContactForm'
+        },
+        extra: {
+          contactDomain: formData.email.includes('@') ? formData.email.split('@')[1] : 'invalid_email',
+          subject: formData.subject
+        }
+      })
     } finally {
       setLoading(false)
     }
@@ -93,12 +192,19 @@ export default function ContactForm() {
               type="text"
               id="name"
               name="name"
+              autoComplete="name"
               required
               value={formData.name}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.name ? 'border-red-400' : 'border-gray-300'
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="Juan Pérez"
             />
+            {touched.name && fieldErrors.name && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div>
@@ -109,12 +215,19 @@ export default function ContactForm() {
               type="email"
               id="email"
               name="email"
+              autoComplete="email"
               required
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.email ? 'border-red-400' : 'border-gray-300'
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="juan@ejemplo.com"
             />
+            {touched.email && fieldErrors.email && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.email}</p>
+            )}
           </div>
         </div>
 
@@ -128,11 +241,19 @@ export default function ContactForm() {
               type="tel"
               id="phone"
               name="phone"
+              inputMode="tel"
+              autoComplete="tel"
               value={formData.phone}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-              placeholder="+54 11 1234-5678"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
+              } text-gray-900 placeholder:text-gray-600`}
+              placeholder="+54 9 11 1234-5678"
             />
+            {touched.phone && fieldErrors.phone && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.phone}</p>
+            )}
           </div>
 
           <div>
@@ -143,12 +264,19 @@ export default function ContactForm() {
               type="text"
               id="subject"
               name="subject"
+              autoComplete="off"
               required
               value={formData.subject}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              onBlur={handleBlur}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
+                fieldErrors.subject ? 'border-red-400' : 'border-gray-300'
+              } text-gray-900 placeholder:text-gray-500`}
               placeholder="Consulta sobre servicios"
             />
+            {touched.subject && fieldErrors.subject && (
+              <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.subject}</p>
+            )}
           </div>
         </div>
 
@@ -160,22 +288,69 @@ export default function ContactForm() {
           <textarea
             id="message"
             name="message"
+            autoComplete="off"
             required
             value={formData.message}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             rows={6}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none ${
+              fieldErrors.message ? 'border-red-400' : 'border-gray-300'
+            } text-gray-900 placeholder:text-gray-500`}
             placeholder="Escribe tu consulta aquí..."
           />
+          {touched.message && fieldErrors.message && (
+            <p className="field-feedback-enter mt-2 text-sm text-red-600">{fieldErrors.message}</p>
+          )}
         </div>
 
         {/* Botón submit */}
+        <TurnstileWidget action="contact_form" onTokenChange={setCaptchaToken} />
+        <div className="space-y-2">
+          <label htmlFor="contact-accepted-privacy" className="flex items-start gap-3 text-sm text-gray-700">
+            <input
+              id="contact-accepted-privacy"
+              name="acceptedPrivacy"
+              type="checkbox"
+              checked={formData.acceptedPrivacy}
+              onChange={(event) => {
+                const acceptedPrivacy = event.target.checked
+                setFormData((prev) => ({ ...prev, acceptedPrivacy }))
+                setTouched((prev) => ({ ...prev, acceptedPrivacy: true }))
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  acceptedPrivacy: acceptedPrivacy
+                    ? ''
+                    : 'Debes aceptar la política de privacidad para continuar.'
+                }))
+              }}
+              aria-invalid={touched.acceptedPrivacy && Boolean(fieldErrors.acceptedPrivacy)}
+              className="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            />
+            <span>
+              Acepto la{' '}
+              <a
+                href="/privacy"
+                className="font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Política de Privacidad
+              </a>{' '}
+              y el tratamiento de mis datos personales.
+            </span>
+          </label>
+          {touched.acceptedPrivacy && fieldErrors.acceptedPrivacy && (
+            <p className="field-feedback-enter text-sm text-red-600">{fieldErrors.acceptedPrivacy}</p>
+          )}
+        </div>
+
         <button
           type="submit"
-          disabled={loading}
-          className="w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-all duration-200 transform hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          disabled={loading || !formData.acceptedPrivacy || (captchaEnabled && !captchaToken)}
+          className="btn-motion w-full md:w-auto px-10 py-4 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
-          {loading ? 'Enviando...' : 'Enviar Mensaje'}
+          {loading ? 'Enviando...' : 'Enviar Consulta'}
         </button>
       </form>
     </div>
