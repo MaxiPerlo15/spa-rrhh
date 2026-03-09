@@ -138,6 +138,31 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    strategy:
+      matrix:
+        node-version: [20.19.0]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies (high+critical)
+        run: npm audit --audit-level=high
+
   api-smoke:
     name: API Smoke
     runs-on: ubuntu-latest
@@ -233,12 +258,20 @@ jobs:
     runs-on: ubuntu-latest
     # Manual merge gate for this private single-dev repo:
     # do not merge to main unless these checks are green.
-    needs: [lint-and-build, unit-tests, coverage, api-smoke, e2e-tests]
+    # Mandatory checks:
+    # - Lint and Build
+    # - Unit Tests
+    # - Coverage
+    # - NPM Audit (high+critical)
+    # - API Smoke
+    # - E2E Tests
+    needs: [lint-and-build, unit-tests, coverage, npm-audit, api-smoke, e2e-tests]
     if: >
       always() &&
       needs.lint-and-build.result == 'success' &&
       needs.unit-tests.result == 'success' &&
       needs.coverage.result == 'success' &&
+      needs.npm-audit.result == 'success' &&
       needs.api-smoke.result == 'success' &&
       (
         needs.e2e-tests.result == 'success' ||

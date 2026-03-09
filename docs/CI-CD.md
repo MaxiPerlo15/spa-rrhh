@@ -70,11 +70,15 @@ El archivo `.github/workflows/ci.yml` ejecuta automáticamente:
 4. **Job: api-smoke**
    - ✅ Ejecuta smoke tests de APIs críticas
 
-5. **Job: e2e-tests** (siempre en PR a `main` y en pushes a `main`)
+5. **Job: npm-audit**
+   - ✅ Ejecuta `npm audit --audit-level=high`
+   - ✅ Falla si detecta vulnerabilidades `high` o `critical`
+
+6. **Job: e2e-tests** (siempre en PR a `main` y en pushes a `main`)
    - ✅ Ejecuta tests E2E (`npm run test:e2e`)
    - ✅ Sube resultados
 
-6. **Job: ci-success**
+7. **Job: ci-success**
    - ✅ Resume el estado final real de todos los checks obligatorios del pipeline
    - ✅ Debe quedar verde antes de mergear manualmente a `main`
 
@@ -93,6 +97,7 @@ El control compensatorio es operativo: no mergear a `main` si `CI Success` no es
 - `Lint and Build`
 - `Unit Tests`
 - `Coverage`
+- `NPM Audit`
 - `API Smoke`
 - `E2E Tests`
 - `CI Success`
@@ -110,6 +115,7 @@ La estrategia operativa de despliegue, dominio y rollback está documentada en:
    - `Lint and Build`
    - `Unit Tests`
    - `Coverage`
+   - `NPM Audit`
    - `API Smoke`
    - `E2E Tests`
    - `CI Success`
@@ -133,6 +139,15 @@ El workflow incluye hardening para hacer la pipeline más determinista:
    - `GET /api/vacancies`
    - `GET /api/auth/csrf`
    - `GET /api/admin/notifications` (debe rechazar sin sesión)
+3. Ejecuta auditoría de vulnerabilidades npm:
+   - `npm audit --audit-level=high`
+   - Bloquea CI ante findings `high` o `critical`
+
+## Política de dependencias (MIS-115)
+
+La política operativa de dependencias está documentada en:
+
+- `docs/DEPENDENCY-POLICY.md`
 
 ## Ver resultados
 
