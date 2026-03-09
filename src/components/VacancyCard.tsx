@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 
-const RENDER_TIME_REFERENCE_MS = Date.now()
-
 interface VacancyCardProps {
   id: string
   title: string
@@ -16,6 +14,21 @@ interface VacancyCardProps {
   benefits?: string
   createdAt?: string
   onApply: (id: string, title: string) => void
+}
+
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+export function getVacancyPublishedLabel(createdAt?: string) {
+  if (!createdAt) return null
+
+  const publishedTime = new Date(createdAt).getTime()
+  if (Number.isNaN(publishedTime)) return null
+
+  const diffMs = Date.now() - publishedTime
+  const diffDays = Math.floor(diffMs / DAY_IN_MS)
+
+  if (diffDays < 2) return 'Nueva'
+  return `Hace ${diffDays} días`
 }
 
 export default function VacancyCard({ id, title, description, location, workday, modality, salary, requirements, benefits, createdAt, onApply }: VacancyCardProps) {
@@ -47,17 +60,7 @@ export default function VacancyCard({ id, title, description, location, workday,
     'HYBRID': 'bg-indigo-100 text-indigo-700'
   }
 
-  const getPublishedTag = () => {
-    if (!createdAt) return null
-    const publishedTime = new Date(createdAt).getTime()
-    if (Number.isNaN(publishedTime)) return null
-    const diffMs = RENDER_TIME_REFERENCE_MS - publishedTime
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-    if (diffDays < 2) return 'Nueva'
-    return `Hace ${diffDays} días`
-  }
-
-  const publishedTag = getPublishedTag()
+  const publishedTag = getVacancyPublishedLabel(createdAt)
 
   return (
     <div className="group card-lift bg-white rounded-xl shadow-md p-6 hover:shadow-lg border border-blue-400 hover:translate-y-[-4px] transform-gpu transition-all duration-200">

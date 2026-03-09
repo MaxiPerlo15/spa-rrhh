@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import VacancyCard from '@/components/VacancyCard'
+import VacancyCard, { getVacancyPublishedLabel } from '@/components/VacancyCard'
 
 const baseProps = {
   id: 'vacancy-1',
@@ -46,6 +46,10 @@ describe('VacancyCard badges de publicación', () => {
     expect(screen.getByText(/^Hace \d+ días$/)).toBeTruthy()
   })
 
+  it('muestra Hace 2 días exactamente en el umbral de 2 días', () => {
+    expect(getVacancyPublishedLabel('2026-03-02T12:00:00.000Z')).toBe('Hace 2 días')
+  })
+
   it('mantiene badge Hace X días en ofertas más antiguas', () => {
     render(
       <VacancyCard
@@ -56,6 +60,18 @@ describe('VacancyCard badges de publicación', () => {
 
     expect(screen.queryByText('Nueva')).toBeNull()
     expect(screen.getByText(/^Hace \d+ días$/)).toBeTruthy()
+  })
+
+  it('no muestra badge si la fecha es inválida', () => {
+    render(
+      <VacancyCard
+        {...baseProps}
+        createdAt="fecha-invalida"
+      />
+    )
+
+    expect(screen.queryByText('Nueva')).toBeNull()
+    expect(screen.queryByText(/^Hace \d+ días$/)).toBeNull()
   })
 
   it('ejecuta Postularme', () => {
