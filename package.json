@@ -28,7 +28,8 @@
     "predeploy:check": "npm run env:check:prod && npm run test:e2e:matrix && npm run build",
     "db:seed": "dotenv -e .env -- tsx prisma/seed.ts",
     "db:reset": "dotenv -e .env -- npx prisma migrate reset --force",
-    "db:verify": "dotenv -e .env -- tsx scripts/verify-admin.ts"
+    "db:verify": "dotenv -e .env -- tsx scripts/verify-admin.ts",
+    "admin:create": "dotenv -e .env -- tsx scripts/create-admin.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env -- tsx prisma/seed.ts"

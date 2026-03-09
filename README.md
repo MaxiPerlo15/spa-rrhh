@@ -191,10 +191,16 @@ npm run db:seed
 - **Email**: `admin@sparrhh.com`
 - **Password**: `ChangeMe123!`
 
-Para personalizar las credenciales del admin, agrega en `.env`:
+Para personalizar las credenciales del admin inicial, agrega en `.env`:
 ```bash
 ADMIN_EMAIL="tu-email@empresa.com"
 ADMIN_PASSWORD="TuPasswordSegura123!"
+```
+
+Para crear admins adicionales sin interfaz de gestión:
+
+```bash
+npm run admin:create -- --email admin2@empresa.com --password "TuPasswordSegura123!" --name "Admin Dos"
 ```
 
 Ver más detalles en [docs/DATABASE-SETUP.md](docs/DATABASE-SETUP.md)

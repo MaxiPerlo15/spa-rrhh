@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
-import bcrypt from 'bcrypt'
+import { createOrUpdateAdminUser } from '@/lib/adminUsers'
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) {
@@ -24,20 +24,10 @@ async function main() {
   }
   
   const passwordToUse = adminPassword || 'ChangeMe123!'
-  const passwordHash = await bcrypt.hash(passwordToUse, 10)
-  
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      passwordHash,
-      role: 'ADMIN'
-    },
-    create: {
-      email: adminEmail,
-      name: 'Administrador',
-      passwordHash,
-      role: 'ADMIN'
-    }
+  const admin = await createOrUpdateAdminUser(prisma, {
+    email: adminEmail,
+    password: passwordToUse,
+    name: 'Administrador'
   })
 
   console.log(`✅ Usuario admin creado/actualizado: ${admin.email}`)
@@ -119,4 +109,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect()
+    await pool.end()
   })

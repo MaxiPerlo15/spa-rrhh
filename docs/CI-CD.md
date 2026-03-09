@@ -59,17 +59,24 @@ El archivo `.github/workflows/ci.yml` ejecuta automáticamente:
    - ✅ Compila el proyecto (`npm run build`)
    - ✅ Sube artefactos de build
 
-2. **Job: test**
-   - ✅ Ejecuta tests unitarios con cobertura (`npm run test:coverage`)
-   - ✅ Valida umbrales mínimos de cobertura definidos en `vitest.config.ts`
-   - ✅ Sube resultados de tests
+2. **Job: unit-tests**
+   - ✅ Ejecuta tests unitarios (`npm run test:unit`)
 
-3. **Job: e2e** (siempre en PR a `main` y en pushes a `main`)
+3. **Job: coverage**
+   - ✅ Ejecuta tests con cobertura (`npm run test:coverage`)
+   - ✅ Valida umbrales mínimos de cobertura definidos en `vitest.config.ts`
+   - ✅ Sube artefactos de cobertura
+
+4. **Job: api-smoke**
+   - ✅ Ejecuta smoke tests de APIs críticas
+
+5. **Job: e2e-tests** (siempre en PR a `main` y en pushes a `main`)
    - ✅ Ejecuta tests E2E (`npm run test:e2e`)
    - ✅ Sube resultados
 
-4. **Job: ci-success**
-   - ✅ Confirma que todo pasó correctamente
+6. **Job: ci-success**
+   - ✅ Resume el estado final real de todos los checks obligatorios del pipeline
+   - ✅ Debe quedar verde antes de mergear manualmente a `main`
 
 ## Triggers
 
@@ -78,28 +85,17 @@ El pipeline se ejecuta en:
 - Push a ramas `feature/*` y `release/*`
 - Pull Requests hacia `main`
 
-## Required Checks (Branch Protection)
+## Semáforo manual de merge
 
-Para bloquear merges con señal incompleta, configura protección de `main` con checks granulares obligatorios:
+Este repositorio es privado y hoy tiene un único desarrollador iterando. No se usa `branch protection` como mecanismo principal.
+El control compensatorio es operativo: no mergear a `main` si `CI Success` no está verde.
 
 - `Lint and Build`
-- `Run Tests`
+- `Unit Tests`
+- `Coverage`
+- `API Smoke`
 - `E2E Tests`
-
-Opcional:
-- `CI Success` (solo como check resumen visual)
-
-### Checklist de configuración en GitHub
-
-1. Ve a **Settings** → **Branches**.
-2. Edita o crea la regla de protección para `main`.
-3. Activa **Require status checks to pass before merging**.
-4. Selecciona como required checks:
-   - `Lint and Build`
-   - `Run Tests`
-   - `E2E Tests`
-5. (Opcional) añade `CI Success`.
-6. Guarda la regla.
+- `CI Success`
 
 ## Deployment strategy (Vercel)
 
@@ -107,17 +103,17 @@ La estrategia operativa de despliegue, dominio y rollback está documentada en:
 
 - `docs/DEPLOYMENT-VERCEL.md`
 
-## Governance en repo privado sin enforcement efectivo
-
-Actualmente, GitHub muestra que la ruleset puede no aplicar enforcement real en este repositorio privado según plan.
-Para mitigar ese riesgo se define la siguiente política operativa obligatoria:
+## Governance operativa para repo privado
 
 1. Todo cambio entra por PR hacia `main` (sin push directo).
 2. No se hace merge si no están verdes:
    - `Lint and Build`
-   - `Run Tests`
+   - `Unit Tests`
+   - `Coverage`
+   - `API Smoke`
    - `E2E Tests`
-3. Si `CI Success` está configurado, también debe quedar en verde.
+   - `CI Success`
+3. `CI Success` es el semáforo final: si está rojo o ausente por fallo aguas arriba, no se mergea.
 4. Toda excepción debe quedar documentada en el PR (motivo + plan de remediación).
 
 ### Checklist mínimo de merge (control compensatorio)
@@ -132,7 +128,7 @@ Para mitigar ese riesgo se define la siguiente política operativa obligatoria:
 
 El workflow incluye hardening para hacer la pipeline más determinista:
 
-1. Ejecuta `prisma migrate deploy` en jobs de `lint-and-build`, `test` y `e2e`.
+1. Ejecuta `prisma migrate deploy` en jobs de `lint-and-build`, `unit-tests`, `coverage`, `api-smoke` y `e2e-tests`.
 2. Ejecuta smoke tests de APIs críticas en CI:
    - `GET /api/vacancies`
    - `GET /api/auth/csrf`
@@ -163,4 +159,4 @@ Puedes agregar un badge al README:
 
 ### E2E tests no se ejecutan en PR
 - Verifica que el PR apunte a `main`
-- Revisa el `if` del job `e2e` en `.github/workflows/ci.yml`
+- Revisa el `if` del job `e2e-tests` en `.github/workflows/ci.yml`

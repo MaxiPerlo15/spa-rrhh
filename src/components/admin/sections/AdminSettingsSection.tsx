@@ -118,7 +118,7 @@ export default function AdminSettingsSection({
           </div>
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Modelo de acceso</p>
-            <p className="text-sm font-medium text-gray-900">Single-admin (cuenta única)</p>
+            <p className="text-sm font-medium text-gray-900">Multi-admin básico (1-5 administradores)</p>
           </div>
           <div className="rounded-lg border border-gray-200 p-4 md:col-span-2">
             <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Seguridad de acceso</p>

@@ -6,7 +6,7 @@ El proyecto incluye un script de seed que inicializa la base de datos con datos 
 
 ### Contenido del Seed
 
-1. **Usuario Administrador**: Crea/actualiza un usuario admin para acceder al panel de administración
+1. **Usuario Administrador inicial**: Crea/actualiza un admin base para acceder al panel de administración
 2. **Vacantes de Ejemplo**: Crea 5 vacantes de muestra (opcional, solo en desarrollo)
 
 ### Ejecutar el Seed
@@ -30,10 +30,23 @@ npm run db:reset
 # .env
 DATABASE_URL="postgresql://user:password@localhost:5432/spa_rrhh_db"
 
-# Opcional: Personalizar admin
+# Opcional: Personalizar admin inicial
 ADMIN_EMAIL="admin@tuempresa.com"    # Default: admin@sparrhh.com
 ADMIN_PASSWORD="TuPasswordSegura123"  # Default: ChangeMe123!
 ```
+
+### Admins adicionales
+
+Para agregar administradores extra sin UI de gestión:
+
+```bash
+npm run admin:create -- --email admin2@tuempresa.com --password "TuPasswordSegura123!" --name "Admin Dos"
+```
+
+Notas:
+- cualquier usuario con `role = ADMIN` en base puede iniciar sesión;
+- `ADMIN_EMAIL` ya no limita el acceso a una única cuenta;
+- el seed sigue creando solo un admin inicial por compatibilidad operativa.
 
 ### Credenciales por Defecto
 
@@ -67,7 +80,7 @@ ADMIN_EMAIL="admin@tudominio.com"
    🎉 Seed completado exitosamente!
    ```
 
-3. Inicia sesión en `/admin/signin` con las credenciales configuradas
+3. Inicia sesión en `/admin/signin` con cualquiera de las credenciales admin configuradas
 
 ### Troubleshooting
 
@@ -89,8 +102,8 @@ brew services start postgresql@16
 
 #### El admin ya existe
 
-El script usa `upsert`, por lo que:
-- Si el admin existe: actualiza la contraseña
+El seed usa `createOrUpdateAdminUser`, por lo que:
+- Si el admin inicial existe: actualiza la contraseña
 - Si no existe: lo crea
 
 ### CI/CD
