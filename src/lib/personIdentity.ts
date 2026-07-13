@@ -1,5 +1,8 @@
 import { createHash } from 'crypto'
 
+// Java parity: ApplicationManager.buildPersonKey() in the Spring backend
+// must produce identical SHA-256 hashes for the same inputs.
+// See: backend/src/main/java/com/meinardi/rrhh/application/ApplicationManager.java
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }

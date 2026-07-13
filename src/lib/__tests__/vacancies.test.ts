@@ -89,12 +89,17 @@ describe('Vacancies API Service', () => {
     expect(result.status).toBe('closed')
   })
 
-  it('deleteVacancy no lanza error si la respuesta es ok', async () => {
+  it('deleteVacancy devuelve y normaliza la vacante cerrada si la respuesta es ok', async () => {
+    const mockVacancy = { id: '1', title: 'Dev', location: '', workday: '', modality: '', status: 'CLOSED', createdAt: '' }
     vi.stubGlobal('fetch', vi.fn(() =>
-      Promise.resolve({ ok: true })
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockVacancy)
+      })
     ))
 
-    await expect(deleteVacancy('1')).resolves.toBeUndefined()
+    const result = await deleteVacancy('1')
+    expect(result.status).toBe('closed')
   })
 
   it('deleteVacancy lanza error si la respuesta no es ok', async () => {
@@ -102,7 +107,7 @@ describe('Vacancies API Service', () => {
       Promise.resolve({ ok: false })
     ))
 
-    await expect(deleteVacancy('1')).rejects.toThrow('Error al eliminar la vacante')
+    await expect(deleteVacancy('1')).rejects.toThrow('Error al cerrar la vacante')
   })
 
   it('toggleVacancyStatus alterna el estado correctamente', async () => {
@@ -115,7 +120,7 @@ describe('Vacancies API Service', () => {
           location: '',
           workday: '',
           modality: '',
-          status: 'CLOSED',
+          status: 'INACTIVE',
           createdAt: ''
         })
       })
@@ -123,6 +128,14 @@ describe('Vacancies API Service', () => {
 
     const vacancy: Vacancy = { id: '1', title: 'Dev', location: '', workday: '', modality: '', status: 'active', createdAt: '' }
     const result = await toggleVacancyStatus(vacancy)
-    expect(result.status).toBe('closed')
+    expect(result.status).toBe('inactive')
+  })
+
+  it('toggleVacancyStatus rechaza vacantes cerradas', async () => {
+    const vacancy: Vacancy = { id: '1', title: 'Dev', location: '', workday: '', modality: '', status: 'closed', createdAt: '' }
+
+    await expect(toggleVacancyStatus(vacancy)).rejects.toThrow(
+      'Transición inválida de vacante: CLOSED -> ACTIVE'
+    )
   })
 })

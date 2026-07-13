@@ -70,25 +70,32 @@ describe('rateLimit', () => {
     expect(third.remaining).toBe(0)
   })
 
-  it('en producción deniega si faltan credenciales Upstash (fail-closed)', async () => {
+  it('en producción bloquea si faltan credenciales Upstash', async () => {
     const { rateLimit } = await loadRateLimit({
       NODE_ENV: 'production',
       UPSTASH_REDIS_REST_URL: undefined,
       UPSTASH_REDIS_REST_TOKEN: undefined
     })
 
-    const result = await rateLimit({
+    const first = await rateLimit({
       key: 'prod-user',
       windowMs: 60_000,
-      maxRequests: 5
+      maxRequests: 1
     })
 
-    expect(result.allowed).toBe(false)
-    expect(result.remaining).toBe(0)
-    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    const second = await rateLimit({
+      key: 'prod-user',
+      windowMs: 60_000,
+      maxRequests: 1
+    })
+
+    expect(first.allowed).toBe(false)
+    expect(first.degraded).toBe(true)
+    expect(second.allowed).toBe(false)
+    expect(second.degraded).toBe(true)
   })
 
-  it('en producción deniega si Upstash falla (fail-closed)', async () => {
+  it('en producción bloquea si Upstash falla', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('network error')
     })
@@ -100,15 +107,22 @@ describe('rateLimit', () => {
       UPSTASH_REDIS_REST_TOKEN: 'token'
     })
 
-    const result = await rateLimit({
+    const first = await rateLimit({
       key: 'prod-user-fetch-failure',
       windowMs: 60_000,
-      maxRequests: 5
+      maxRequests: 1
     })
 
-    expect(result.allowed).toBe(false)
-    expect(result.remaining).toBe(0)
-    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    const second = await rateLimit({
+      key: 'prod-user-fetch-failure',
+      windowMs: 60_000,
+      maxRequests: 1
+    })
+
+    expect(first.allowed).toBe(false)
+    expect(first.degraded).toBe(true)
+    expect(second.allowed).toBe(false)
+    expect(second.degraded).toBe(true)
     expect(fetchMock).toHaveBeenCalled()
   })
 

@@ -26,6 +26,11 @@ export interface CreateContactData {
   captchaToken?: string
 }
 
+export interface CreateContactResponse {
+  message: string
+  contactId: string
+}
+
 type ApiValidationError = {
   error?: string
   code?: string
@@ -73,7 +78,7 @@ export async function getContactById(id: string): Promise<Contact> {
 /**
  * Crea un nuevo contacto
  */
-export async function createContact(data: CreateContactData): Promise<Contact> {
+export async function createContact(data: CreateContactData): Promise<CreateContactResponse> {
   const response = await apiFetch('/api/contacts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -82,7 +87,10 @@ export async function createContact(data: CreateContactData): Promise<Contact> {
   
   if (!response.ok) {
     const payload = await getApiErrorPayload(response, 'Error al crear el contacto')
-    throw new ApiRequestError(payload.message, response.status, payload.code)
+    throw new ApiRequestError(payload.message, {
+      status: response.status,
+      code: payload.code
+    })
   }
   
   return response.json()

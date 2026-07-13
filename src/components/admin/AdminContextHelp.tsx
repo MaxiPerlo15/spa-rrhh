@@ -18,6 +18,11 @@ const TAB_HELP: Record<AdminTab, { title: string; tip: string; action: string }>
     tip: 'Usa filtros por estado y búsqueda para acelerar screening y seguimiento.',
     action: 'Actualizar estado tras cada revisión'
   },
+  candidates: {
+    title: 'Ayuda: Candidatos',
+    tip: 'Esta vista consolida candidatos a partir de postulaciones para revisar CVs y recorridos asociados sin duplicados visuales.',
+    action: 'Buscar por email o teléfono antes de revisar CVs'
+  },
   contacts: {
     title: 'Ayuda: Contactos',
     tip: 'Marca como respondidos los mensajes atendidos para mantener trazabilidad operativa.',

@@ -1,7 +1,15 @@
-import type { Application, Vacancy } from '@prisma/client'
+import type { Vacancy } from '@prisma/client'
 
 type VacancyWithOptionalApplications = Vacancy & {
-  applications?: Pick<Application, 'id' | 'candidateName' | 'status' | 'submittedAt'>[]
+  applications?: Array<{
+    id: string
+    status: string
+    submittedAt: Date
+    candidate: {
+      name: string
+      lastName: string | null
+    }
+  }>
 }
 
 export interface VacancyDto {
@@ -39,7 +47,7 @@ export function toVacancyDto(vacancy: VacancyWithOptionalApplications): VacancyD
     createdAt: vacancy.createdAt.toISOString(),
     applications: vacancy.applications?.map((application) => ({
       id: application.id,
-      candidateName: application.candidateName,
+      candidateName: [application.candidate.name, application.candidate.lastName].filter(Boolean).join(' '),
       status: application.status,
       submittedAt: application.submittedAt.toISOString()
     }))

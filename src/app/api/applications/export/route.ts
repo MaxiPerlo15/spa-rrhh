@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { buildApplicationsCsv } from '@/lib/csv/applicationsExport'
+import { resolveApplicationCandidate } from '@/lib/candidateRecord'
+import { ExportApplicationsUseCase } from '@/application/exports/ExportApplicationsUseCase'
 
 const exportApplicationsQuerySchema = z.object({
   status: z.enum(['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED']).optional(),
@@ -55,9 +56,9 @@ export async function GET(request: NextRequest) {
       ...(search
         ? {
             OR: [
-              { candidateName: { contains: search, mode: 'insensitive' as const } },
-              { email: { contains: search, mode: 'insensitive' as const } },
-              { vacancy: { is: { title: { contains: search, mode: 'insensitive' as const } } } }
+              { candidate: { is: { name: { contains: search, mode: 'insensitive' as const } } } },
+              { candidate: { is: { lastName: { contains: search, mode: 'insensitive' as const } } } },
+              { candidate: { is: { email: { contains: search, mode: 'insensitive' as const } } } }
             ]
           }
         : {})
@@ -66,44 +67,48 @@ export async function GET(request: NextRequest) {
     const orderBy: Prisma.ApplicationOrderByWithRelationInput[] =
       sortBy === 'submittedAt'
         ? [{ submittedAt: sortDirection }]
-        : [{ [sortBy]: sortDirection } as Prisma.ApplicationOrderByWithRelationInput, { submittedAt: 'desc' }]
+        : sortBy === 'candidateName'
+          ? [{ candidate: { name: sortDirection } }, { submittedAt: 'desc' }]
+          : [{ status: sortDirection }, { submittedAt: 'desc' }]
 
     const applications = await prisma.application.findMany({
       where,
       select: {
-        candidateName: true,
-        email: true,
-        phone: true,
+        candidateId: true,
         submittedAt: true,
-        vacancy: {
+        candidate: {
           select: {
-            title: true
+            id: true,
+            name: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            resumeUrl: true,
+            resumeFileName: true,
+            resumeKey: true
           }
         }
       },
       orderBy
     })
 
-    const csv = buildApplicationsCsv(
+    const exportFile = new ExportApplicationsUseCase().execute(
       applications.map((application) => ({
-        candidateName: application.candidateName,
-        email: application.email,
-        phone: application.phone,
-        vacancyTitle: application.vacancy?.title ?? 'Espontánea',
+        ...resolveApplicationCandidate(application),
+        vacancyTitle: 'Espontánea',
         submittedAt: application.submittedAt
       }))
     )
-    const fileDate = new Date().toISOString().slice(0, 10)
 
-    return new NextResponse(csv, {
+    return new NextResponse(exportFile.content, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="postulaciones-${fileDate}.csv"`
+        'Content-Type': exportFile.mimeType,
+        'Content-Disposition': `attachment; filename="${exportFile.fileName}"`
       }
     })
   } catch (error) {
-    logger.error('Error al exportar postulaciones CSV', error)
+    logger.error('Error al exportar postulaciones', error)
     return NextResponse.json({ error: 'Error al exportar postulaciones' }, { status: 500 })
   }
 }

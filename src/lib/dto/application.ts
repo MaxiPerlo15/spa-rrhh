@@ -1,20 +1,27 @@
-import type { ApplicationStatus, Vacancy } from '@prisma/client'
+export type ApplicationStatus =
+  | 'PENDING'
+  | 'REVIEWING'
+  | 'INTERVIEWED'
+  | 'ACCEPTED'
+  | 'REJECTED'
 
 type ApplicationWithVacancy = {
   id: string
+  candidateId: string
   candidateName: string
   email: string
   phone: string
   resumeUrl: string | null
   resumeFileName: string | null
   coverLetter: string | null
-  status: ApplicationStatus
-  submittedAt: Date
-  vacancy?: Pick<Vacancy, 'id' | 'title' | 'location'> | null
+  status: ApplicationStatus | string
+  submittedAt: Date | string
+  vacancy?: { id: string; title: string; location: string } | null
 }
 
 export type ApplicationAdminDto = {
   id: string
+  candidateId: string
   candidateName: string
   email: string
   phone: string
@@ -33,14 +40,17 @@ export type ApplicationAdminDto = {
 export function toApplicationAdminDto(application: ApplicationWithVacancy): ApplicationAdminDto {
   return {
     id: application.id,
+    candidateId: application.candidateId,
     candidateName: application.candidateName,
     email: application.email,
     phone: application.phone,
     resumeUrl: application.resumeUrl ?? undefined,
     resumeFileName: application.resumeFileName ?? undefined,
     coverLetter: application.coverLetter ?? undefined,
-    status: application.status,
-    submittedAt: application.submittedAt.toISOString(),
+    status: application.status as ApplicationStatus,
+    submittedAt: application.submittedAt instanceof Date
+      ? application.submittedAt.toISOString()
+      : application.submittedAt,
     vacancy: application.vacancy
       ? {
           id: application.vacancy.id,

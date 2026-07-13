@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
+import { useCspNonce } from '@/contexts/CspNonceContext'
 
 declare global {
   interface Window {
@@ -28,6 +29,7 @@ interface TurnstileWidgetProps {
 }
 
 export default function TurnstileWidget({ action, onTokenChange }: TurnstileWidgetProps) {
+  const nonce = useCspNonce()
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const containerRef = useRef<HTMLDivElement | null>(null)
   const widgetIdRef = useRef<string | null>(null)
@@ -64,6 +66,7 @@ export default function TurnstileWidget({ action, onTokenChange }: TurnstileWidg
         id="cf-turnstile-script"
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
+        nonce={nonce ?? undefined}
         onReady={() => setScriptReady(true)}
       />
       <div ref={containerRef} />

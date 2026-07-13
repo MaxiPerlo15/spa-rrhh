@@ -30,9 +30,10 @@ npm run db:reset
 # .env
 DATABASE_URL="postgresql://user:password@localhost:5432/spa_rrhh_db"
 
-# Opcional: Personalizar admin inicial
+# Optional: customize the initial admin email
 ADMIN_EMAIL="admin@tuempresa.com"    # Default: admin@sparrhh.com
-ADMIN_PASSWORD="TuPasswordSegura123"  # Default: ChangeMe123!
+# Required: use a unique value; no shared default is provided.
+ADMIN_PASSWORD="TuPasswordSegura123"
 ```
 
 ### Admins adicionales
@@ -48,12 +49,14 @@ Notas:
 - `ADMIN_EMAIL` ya no limita el acceso a una única cuenta;
 - el seed sigue creando solo un admin inicial por compatibilidad operativa.
 
-### Credenciales por Defecto
+### Initial credentials
 
-**⚠️ SOLO para desarrollo/testing:**
+`ADMIN_EMAIL` defaults to `admin@sparrhh.com`, but `ADMIN_PASSWORD` is required.
+Generate and store a unique local password before running the seed:
 
-- **Email**: `admin@sparrhh.com`
-- **Password**: `ChangeMe123!`
+```bash
+openssl rand -base64 32
+```
 
 ### Producción
 

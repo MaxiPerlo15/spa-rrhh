@@ -19,10 +19,12 @@ export default function ContactForm() {
     acceptedPrivacy: false
   })
   const [submitted, setSubmitted] = useState(false)
+  const [submittedEmail, setSubmittedEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [captchaToken, setCaptchaToken] = useState('')
+  const [isReviewingSubmission, setIsReviewingSubmission] = useState(false)
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
   const formatPhoneMask = (rawValue: string) => {
@@ -108,9 +110,15 @@ export default function ContactForm() {
       return
     }
 
+    setIsReviewingSubmission(true)
+  }
+
+  const submitContact = async () => {
     setLoading(true)
 
     try {
+      const nextSubmittedEmail = formData.email
+
       await createContact({
         name: formData.name,
         email: formData.email,
@@ -122,7 +130,9 @@ export default function ContactForm() {
       })
 
       // Mostrar éxito y resetear
+      setSubmittedEmail(nextSubmittedEmail)
       setSubmitted(true)
+      setIsReviewingSubmission(false)
       showSuccess('¡Mensaje enviado exitosamente! Te contactaremos pronto.')
       setFormData({
         name: '',
@@ -174,13 +184,78 @@ export default function ContactForm() {
             <div>
               <p className="font-semibold text-green-900">¡Mensaje enviado exitosamente!</p>
               <p className="text-sm text-green-700">
-                Tu consulta ha sido recibida. Te contactaremos a la brevedad a <span className="font-semibold">{formData.email || 'tu email'}</span>
+                Tu consulta ha sido recibida. Te contactaremos a la brevedad a <span className="font-semibold">{submittedEmail || 'tu email'}</span>
               </p>
             </div>
           </div>
         </div>
       )}
 
+      {isReviewingSubmission ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-primary-100 bg-primary-50 p-5">
+            <h3 className="text-lg font-semibold text-primary-950">Revisá tu consulta antes de enviarla</h3>
+            <p className="mt-1 text-sm text-primary-900">
+              Confirmá que los datos sean correctos. Cuando continúes, la consulta quedará registrada como contacto para su gestión posterior.
+            </p>
+          </div>
+
+          <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</p>
+              <p className="mt-1 text-sm text-gray-900">{formData.name}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</p>
+              <p className="mt-1 text-sm text-gray-900">{formData.email}</p>
+            </div>
+            {formData.phone.trim() && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Teléfono</p>
+                <p className="mt-1 text-sm text-gray-900">{formData.phone}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Asunto</p>
+              <p className="mt-1 text-sm text-gray-900">{formData.subject}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mensaje</p>
+              <p className="mt-1 whitespace-pre-line text-sm text-gray-900">{formData.message}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:gap-4">
+            <button
+              type="button"
+              onClick={() => setIsReviewingSubmission(false)}
+              className="btn-motion w-full rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-50 sm:flex-1"
+            >
+              Volver a editar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsReviewingSubmission(false)
+                showInfo('Se canceló el envío de la consulta.')
+              }}
+              className="btn-motion w-full rounded-lg border border-amber-300 bg-amber-50 px-6 py-3 font-medium text-amber-900 hover:bg-amber-100 sm:flex-1"
+            >
+              Cancelar envío
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void submitContact()
+              }}
+              disabled={loading}
+              className="btn-motion w-full rounded-lg bg-primary-500 px-6 py-3 font-medium text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
+            >
+              {loading ? 'Enviando...' : 'Confirmar consulta'}
+            </button>
+          </div>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Nombre y Email */}
         <div className="grid md:grid-cols-2 gap-6">
@@ -353,6 +428,7 @@ export default function ContactForm() {
           {loading ? 'Enviando...' : 'Enviar Consulta'}
         </button>
       </form>
+      )}
     </div>
   )
 }

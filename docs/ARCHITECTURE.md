@@ -464,12 +464,17 @@ Ubicación: `tests/e2e/`
 
 **Comando**: `npm run test:e2e`
 
-### Unit Tests (Futuros)
+### Unit Tests (Vitest)
 
-**Prioridades**:
-1. Funciones de utilidad
-2. Custom hooks (con React Testing Library)
-3. Servicios de API (con MSW)
+**Cobertura actual**:
+1. Utilidades y helpers críticos (`rateLimit`, `csrf`, `passwordReset`, `cvRetention`, políticas de validación)
+2. Custom hooks (`useAdminDashboard`, `useMobileKeyboardAssist`)
+3. Servicios API de frontend (`vacancies`, `applications`, `contacts`, `http`)
+4. Componentes críticos del panel y formularios públicos
+
+**Comandos**:
+- `npm run test:unit`
+- `npm run test:coverage`
 
 ## Seguridad
 
@@ -477,8 +482,10 @@ Ubicación: `tests/e2e/`
 - ✅ Variables de entorno para secrets
 - ✅ Validación en cliente y servidor
 - ✅ Sanitización de inputs
-- 🔄 CSRF protection (Next.js built-in)
-- 🔄 Rate limiting (pendiente)
+- ✅ Protección CSRF por validación de `Origin/Referer` en mutaciones admin con cookie session
+- ✅ Rate limiting en formularios públicos y uploads sensibles
+- ✅ Verificación captcha server-side en formularios públicos
+- ✅ Auditoría admin y logging de eventos de seguridad
 
 ## Performance
 
@@ -495,19 +502,17 @@ Ubicación: `tests/e2e/`
 ## Roadmap de Arquitectura
 
 ### v0.3.0 - Servicios y Optimizaciones
-- [ ] Implementar servicio de emails (Resend/SendGrid)
-- [ ] Servicio de storage para CVs (S3/Cloudinary)
-- [ ] Implementar caché con Redis
-- [ ] Monitoring con Sentry
+- [ ] Búsqueda semántica de candidatos
+- [ ] Scoring automático de CV
+- [ ] Integración con LinkedIn o portales externos
+- [ ] Multiusuario con roles avanzados
 
 ### v0.4.0 - Testing y Calidad
-- [ ] Unit tests para hooks y utilidades
 - [ ] Integration tests para API routes
 - [ ] Visual regression tests
 - [ ] Performance budgets
 
 ### v0.5.0 - Escalabilidad
-- [ ] Implementar rate limiting
 - [ ] CDN para assets estáticos
 - [ ] Database read replicas
 - [ ] Background jobs (Bull/BullMQ)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -13,6 +13,23 @@ interface ToastProps {
 
 export default function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false)
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const scheduleClose = useCallback(() => {
+    setIsVisible(false)
+
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+
+    if (exitTimerRef.current) {
+      clearTimeout(exitTimerRef.current)
+    }
+
+    exitTimerRef.current = setTimeout(onClose, 300)
+  }, [onClose])
 
   useEffect(() => {
     // Trigger entrance animation with requestAnimationFrame
@@ -21,16 +38,18 @@ export default function Toast({ message, type, duration = 3000, onClose }: Toast
     })
 
     // Auto close
-    const timer = setTimeout(() => {
-      setIsVisible(false)
-      setTimeout(onClose, 300) // Wait for exit animation
-    }, duration)
+    autoCloseTimerRef.current = setTimeout(scheduleClose, duration)
 
     return () => {
       cancelAnimationFrame(enterTimer)
-      clearTimeout(timer)
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current)
+      }
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current)
+      }
     }
-  }, [duration, onClose])
+  }, [duration, scheduleClose])
 
   const styles = {
     success: 'bg-green-500 border-green-600',
@@ -58,10 +77,7 @@ export default function Toast({ message, type, duration = 3000, onClose }: Toast
       <span className="text-2xl font-bold">{icons[type]}</span>
       <p className="font-medium">{message}</p>
       <button
-        onClick={() => {
-          setIsVisible(false)
-          setTimeout(onClose, 300)
-        }}
+        onClick={scheduleClose}
         className="btn-motion ml-4 text-white hover:text-gray-200"
         aria-label="Cerrar notificación"
       >

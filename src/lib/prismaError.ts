@@ -9,6 +9,10 @@ export function isMissingTableOrColumnError(error: unknown): boolean {
   return code === 'P2021' || code === 'P2022'
 }
 
+export function canUseSchemaDriftFallback(error: unknown): boolean {
+  return isMissingTableOrColumnError(error) && process.env.NODE_ENV !== 'production'
+}
+
 export function isPrismaRecordNotFoundError(error: unknown): boolean {
   return getPrismaErrorCode(error) === 'P2025'
 }

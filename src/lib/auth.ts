@@ -1,120 +1,19 @@
 import { getServerSession } from "next-auth/next"
 import type { NextAuthOptions } from "next-auth"
-import Credentials from "next-auth/providers/credentials"
-import bcrypt from "bcrypt"
-import { prisma } from '@/lib/prisma'
-import { clearAttemptFailures, getAttemptLock, recordAttemptFailure } from '@/lib/authAttemptGuard'
-import { logger } from '@/lib/logger'
 
-const isProduction = process.env.NODE_ENV === 'production'
-const secureCookiesEnabled = isProduction
-  ? true
-  : process.env.SESSION_COOKIE_SECURE === 'true'
-
-const configuredSameSite = process.env.SESSION_COOKIE_SAME_SITE
-const sameSite =
-  configuredSameSite === 'strict' || configuredSameSite === 'lax' || configuredSameSite === 'none'
-    ? configuredSameSite
-    : 'lax'
-const cookieSameSite = sameSite === 'none' && !secureCookiesEnabled ? 'lax' : sameSite
-
-type AuthorizeRequestLike = {
-  headers?: {
-    'x-forwarded-for'?: string | string[]
-  }
-}
-
-type AuthorizeCredentialsLike = {
-  email?: string
-  password?: string
-}
-
-export async function authorizeAdminCredentials(
-  credentials: AuthorizeCredentialsLike | undefined,
-  req?: AuthorizeRequestLike
-) {
-  if (!credentials?.email || !credentials?.password) {
-    return null
-  }
-
-  const normalizedEmail = String(credentials.email).trim().toLowerCase()
-  const forwardedFor = req?.headers?.['x-forwarded-for']
-  const ip = Array.isArray(forwardedFor)
-    ? forwardedFor[0]?.split(',')[0]?.trim() || 'unknown'
-    : forwardedFor?.split(',')[0]?.trim() || 'unknown'
-  const identity = `${normalizedEmail}:${ip}`
-
-  const lockState = await getAttemptLock('login', identity)
-  if (lockState.blocked) {
-    logger.security('auth.login.throttled', {
-      email: normalizedEmail,
-      ip,
-      retryAfterSeconds: lockState.retryAfterSeconds
-    })
-    throw new Error(`AUTH_THROTTLED:${lockState.retryAfterSeconds}`)
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail }
-  })
-
-  if (!user || user.role !== 'ADMIN') {
-    const attemptState = await recordAttemptFailure('login', identity)
-    logger.security('auth.login.failed', {
-      email: normalizedEmail,
-      ip,
-      failures: attemptState.failures,
-      blocked: attemptState.blocked
-    })
-    if (attemptState.blocked) {
-      throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
-    }
-    return null
-  }
-
-  const isValidPassword = await bcrypt.compare(
-    credentials.password as string,
-    user.passwordHash
-  )
-
-  if (!isValidPassword) {
-    const attemptState = await recordAttemptFailure('login', identity)
-    logger.security('auth.login.failed', {
-      email: normalizedEmail,
-      ip,
-      failures: attemptState.failures,
-      blocked: attemptState.blocked
-    })
-    if (attemptState.blocked) {
-      throw new Error(`AUTH_THROTTLED:${attemptState.retryAfterSeconds}`)
-    }
-    return null
-  }
-
-  await clearAttemptFailures('login', identity)
-  logger.info('Login exitoso', { email: normalizedEmail, ip })
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role
-  }
-}
+// NOTE: Credentials provider removed in Phase 4 (PR 4) — admin auth is now Spring-only.
+// The NextAuth route is kept for potential future providers (OAuth, etc.).
+//
+// ROLLBACK PROCEDURE:
+// To re-enable NextAuth Credentials login within 5 minutes:
+//   1. Restore the Credentials import: import Credentials from "next-auth/providers/credentials"
+//   2. Restore authorizeAdminCredentials function (see git history for the Prisma-based version)
+//   3. Add the Credentials provider entry back to the providers array in authOptions
+//   4. Ensure PRISMA_USER_TABLE is populated (it is retained as dormant for exactly this scenario)
+//   5. Redeploy — NextAuth will handle login via Prisma User table as before
 
 export const authOptions: NextAuthOptions = {
-  providers: [
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials, req) {
-        return authorizeAdminCredentials(credentials, req)
-      }
-    })
-  ],
+  providers: [],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -141,18 +40,6 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     maxAge: 60 * 60 * 8
-  },
-  useSecureCookies: secureCookiesEnabled,
-  cookies: {
-    sessionToken: {
-      name: secureCookiesEnabled ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: cookieSameSite,
-        path: '/',
-        secure: secureCookiesEnabled
-      }
-    }
   },
   secret: process.env.NEXTAUTH_SECRET
 }

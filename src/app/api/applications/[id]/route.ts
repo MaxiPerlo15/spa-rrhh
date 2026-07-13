@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import type { ApplicationStatus } from '@/domain/application/ApplicationStatusMachine'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { auditAdminAction } from '@/lib/adminAudit'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   formatValidationError,
   routeIdSchema,
   updateApplicationStatusSchema
 } from '@/lib/apiValidation'
 import { toApplicationAdminDto } from '@/lib/dto/application'
+import { getApplication, updateApplicationStatus, deleteApplication, SpringApplicationWriteError } from '@/lib/server/springApplicationGateway'
+import { getBackendUrl } from '@/lib/server/springBackend'
 
 interface RouteParams {
   params: Promise<{
@@ -16,7 +19,7 @@ interface RouteParams {
   }>
 }
 
-// GET /api/applications/[id] - Obtener una postulación específica
+// GET /api/applications/[id] — Spring-delegated detail
 export async function GET(
   request: NextRequest,
   { params }: RouteParams
@@ -24,10 +27,25 @@ export async function GET(
   try {
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'application.view',
+        resourceType: 'application',
+        outcome: 'DENIED'
+      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
       )
+    }
+
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
@@ -35,29 +53,15 @@ export async function GET(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    
-    const application = await prisma.application.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        candidateName: true,
-        email: true,
-        phone: true,
-        resumeUrl: true,
-        resumeFileName: true,
-        coverLetter: true,
-        status: true,
-        submittedAt: true,
-        vacancy: {
-          select: {
-            id: true,
-            title: true,
-            location: true
-          }
-        }
-      }
-    })
 
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Spring backend not configured' },
+        { status: 503 }
+      )
+    }
+
+    const application = await getApplication(id)
     if (!application) {
       return NextResponse.json(
         { error: 'Postulación no encontrada' },
@@ -65,7 +69,38 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(toApplicationAdminDto(application))
+    await auditAdminAction({
+      request,
+      actor: {
+        id: session.user?.id,
+        email: session.user?.email
+      },
+      action: 'application.view',
+      resourceType: 'application',
+      resourceId: id,
+      outcome: 'SUCCESS',
+      metadata: {
+        backend: 'spring'
+      }
+    })
+
+    return NextResponse.json(
+      toApplicationAdminDto({
+        id: application.id,
+        candidateId: application.candidateId,
+        candidateName: application.candidateName,
+        email: application.email,
+        phone: application.phone,
+        resumeUrl: application.resumeUrl,
+        resumeFileName: application.resumeFileName,
+        coverLetter: application.coverLetter,
+        status: application.status as ApplicationStatus,
+        submittedAt: application.submittedAt,
+        vacancy: application.vacancy
+          ? { id: application.vacancy.id, title: application.vacancy.title, location: application.vacancy.location }
+          : null
+      })
+    )
   } catch (error) {
     logger.error('Error al obtener postulación', error)
     return NextResponse.json(
@@ -75,7 +110,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/applications/[id] - Actualizar estado de postulación (admin)
+// PATCH /api/applications/[id] — Spring-delegated status update
 export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
@@ -83,7 +118,6 @@ export async function PATCH(
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
   try {
-    // Verificar autenticación
     session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       await auditAdminAction({
@@ -102,6 +136,18 @@ export async function PATCH(
       )
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Spring backend not configured' },
+        { status: 503 }
+      )
+    }
+
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
@@ -115,36 +161,25 @@ export async function PATCH(
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
     const { status } = bodyValidation.data
-    const previous = await prisma.application.findUnique({
-      where: { id },
-      select: {
-        status: true,
-        candidateName: true
-      }
-    })
 
-    const application = await prisma.application.update({
-      where: { id },
-      data: { status },
-      select: {
-        id: true,
-        candidateName: true,
-        email: true,
-        phone: true,
-        resumeUrl: true,
-        resumeFileName: true,
-        coverLetter: true,
-        status: true,
-        submittedAt: true,
-        vacancy: {
-          select: {
-            id: true,
-            title: true,
-            location: true
-          }
+    let updated
+    try {
+      updated = await updateApplicationStatus(id, status)
+    } catch (error) {
+      if (error instanceof SpringApplicationWriteError) {
+        if (error.status === 404) {
+          return NextResponse.json(
+            { error: 'Postulación no encontrada' },
+            { status: 404 }
+          )
         }
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status }
+        )
       }
-    })
+      throw error
+    }
 
     await auditAdminAction({
       request,
@@ -157,13 +192,28 @@ export async function PATCH(
       resourceId: id,
       outcome: 'SUCCESS',
       metadata: {
-        previousStatus: previous?.status,
         newStatus: status,
-        candidateName: previous?.candidateName
+        backend: 'spring'
       }
     })
 
-    return NextResponse.json(toApplicationAdminDto(application))
+    return NextResponse.json(
+      toApplicationAdminDto({
+        id: updated.id,
+        candidateId: updated.candidateId,
+        candidateName: updated.candidateName,
+        email: updated.email,
+        phone: updated.phone,
+        resumeUrl: updated.resumeUrl,
+        resumeFileName: updated.resumeFileName,
+        coverLetter: updated.coverLetter,
+        status: updated.status as ApplicationStatus,
+        submittedAt: updated.submittedAt,
+        vacancy: updated.vacancy
+          ? { id: updated.vacancy.id, title: updated.vacancy.title, location: updated.vacancy.location }
+          : null
+      })
+    )
   } catch (error) {
     await auditAdminAction({
       request,
@@ -187,7 +237,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/applications/[id] - Eliminar postulación (admin)
+// DELETE /api/applications/[id] — Spring-delegated hard delete
 export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
@@ -195,7 +245,6 @@ export async function DELETE(
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
   try {
-    // Verificar autenticación
     session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       await auditAdminAction({
@@ -214,6 +263,18 @@ export async function DELETE(
       )
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Spring backend not configured' },
+        { status: 503 }
+      )
+    }
+
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
@@ -221,18 +282,23 @@ export async function DELETE(
     const { id } = parsedParams.data
     resourceId = id
 
-    const existing = await prisma.application.findUnique({
-      where: { id },
-      select: {
-        candidateName: true,
-        status: true,
-        email: true
+    try {
+      await deleteApplication(id)
+    } catch (error) {
+      if (error instanceof SpringApplicationWriteError) {
+        if (error.status === 404) {
+          return NextResponse.json(
+            { error: 'Postulación no encontrada' },
+            { status: 404 }
+          )
+        }
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status }
+        )
       }
-    })
-
-    await prisma.application.delete({
-      where: { id }
-    })
+      throw error
+    }
 
     await auditAdminAction({
       request,
@@ -245,9 +311,7 @@ export async function DELETE(
       resourceId: id,
       outcome: 'SUCCESS',
       metadata: {
-        candidateName: existing?.candidateName,
-        previousStatus: existing?.status,
-        candidateEmail: existing?.email
+        backend: 'spring'
       }
     })
 

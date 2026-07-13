@@ -1,4 +1,4 @@
-import type { Contact } from '@prisma/client'
+export type ContactStatus = 'PENDING' | 'RESPONDED' | 'ARCHIVED'
 
 export type ContactAdminDto = {
   id: string
@@ -7,11 +7,20 @@ export type ContactAdminDto = {
   phone: string
   subject: string
   message: string
-  status: Contact['status']
+  status: ContactStatus
   createdAt: string
 }
 
-type ContactAdminDtoSource = Pick<Contact, 'id' | 'name' | 'email' | 'phone' | 'subject' | 'message' | 'status' | 'createdAt'>
+type ContactAdminDtoSource = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  subject: string
+  message: string
+  status: ContactStatus | string
+  createdAt: Date | string
+}
 
 export function toContactAdminDto(contact: ContactAdminDtoSource): ContactAdminDto {
   return {
@@ -21,7 +30,9 @@ export function toContactAdminDto(contact: ContactAdminDtoSource): ContactAdminD
     phone: contact.phone,
     subject: contact.subject,
     message: contact.message,
-    status: contact.status,
-    createdAt: contact.createdAt.toISOString()
+    status: contact.status as ContactStatus,
+    createdAt: contact.createdAt instanceof Date
+      ? contact.createdAt.toISOString()
+      : contact.createdAt
   }
 }

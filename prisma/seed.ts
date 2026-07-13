@@ -18,24 +18,20 @@ async function main() {
   // Crear usuario admin
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@sparrhh.com'
   const adminPassword = process.env.ADMIN_PASSWORD
-  
-  if (!adminPassword) {
-    console.warn('⚠️  ADMIN_PASSWORD no está definida, usando contraseña por defecto (NO usar en producción)')
+
+  if (!adminPassword?.trim()) {
+    throw new Error(
+      'ADMIN_PASSWORD is required to seed the admin user. Set a unique password in your ignored local .env before running npm run db:seed.'
+    )
   }
-  
-  const passwordToUse = adminPassword || 'ChangeMe123!'
+
   const admin = await createOrUpdateAdminUser(prisma, {
     email: adminEmail,
-    password: passwordToUse,
+    password: adminPassword,
     name: 'Administrador'
   })
 
   console.log(`✅ Usuario admin creado/actualizado: ${admin.email}`)
-  if (!adminPassword) {
-    console.log('   📧 Email: admin@sparrhh.com')
-    console.log('   🔑 Password: ChangeMe123!')
-    console.log('   ⚠️  IMPORTANTE: Cambia esta contraseña en producción')
-  }
 
   // Crear vacantes de ejemplo
   const vacancies = await prisma.vacancy.createMany({

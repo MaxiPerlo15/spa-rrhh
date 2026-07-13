@@ -168,7 +168,7 @@ export default function AdminApplicationsSection({
               disabled={isExportingCsv || filteredApplications.length === 0}
               className="w-full rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-50 to-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition-all duration-200 hover:from-emerald-100 hover:to-emerald-200 hover:shadow disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isExportingCsv ? 'Generando...' : 'Generar Excel'}
+              {isExportingCsv ? 'Exportando...' : 'Exportar CSV'}
             </button>
             <MobileFilterSheet
               label="Filtrar postulaciones por estado"
@@ -219,7 +219,7 @@ export default function AdminApplicationsSection({
                   disabled={isExportingCsv || filteredApplications.length === 0}
                   className="rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-50 to-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition-all duration-200 hover:from-emerald-100 hover:to-emerald-200 hover:shadow disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isExportingCsv ? 'Generando...' : 'Generar Excel'}
+                  {isExportingCsv ? 'Exportando...' : 'Exportar CSV'}
                 </button>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function AdminApplicationsSection({
           )}
           {filteredApplications.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-              No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'disponibles'}
+              No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'registradas'}
             </div>
           ) : (
             paginatedApplications.map((application) => {
@@ -364,7 +364,7 @@ export default function AdminApplicationsSection({
               {filteredApplications.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'disponibles'}
+                    No hay postulaciones {filterStatus !== 'all' ? 'con este estado' : 'registradas'}
                   </td>
                 </tr>
               ) : (

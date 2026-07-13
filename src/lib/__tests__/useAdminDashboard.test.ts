@@ -10,6 +10,17 @@ import type { Vacancy } from '../../lib/api/vacancies'
 import type { Application } from '../../lib/api/applications'
 import type { Contact } from '../../lib/api/contacts'
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 const vacancyA: Vacancy = {
   id: 'v1',
   title: 'Frontend Developer',
@@ -32,6 +43,7 @@ const vacancyB: Vacancy = {
 
 const applicationA: Application = {
   id: 'a1',
+  candidateId: 'cand-a1',
   candidateName: 'Maxi',
   email: 'maxi@example.com',
   phone: '+549111111111',
@@ -42,6 +54,7 @@ const applicationA: Application = {
 
 const applicationB: Application = {
   id: 'a2',
+  candidateId: 'cand-a2',
   candidateName: 'Ana',
   email: 'ana@example.com',
   phone: '+549222222222',
@@ -82,6 +95,8 @@ vi.mock('../../lib/api/vacancies.ts', () => ({
 
 vi.mock('../../lib/api/applications.ts', () => ({
   getApplications: vi.fn(() => Promise.resolve([applicationA, applicationB])),
+  createAdminCandidate: vi.fn(),
+  updateAdminCandidate: vi.fn(),
   updateApplicationStatus: vi.fn(),
   deleteApplication: vi.fn()
 }))
@@ -132,6 +147,19 @@ describe('useAdminDashboard', () => {
     expect(result.current.error).toBe('Error de red')
   })
 
+  it('no carga datos mientras está deshabilitado', async () => {
+    const { result } = renderHook(() => useAdminDashboard({ enabled: false }))
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(vacanciesApi.getVacancies).not.toHaveBeenCalled()
+    expect(applicationsApi.getApplications).not.toHaveBeenCalled()
+    expect(contactsApi.getContacts).not.toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
+  })
+
   it('maneja create/update/delete/toggle de vacantes', async () => {
     const createdVacancy: Vacancy = {
       ...vacancyA,
@@ -145,13 +173,17 @@ describe('useAdminDashboard', () => {
     }
     const toggledVacancy: Vacancy = {
       ...vacancyA,
+      status: 'inactive'
+    }
+    const closedVacancy: Vacancy = {
+      ...vacancyB,
       status: 'closed'
     }
 
     vi.mocked(vacanciesApi.createVacancy).mockResolvedValue(createdVacancy)
     vi.mocked(vacanciesApi.updateVacancy).mockResolvedValue(updatedVacancy)
     vi.mocked(vacanciesApi.toggleVacancyStatus).mockResolvedValue(toggledVacancy)
-    vi.mocked(vacanciesApi.deleteVacancy).mockResolvedValue()
+    vi.mocked(vacanciesApi.deleteVacancy).mockResolvedValue(closedVacancy)
 
     const { result } = renderHook(() => useAdminDashboard())
     await waitFor(() => expect(result.current.isLoading).toBe(false))
@@ -175,24 +207,43 @@ describe('useAdminDashboard', () => {
     await act(async () => {
       await result.current.toggleVacancyStatus(vacancyA)
     })
-    expect(result.current.vacancies.find((v) => v.id === 'v1')?.status).toBe('closed')
+    expect(result.current.vacancies.find((v) => v.id === 'v1')?.status).toBe('inactive')
 
     await act(async () => {
       await result.current.deleteVacancy('v2')
     })
-    expect(result.current.vacancies.some((v) => v.id === 'v2')).toBe(false)
+    expect(result.current.vacancies.find((v) => v.id === 'v2')?.status).toBe('closed')
   })
 
-  it('maneja update/delete de postulaciones y contactos', async () => {
+  it('maneja create/update/delete de postulaciones y contactos', async () => {
+    const createdApplication: Application = {
+      id: 'a3',
+      candidateId: 'cand-a3',
+      candidateName: 'Laura',
+      email: 'laura@example.com',
+      phone: '+5493517777777',
+      status: 'PENDING',
+      submittedAt: new Date().toISOString()
+    }
     const updatedApplication: Application = {
       ...applicationA,
       status: 'ACCEPTED'
     }
+    const candidateUpdatedApplications: Application[] = [
+      {
+        ...applicationA,
+        candidateName: 'Maxi Perlo',
+        email: 'maxi.perlo@example.com',
+        phone: '+549351000000'
+      }
+    ]
     const updatedContact: Contact = {
       ...contactA,
       status: 'ARCHIVED'
     }
 
+    vi.mocked(applicationsApi.createAdminCandidate).mockResolvedValue(createdApplication)
+    vi.mocked(applicationsApi.updateAdminCandidate).mockResolvedValue(candidateUpdatedApplications)
     vi.mocked(applicationsApi.updateApplicationStatus).mockResolvedValue(updatedApplication)
     vi.mocked(applicationsApi.deleteApplication).mockResolvedValue()
     vi.mocked(contactsApi.updateContactStatus).mockResolvedValue(updatedContact)
@@ -200,6 +251,29 @@ describe('useAdminDashboard', () => {
 
     const { result } = renderHook(() => useAdminDashboard())
     await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await result.current.createCandidate({
+        candidateName: createdApplication.candidateName,
+        email: createdApplication.email,
+        phone: createdApplication.phone,
+        notes: 'Contacto manual'
+      })
+    })
+    expect(result.current.applications[0].id).toBe('a3')
+
+    await act(async () => {
+      await result.current.updateCandidate('a1', {
+        candidateName: 'Maxi Perlo',
+        email: 'maxi.perlo@example.com',
+        phone: '+549351000000'
+      })
+    })
+    expect(result.current.applications.find((a) => a.id === 'a1')).toMatchObject({
+      candidateName: 'Maxi Perlo',
+      email: 'maxi.perlo@example.com',
+      phone: '+549351000000'
+    })
 
     await act(async () => {
       await result.current.updateApplicationStatus('a1', 'ACCEPTED')
@@ -220,5 +294,56 @@ describe('useAdminDashboard', () => {
       await result.current.deleteContact('c2')
     })
     expect(result.current.contacts.some((c) => c.id === 'c2')).toBe(false)
+  })
+
+  it('ignora respuestas viejas cuando dos recargas compiten entre sí', async () => {
+    const firstVacancies = createDeferred<Vacancy[]>()
+    const firstApplications = createDeferred<Application[]>()
+    const firstContacts = createDeferred<Contact[]>()
+    const secondVacancies = createDeferred<Vacancy[]>()
+    const secondApplications = createDeferred<Application[]>()
+    const secondContacts = createDeferred<Contact[]>()
+
+    vi.mocked(vacanciesApi.getVacancies)
+      .mockReturnValueOnce(firstVacancies.promise)
+      .mockReturnValueOnce(secondVacancies.promise)
+    vi.mocked(applicationsApi.getApplications)
+      .mockReturnValueOnce(firstApplications.promise)
+      .mockReturnValueOnce(secondApplications.promise)
+    vi.mocked(contactsApi.getContacts)
+      .mockReturnValueOnce(firstContacts.promise)
+      .mockReturnValueOnce(secondContacts.promise)
+
+    const { result } = renderHook(() => useAdminDashboard())
+
+    await act(async () => {
+      void result.current.fetchDashboardData()
+    })
+
+    await act(async () => {
+      secondVacancies.resolve([vacancyB])
+      secondApplications.resolve([applicationB])
+      secondContacts.resolve([contactB])
+      await Promise.all([secondVacancies.promise, secondApplications.promise, secondContacts.promise])
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.vacancies).toEqual([vacancyB])
+    expect(result.current.applications).toEqual([applicationB])
+    expect(result.current.contacts).toEqual([contactB])
+
+    await act(async () => {
+      firstVacancies.resolve([vacancyA, vacancyB])
+      firstApplications.resolve([applicationA, applicationB])
+      firstContacts.resolve([contactA, contactB])
+      await Promise.all([firstVacancies.promise, firstApplications.promise, firstContacts.promise])
+    })
+
+    expect(result.current.vacancies).toEqual([vacancyB])
+    expect(result.current.applications).toEqual([applicationB])
+    expect(result.current.contacts).toEqual([contactB])
   })
 })

@@ -1,12 +1,17 @@
+export interface ApiRequestErrorOptions {
+  status?: number
+  code?: string
+}
+
 export class ApiRequestError extends Error {
-  status: number
+  status?: number
   code?: string
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, options: ApiRequestErrorOptions = {}) {
     super(message)
     this.name = 'ApiRequestError'
-    this.status = status
-    this.code = code
+    this.status = options.status
+    this.code = options.code
   }
 }
 

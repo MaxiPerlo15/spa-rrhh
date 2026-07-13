@@ -6,6 +6,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 
+function isSpringAuthEnabled() {
+  return process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED === 'true'
+}
+
+function getSpringBackendUrl() {
+  return process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, '') || null
+}
+
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -18,14 +26,45 @@ export default function SignInPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
-    setIsLoading(true)
 
     try {
       const normalizedEmail = email.trim().toLowerCase()
+      const trimmedPassword = password.trim()
+
+      if (!normalizedEmail || !trimmedPassword) {
+        const message = 'Ingresa email y contraseña para continuar.'
+        setError(message)
+        showError(message)
+        return
+      }
+
+      setIsLoading(true)
+
+      // Spring relay mode: POST directly to Spring backend
+      if (isSpringAuthEnabled() && getSpringBackendUrl()) {
+        const response = await fetch(`${getSpringBackendUrl()}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, password: trimmedPassword })
+        })
+
+        if (!response.ok) {
+          setError('Credenciales inválidas')
+          showError('Credenciales inválidas. Verifica email y contraseña.')
+          return
+        }
+
+        showSuccess('Inicio de sesión exitoso. Redirigiendo al panel.')
+        router.push('/admin')
+        router.refresh()
+        return
+      }
+
+      // Legacy NextAuth mode
       const callbackUrl = `${window.location.origin}/admin`
       const result = await signIn('credentials', {
         email: normalizedEmail,
-        password,
+        password: trimmedPassword,
         redirect: false,
         callbackUrl
       })
@@ -142,13 +181,21 @@ export default function SignInPage() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-primary-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/"
+                className="w-full rounded-lg border border-gray-300 py-3 px-4 text-center font-semibold text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto sm:flex-1"
+              >
+                Cancelar
+              </Link>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full rounded-lg bg-primary-500 py-3 px-4 font-semibold text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
+              >
+                {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              </button>
+            </div>
 
             <div className="text-center">
               <Link href="/admin/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 transition-colors">

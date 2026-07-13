@@ -35,6 +35,8 @@ Tabla 18-01. Matriz de trazabilidad principal.
 | CU-020 | RF-21, RF-22, RF-23 | RNF-01, RNF-07, RNF-08 | RN-01 | `GET/POST/DELETE /api/admin/notifications`, `PATCH/DELETE /api/admin/notifications/[id]` | `adminHeader.a11y.test.tsx`, `qa-matrix.spec.ts` |
 | CU-021 | RF-24 | RNF-01, RNF-06, RNF-09 | RN-06 | `GET /api/admin/audit` | `qa-matrix.spec.ts` (smoke admin), `auditRetention.test.ts` (política relacionada) |
 | CU-022 | RF-25 | RNF-01, RNF-06, RNF-08 | RN-07 | `POST /api/internal/audit-retention` | `auditRetention.test.ts` |
+| CU-023 | RF-26 | RNF-01, RNF-05, RNF-07, RNF-08 | RN-01 | `GET /api/applications/export` | `applicationsExportRoute.test.ts`, `application.test.ts` |
+| CU-024 | RF-27 | RNF-01, RNF-05, RNF-07, RNF-08 | RN-01 | `GET /api/admin/candidates/export` | `candidatesExportRoute.test.ts`, `application.test.ts`, `adminCandidatesSection.test.tsx` |
 
 ## 3. Cobertura y huecos detectados
 

@@ -1,18 +1,8 @@
+import { ApiRequestError } from './errors'
+
 const DEFAULT_TIMEOUT_MS = 12_000
 const DEFAULT_RETRIES = 1
 const BASE_RETRY_DELAY_MS = 600
-
-type ApiErrorCode = 'TIMEOUT' | 'NETWORK'
-
-export class ApiRequestError extends Error {
-  code: ApiErrorCode
-
-  constructor(message: string, code: ApiErrorCode) {
-    super(message)
-    this.name = 'ApiRequestError'
-    this.code = code
-  }
-}
 
 interface FetchJsonOptions extends RequestInit {
   timeoutMs?: number
@@ -86,11 +76,17 @@ export async function apiFetch(input: RequestInfo | URL, options: FetchJsonOptio
         continue
       }
 
-      throw new ApiRequestError(message, isTimeout ? 'TIMEOUT' : 'NETWORK')
+      throw new ApiRequestError(message, {
+        code: isTimeout ? 'TIMEOUT' : 'NETWORK'
+      })
     } finally {
       timeout.clear()
     }
   }
 
-  throw new ApiRequestError('No se pudo completar la solicitud.', 'NETWORK')
+  throw new ApiRequestError('No se pudo completar la solicitud.', {
+    code: 'NETWORK'
+  })
 }
+
+export { ApiRequestError } from './errors'

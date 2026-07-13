@@ -27,6 +27,8 @@
 - RF-23: Eliminar notificaciones.
 - RF-24: Consultar log de auditoría.
 - RF-25: Ejecutar purga de auditoría por retención.
+- RF-26: Exportar postulaciones.
+- RF-27: Exportar candidatos.
 
 ## 2. Requisitos No Funcionales (RNF)
 

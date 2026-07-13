@@ -1,16 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { auditAdminAction } from '@/lib/adminAudit'
-import { normalizeLocation } from '@/lib/utils'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   createVacancySchema,
   formatValidationError,
   vacanciesListQuerySchema
 } from '@/lib/apiValidation'
-import { toVacancyDto } from '@/lib/dto/vacancy'
+import { revalidatePublicVacanciesCache } from '@/lib/server/publicVacancies'
+import {
+  getBackendUrl,
+  getSpringBackendHeaders
+} from '@/lib/server/springBackend'
+import {
+  type SpringVacancyResponse,
+  mapSpringToDto,
+  buildCreatePayload,
+  parseSpringError,
+  getUnsupportedSpringVacancyFields,
+  rejectUnsupportedSpringVacancyFields,
+  SpringVacancyWriteError
+} from '@/lib/server/springVacancyGateway'
 
+async function createVacancyInSpring(data: ReturnType<typeof buildCreatePayload>) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy creation')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getSpringBackendHeaders()
+    },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    if (response.status === 400 || response.status === 404 || response.status === 409) {
+      throw new SpringVacancyWriteError(
+        response.status,
+        parseSpringError(errorBody) || 'No se pudo crear la vacante por una regla de negocio'
+      )
+    }
+    throw new Error(`Spring backend rejected vacancy creation (${response.status}): ${errorBody}`)
+  }
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+async function listVacanciesInSpring(all: boolean) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy listing')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies?all=${all}`, {
+    method: 'GET',
+    headers: getSpringBackendHeaders()
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Spring backend rejected vacancy list (${response.status}): ${errorBody}`)
+  }
+
+  const vacancies = await response.json() as SpringVacancyResponse[]
+  return vacancies.map(mapSpringToDto)
+}
 
 // GET /api/vacancies - Listar vacantes
 export async function GET(request: NextRequest) {
@@ -22,8 +82,15 @@ export async function GET(request: NextRequest) {
     if (!queryValidation.success) {
       return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
     }
-    const { all } = queryValidation.data // Para el admin dashboard
-    
+    const { all } = queryValidation.data
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Vacancy backend not configured' },
+        { status: 503 }
+      )
+    }
+
     // Solo admins pueden pedir todas las vacantes
     if (all) {
       const session = await auth()
@@ -35,16 +102,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const vacancies = await prisma.vacancy.findMany({
-      where: all ? {} : { status: 'ACTIVE' },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    const formattedVacancies = vacancies.map(toVacancyDto)
-
-    return NextResponse.json(formattedVacancies)
+    const springVacancies = await listVacanciesInSpring(all)
+    return NextResponse.json(springVacancies)
   } catch (error) {
     logger.error('Error al obtener vacantes', error)
     return NextResponse.json(
@@ -77,6 +136,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Vacancy backend not configured' },
+        { status: 503 }
+      )
+    }
+
     const body = await request.json()
     const bodyValidation = createVacancySchema.safeParse(body)
     if (!bodyValidation.success) {
@@ -84,19 +155,19 @@ export async function POST(request: NextRequest) {
     }
     const { title, description, location, workday, modality, salary, requirements, benefits } = bodyValidation.data
 
-    const vacancy = await prisma.vacancy.create({
-      data: {
-        title,
-        description,
-        location: normalizeLocation(location),
-        workday,
-        modality,
-        salary,
-        requirements,
-        benefits,
-        status: 'ACTIVE'
-      }
-    })
+    const unsupportedFields = getUnsupportedSpringVacancyFields({ salary, benefits })
+    if (unsupportedFields.length > 0) {
+      return rejectUnsupportedSpringVacancyFields(unsupportedFields)
+    }
+
+    const springVacancy = await createVacancyInSpring(buildCreatePayload({
+      title,
+      description,
+      location,
+      workday,
+      modality,
+      requirements
+    }))
 
     await auditAdminAction({
       request,
@@ -106,16 +177,25 @@ export async function POST(request: NextRequest) {
       },
       action: 'vacancy.create',
       resourceType: 'vacancy',
-      resourceId: vacancy.id,
+      resourceId: springVacancy.id,
       outcome: 'SUCCESS',
       metadata: {
-        title: vacancy.title,
-        status: vacancy.status
+        title: springVacancy.title,
+        status: springVacancy.status,
+        backend: 'spring'
       }
     })
+    revalidatePublicVacanciesCache()
 
-    return NextResponse.json(toVacancyDto(vacancy), { status: 201 })
+    return NextResponse.json(springVacancy, { status: 201 })
   } catch (error) {
+    if (error instanceof SpringVacancyWriteError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      )
+    }
+
     await auditAdminAction({
       request,
       actor: {

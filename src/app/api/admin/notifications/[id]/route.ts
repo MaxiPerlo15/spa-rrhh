@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   formatValidationError,
   routeIdSchema,
   updateAdminNotificationSchema
 } from '@/lib/apiValidation'
 import { toAdminNotificationDto, type AdminNotificationDtoSource } from '@/lib/dto/adminNotification'
-import { isMissingTableOrColumnError } from '@/lib/prismaError'
+import { canUseSchemaDriftFallback, isPrismaRecordNotFoundError } from '@/lib/prismaError'
 
 interface RouteParams {
   params: Promise<{
@@ -21,6 +22,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
@@ -41,7 +47,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         data: { isRead: bodyValidation.data.isRead }
       })
     } catch (error) {
-      if (!isMissingTableOrColumnError(error)) throw error
+      if (isPrismaRecordNotFoundError(error)) {
+        return NextResponse.json({ error: 'Notificación no encontrada' }, { status: 404 })
+      }
+      if (!canUseSchemaDriftFallback(error)) throw error
+      logger.warn('Fallback temporal de actualización de notificaciones por schema drift', {
+        route: 'PATCH /api/admin/notifications/[id]',
+        notificationId: parsedParams.data.id
+      })
       updated = await prisma.adminNotification.update({
         where: { id: parsedParams.data.id },
         data: { isRead: bodyValidation.data.isRead },
@@ -70,16 +83,26 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
 
-    // Usamos deleteMany para evitar errores por registros inexistentes
-    // y para tolerar mejor esquemas parcialmente desalineados.
-    await prisma.adminNotification.deleteMany({
-      where: { id: parsedParams.data.id }
-    })
+    try {
+      await prisma.adminNotification.delete({
+        where: { id: parsedParams.data.id }
+      })
+    } catch (error) {
+      if (isPrismaRecordNotFoundError(error)) {
+        return NextResponse.json({ error: 'Notificación no encontrada' }, { status: 404 })
+      }
+      throw error
+    }
 
     return NextResponse.json({ message: 'Notificación eliminada' })
   } catch (error) {

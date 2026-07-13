@@ -1,0 +1,32 @@
+services:
+  # Create an ignored .env with unique POSTGRES_PASSWORD and
+  # RRHH_SECURITY_INTERNAL_API_TOKEN values before starting this stack.
+  postgres:
+    image: postgres:16
+    container_name: rrhh-postgres
+    environment:
+      POSTGRES_DB: rrhh_db
+      POSTGRES_USER: rrhh_user
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - rrhh_pg_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: rrhh-backend
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/rrhh_db
+      SPRING_DATASOURCE_USERNAME: rrhh_user
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}"
+      RRHH_SECURITY_INTERNAL_API_TOKEN: "${RRHH_SECURITY_INTERNAL_API_TOKEN:?Set RRHH_SECURITY_INTERNAL_API_TOKEN in your local .env}"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+
+volumes:
+  rrhh_pg_data:

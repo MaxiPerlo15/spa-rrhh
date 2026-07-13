@@ -12,7 +12,11 @@ export type PasswordStrengthResult = {
 }
 
 function getTokenSecret() {
-  return process.env.NEXTAUTH_SECRET || 'fallback-secret'
+  const secret = process.env.NEXTAUTH_SECRET?.trim()
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET no configurado')
+  }
+  return secret
 }
 
 function getTokenTtlMinutes() {

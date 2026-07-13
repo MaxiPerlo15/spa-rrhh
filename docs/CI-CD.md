@@ -56,6 +56,7 @@ El archivo `.github/workflows/ci.yml` ejecuta automáticamente:
    - ✅ Cache de npm (acelera builds)
    - ✅ Instala dependencias (`npm ci`)
    - ✅ Ejecuta linter (`npm run lint`)
+   - ✅ Valida tipos (`npm run typecheck`)
    - ✅ Compila el proyecto (`npm run build`)
    - ✅ Sube artefactos de build
 
@@ -101,6 +102,13 @@ El control compensatorio es operativo: no mergear a `main` si `CI Success` no es
 - `API Smoke`
 - `E2E Tests`
 - `CI Success`
+
+Validación local recomendada antes de abrir PR:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test:unit`
+- `npm run build`
 
 ## Deployment strategy (Vercel)
 

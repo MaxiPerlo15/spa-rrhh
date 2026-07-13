@@ -27,6 +27,10 @@ describe('passwordReset helpers', () => {
     expect(hashResetToken(token)).toEqual(hashResetToken(token))
   })
 
+  it('falla si NEXTAUTH_SECRET no está configurado', () => {
+    expect(() => hashResetToken('abc')).toThrow('NEXTAUTH_SECRET no configurado')
+  })
+
   it('usa TTL configurado por env', () => {
     vi.stubEnv('PASSWORD_RESET_TOKEN_TTL_MINUTES', '45')
     expect(getPasswordResetTokenTtlMinutes()).toBe(45)
@@ -39,7 +43,7 @@ describe('passwordReset helpers', () => {
   })
 
   it('valida contraseñas seguras', () => {
-    expect(validateNewPassword('ChangeMe123!')).toBeUndefined()
+    expect(validateNewPassword('ValidPassphrase9!')).toBeUndefined()
     expect(validateNewPassword('short1A')).toContain('al menos')
     expect(validateNewPassword('onlylowercase123')).toContain('mayúsculas')
   })

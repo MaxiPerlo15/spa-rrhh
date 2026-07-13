@@ -35,7 +35,7 @@ describe('Acciones admin con etiquetas accesibles contextuales', () => {
         searchVacancies=""
         setSearchVacancies={vi.fn<(value: string) => void>()}
         filterVacancyStatus="all"
-        setFilterVacancyStatus={vi.fn<(value: 'all' | 'active' | 'closed') => void>()}
+        setFilterVacancyStatus={vi.fn<(value: 'all' | 'active' | 'inactive' | 'closed') => void>()}
         sortVacanciesBy="createdAt"
         setSortVacanciesBy={vi.fn<(value: 'createdAt' | 'title' | 'location' | 'status') => void>()}
         sortVacanciesDirection="desc"
@@ -50,14 +50,54 @@ describe('Acciones admin con etiquetas accesibles contextuales', () => {
       />
     )
 
-    expect(screen.getAllByRole('button', { name: 'Cerrar vacante Desarrollador Frontend' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Desactivar vacante Desarrollador Frontend' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('button', { name: 'Editar vacante Desarrollador Frontend' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('button', { name: 'Eliminar vacante Desarrollador Frontend' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Cerrar vacante Desarrollador Frontend' }).length).toBeGreaterThan(0)
+  })
+
+  it('vacantes: no ofrece cierre para vacantes ya cerradas', () => {
+    const vacancy: Vacancy = {
+      id: 'vac-closed',
+      title: 'Analista QA',
+      location: 'Córdoba',
+      workday: 'FULL_TIME',
+      modality: 'REMOTE',
+      status: 'closed',
+      createdAt: new Date().toISOString()
+    }
+
+    render(
+      <AdminVacanciesSection
+        filteredVacancies={[vacancy]}
+        paginatedVacancies={[vacancy]}
+        currentVacancyPage={1}
+        itemsPerPage={10}
+        setCurrentVacancyPage={vi.fn<(page: number) => void>()}
+        searchVacancies=""
+        setSearchVacancies={vi.fn<(value: string) => void>()}
+        filterVacancyStatus="all"
+        setFilterVacancyStatus={vi.fn<(value: 'all' | 'active' | 'inactive' | 'closed') => void>()}
+        sortVacanciesBy="createdAt"
+        setSortVacanciesBy={vi.fn<(value: 'createdAt' | 'title' | 'location' | 'status') => void>()}
+        sortVacanciesDirection="desc"
+        setSortVacanciesDirection={vi.fn<(value: 'asc' | 'desc') => void>()}
+        getTourClass={getVacancyTourClass}
+        onOpenCreateModal={vi.fn<() => void>()}
+        onToggleStatus={vi.fn<(vacancy: Vacancy) => void>()}
+        onOpenEditModal={vi.fn<(vacancy: Vacancy) => void>()}
+        onDeleteVacancy={vi.fn<(id: string, title: string) => void>()}
+        pendingToggleVacancyId={null}
+        pendingDeleteVacancyId={null}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: 'Cerrar vacante Analista QA' })).toBeNull()
   })
 
   it('postulaciones: acciones Ver/Eliminar tienen labels contextuales', () => {
     const application: Application = {
       id: 'app-1',
+      candidateId: 'cand-1',
       candidateName: 'Maxi Perlo',
       email: 'maxi@spa.com',
       phone: '3510000000',
@@ -104,6 +144,43 @@ describe('Acciones admin con etiquetas accesibles contextuales', () => {
     expect(screen.getAllByRole('button', { name: 'Eliminar postulación de Maxi Perlo' }).length).toBeGreaterThan(0)
   })
 
+  it('postulaciones: informa cuando no hay registros en la tabla', () => {
+    render(
+      <AdminApplicationsSection
+        applications={[]}
+        vacancies={[]}
+        filteredApplications={[]}
+        paginatedApplications={[]}
+        currentApplicationPage={1}
+        itemsPerPage={10}
+        setCurrentApplicationPage={vi.fn<(page: number) => void>()}
+        searchApplications=""
+        setSearchApplications={vi.fn<(value: string) => void>()}
+        filterStatus="all"
+        setFilterStatus={vi.fn<(value: string) => void>()}
+        filterApplicationsVacancyId="all"
+        setFilterApplicationsVacancyId={vi.fn<(value: string) => void>()}
+        sortApplicationsBy="submittedAt"
+        setSortApplicationsBy={vi.fn<(value: 'submittedAt' | 'candidateName' | 'status') => void>()}
+        sortApplicationsDirection="desc"
+        setSortApplicationsDirection={vi.fn<(value: 'asc' | 'desc') => void>()}
+        firstApplicationId={null}
+        firstApplicationWithCvId={null}
+        getTourClass={getApplicationTourClass}
+        onStatusChange={vi.fn<(applicationId: string, newStatus: Application['status']) => void>()}
+        onViewDetails={vi.fn<(application: Application) => void>()}
+        onDownloadCv={vi.fn<(application: Application) => void>()}
+        onDeleteApplication={vi.fn<(applicationId: string, candidateName: string) => void>()}
+        pendingApplicationStatusId={null}
+        pendingDeleteApplicationId={null}
+        onExportCsv={vi.fn<() => void>()}
+        isExportingCsv={false}
+      />
+    )
+
+    expect(screen.getAllByText('No hay postulaciones registradas').length).toBeGreaterThan(0)
+  })
+
   it('contactos: acciones Ver/Eliminar tienen labels contextuales', () => {
     const contact: Contact = {
       id: 'c-1',
@@ -144,5 +221,35 @@ describe('Acciones admin con etiquetas accesibles contextuales', () => {
 
     expect(screen.getAllByRole('button', { name: 'Ver detalle de contacto de Laura Gomez' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('button', { name: 'Eliminar contacto de Laura Gomez' }).length).toBeGreaterThan(0)
+  })
+
+  it('contactos: informa cuando no hay registros en la tabla', () => {
+    render(
+      <AdminContactsSection
+        contacts={[]}
+        filteredContacts={[]}
+        paginatedContacts={[]}
+        currentContactPage={1}
+        itemsPerPage={10}
+        setCurrentContactPage={vi.fn<(page: number) => void>()}
+        searchContacts=""
+        setSearchContacts={vi.fn<(value: string) => void>()}
+        filterContactStatus="all"
+        setFilterContactStatus={vi.fn<(value: string) => void>()}
+        sortContactsBy="createdAt"
+        setSortContactsBy={vi.fn<(value: 'createdAt' | 'name' | 'status') => void>()}
+        sortContactsDirection="desc"
+        setSortContactsDirection={vi.fn<(value: 'asc' | 'desc') => void>()}
+        firstContactId={null}
+        getTourClass={getContactTourClass}
+        onStatusChange={vi.fn<(contactId: string, newStatus: Contact['status']) => void>()}
+        onViewDetails={vi.fn<(contact: Contact) => void>()}
+        onDeleteContact={vi.fn<(contactId: string, contactName: string) => void>()}
+        pendingContactStatusId={null}
+        pendingDeleteContactId={null}
+      />
+    )
+
+    expect(screen.getAllByText('No hay contactos registrados').length).toBeGreaterThan(0)
   })
 })

@@ -1,0 +1,10 @@
+spring:
+  session:
+    cookie:
+      # Only enabled when SPRING_PROFILES_ACTIVE=local is explicitly set.
+      secure: false
+
+rrhh:
+  security:
+    allow-unauthenticated-vacancy-access: true
+    allow-unauthenticated-mutations: true

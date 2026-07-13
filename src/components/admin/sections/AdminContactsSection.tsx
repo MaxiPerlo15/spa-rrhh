@@ -176,7 +176,7 @@ export default function AdminContactsSection({
           )}
           {filteredContacts.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-              No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'disponibles'}
+              No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'registrados'}
             </div>
           ) : (
             paginatedContacts.map((contact) => {
@@ -269,7 +269,7 @@ export default function AdminContactsSection({
               {filteredContacts.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'disponibles'}
+                    No hay contactos {filterContactStatus !== 'all' ? 'con este estado' : 'registrados'}
                   </td>
                 </tr>
               ) : (

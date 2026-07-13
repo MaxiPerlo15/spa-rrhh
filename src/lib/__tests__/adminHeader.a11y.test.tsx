@@ -93,4 +93,35 @@ describe('AdminHeader mobile a11y', () => {
     expect(dialog).toBeTruthy()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
   })
+
+  it('expone la acción de cerrar sesión y permite dispararla', async () => {
+    const onSignOut = vi.fn()
+
+    render(
+      <AdminHeader
+        activeTab="vacancies"
+        userEmail="admin@spa.com"
+        onSignOut={onSignOut}
+        onBackFromSettings={vi.fn()}
+        onOpenFullTutorial={vi.fn()}
+        onOpenSectionTutorial={vi.fn()}
+        onOpenNotifications={vi.fn()}
+        onOpenSettings={vi.fn()}
+        notifications={notifications}
+        onDeleteNotification={vi.fn()}
+        onToggleNotificationRead={vi.fn()}
+        onMarkAllNotificationsAsRead={vi.fn()}
+        onClearReadNotifications={vi.fn()}
+        onNotificationAction={vi.fn()}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Cerrar sesión del panel' }).length).toBeGreaterThan(0)
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar sesión del panel' })[0]!)
+
+    expect(onSignOut).toHaveBeenCalledTimes(1)
+  })
 })

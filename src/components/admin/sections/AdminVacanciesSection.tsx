@@ -11,8 +11,8 @@ interface AdminVacanciesSectionProps {
   setCurrentVacancyPage: (page: number) => void
   searchVacancies: string
   setSearchVacancies: (value: string) => void
-  filterVacancyStatus: 'all' | 'active' | 'closed'
-  setFilterVacancyStatus: (value: 'all' | 'active' | 'closed') => void
+  filterVacancyStatus: 'all' | 'active' | 'inactive' | 'closed'
+  setFilterVacancyStatus: (value: 'all' | 'active' | 'inactive' | 'closed') => void
   sortVacanciesBy: 'createdAt' | 'title' | 'location' | 'status'
   setSortVacanciesBy: (value: 'createdAt' | 'title' | 'location' | 'status') => void
   sortVacanciesDirection: 'asc' | 'desc'
@@ -62,8 +62,27 @@ export default function AdminVacanciesSection({
   const vacancyStatusOptions: FilterOption[] = [
     { value: 'all', label: 'Todos los estados' },
     { value: 'active', label: 'Activas' },
+    { value: 'inactive', label: 'Inactivas' },
     { value: 'closed', label: 'Cerradas' }
   ]
+  const getVacancyStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      active: 'Activa',
+      created: 'Creada',
+      inactive: 'Inactiva',
+      closed: 'Cerrada',
+      draft: 'Borrador'
+    }
+
+    return labels[status] ?? status
+  }
+  const getVacancyStatusClass = (status: string) => {
+    if (status === 'active') return 'bg-green-100 text-green-800'
+    if (status === 'closed') return 'bg-gray-100 text-gray-800'
+    return 'bg-amber-100 text-amber-800'
+  }
+  const canToggleVacancy = (status: string) => status !== 'closed'
+  const canCloseVacancy = (status: string) => status !== 'closed'
   const sortVacancyByOptions: FilterOption[] = [
     { value: 'createdAt', label: 'Ordenar por fecha' },
     { value: 'title', label: 'Ordenar por título' },
@@ -104,7 +123,7 @@ export default function AdminVacanciesSection({
               label="Estado de vacantes"
               value={filterVacancyStatus}
               options={vacancyStatusOptions}
-              onChange={(nextValue) => setFilterVacancyStatus(nextValue as 'all' | 'active' | 'closed')}
+              onChange={(nextValue) => setFilterVacancyStatus(nextValue as 'all' | 'active' | 'inactive' | 'closed')}
               ariaLabel="Filtrar vacantes por estado"
             />
           </div>
@@ -112,11 +131,12 @@ export default function AdminVacanciesSection({
             id="admin-vacancies-filter-status"
             name="admin_vacancies_filter_status"
             value={filterVacancyStatus}
-            onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'closed')}
+            onChange={(event) => setFilterVacancyStatus(event.target.value as 'all' | 'active' | 'inactive' | 'closed')}
             className="hidden md:block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
             <option value="all">Todos los estados</option>
             <option value="active">Activas</option>
+            <option value="inactive">Inactivas</option>
             <option value="closed">Cerradas</option>
           </select>
           <div className="md:hidden">
@@ -181,11 +201,11 @@ export default function AdminVacanciesSection({
                 actions={[
                   {
                     key: 'toggle',
-                    label: isToggling ? 'Procesando' : vacancy.status === 'active' ? 'Cerrar' : 'Activar',
-                    ariaLabel: `${vacancy.status === 'active' ? 'Cerrar' : 'Activar'} vacante ${vacancy.title}`,
+                    label: isToggling ? 'Procesando' : vacancy.status === 'active' ? 'Desactivar' : vacancy.status === 'closed' ? 'Cerrada' : 'Activar',
+                    ariaLabel: `${vacancy.status === 'active' ? 'Desactivar' : vacancy.status === 'closed' ? 'Vacante cerrada' : 'Activar'} vacante ${vacancy.title}`,
                     onClick: () => onToggleStatus(vacancy),
-                    className: vacancy.status === 'active' ? 'bg-orange-600' : 'bg-green-600',
-                    disabled: isRowBusy
+                    className: vacancy.status === 'active' ? 'bg-orange-600' : vacancy.status === 'closed' ? 'bg-gray-500' : 'bg-green-600',
+                    disabled: isRowBusy || !canToggleVacancy(vacancy.status)
                   },
                   {
                     key: 'edit',
@@ -195,14 +215,18 @@ export default function AdminVacanciesSection({
                     className: 'bg-blue-600',
                     disabled: isRowBusy
                   },
-                  {
-                    key: 'delete',
-                    label: isDeleting ? '...' : 'Eliminar',
-                    ariaLabel: `Eliminar vacante ${vacancy.title}`,
-                    onClick: () => onDeleteVacancy(vacancy.id, vacancy.title),
-                    className: 'bg-red-600',
-                    disabled: isRowBusy
-                  }
+                  ...(canCloseVacancy(vacancy.status)
+                    ? [
+                        {
+                          key: 'close',
+                          label: isDeleting ? '...' : 'Cerrar',
+                          ariaLabel: `Cerrar vacante ${vacancy.title}`,
+                          onClick: () => onDeleteVacancy(vacancy.id, vacancy.title),
+                          className: 'bg-red-600',
+                          disabled: isRowBusy
+                        }
+                      ]
+                    : [])
                 ]}
               >
                 <div className="p-4 space-y-3">
@@ -212,11 +236,9 @@ export default function AdminVacanciesSection({
                       <p className="text-xs text-gray-600">{vacancy.location}</p>
                     </div>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vacancy.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${getVacancyStatusClass(vacancy.status)}`}
                     >
-                      {vacancy.status === 'active' ? 'Activa' : 'Cerrada'}
+                      {getVacancyStatusLabel(vacancy.status)}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
@@ -280,11 +302,9 @@ export default function AdminVacanciesSection({
                   </td>
                   <td className="px-4 sm:px-6 py-4 text-sm">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        vacancy.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${getVacancyStatusClass(vacancy.status)}`}
                     >
-                      {vacancy.status === 'active' ? 'Activa' : 'Cerrada'}
+                      {getVacancyStatusLabel(vacancy.status)}
                     </span>
                   </td>
                   <td className="hidden lg:table-cell px-4 sm:px-6 py-4 text-sm text-gray-600">
@@ -295,19 +315,21 @@ export default function AdminVacanciesSection({
                       <button
                         data-tour={index === 0 ? 'vacancy-toggle-btn' : undefined}
                         onClick={() => onToggleStatus(vacancy)}
-                        disabled={isRowBusy}
+                        disabled={isRowBusy || !canToggleVacancy(vacancy.status)}
                         className={`${
-                          vacancy.status === 'active' ? 'text-orange-700 hover:text-orange-900' : 'text-green-700 hover:text-green-900'
+                          vacancy.status === 'active' ? 'text-orange-700 hover:text-orange-900' : vacancy.status === 'closed' ? 'text-gray-500' : 'text-green-700 hover:text-green-900'
                         } font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-toggle-btn')}` : ''}`}
-                        title={vacancy.status === 'active' ? 'Cerrar esta vacante (no aparecerá en la página pública)' : 'Activar esta vacante (aparecerá en la página pública)'}
-                        aria-label={`${vacancy.status === 'active' ? 'Cerrar' : 'Activar'} vacante ${vacancy.title}`}
+                        title={vacancy.status === 'active' ? 'Desactivar esta vacante (no aparecerá en la página pública)' : vacancy.status === 'closed' ? 'La vacante cerrada no puede activarse' : 'Activar esta vacante (aparecerá en la página pública)'}
+                        aria-label={`${vacancy.status === 'active' ? 'Desactivar' : vacancy.status === 'closed' ? 'Vacante cerrada' : 'Activar'} vacante ${vacancy.title}`}
                       >
                         {isToggling ? (
                           'Procesando...'
                         ) : vacancy.status === 'active' ? (
                           <>
-                            <span aria-hidden="true">🔒 </span>Cerrar
+                            <span aria-hidden="true">🔒 </span>Desactivar
                           </>
+                        ) : vacancy.status === 'closed' ? (
+                          'Cerrada'
                         ) : (
                           <>
                             <span aria-hidden="true">✅ </span>Activar
@@ -323,21 +345,23 @@ export default function AdminVacanciesSection({
                       >
                         <span aria-hidden="true">✏️ </span>Editar
                       </button>
-                      <button
-                        data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
-                        onClick={() => onDeleteVacancy(vacancy.id, vacancy.title)}
-                        disabled={isRowBusy}
-                        className={`text-red-700 hover:text-red-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
-                        aria-label={`Eliminar vacante ${vacancy.title}`}
-                      >
-                        {isDeleting ? (
-                          'Eliminando...'
-                        ) : (
-                          <>
-                            <span aria-hidden="true">🗑️ </span>Eliminar
-                          </>
-                        )}
-                      </button>
+                      {canCloseVacancy(vacancy.status) && (
+                        <button
+                          data-tour={index === 0 ? 'vacancy-delete-btn' : undefined}
+                          onClick={() => onDeleteVacancy(vacancy.id, vacancy.title)}
+                          disabled={isRowBusy}
+                          className={`text-red-700 hover:text-red-900 font-medium disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 ${index === 0 ? `rounded-md px-1 ${getTourClass('vacancy-delete-btn')}` : ''}`}
+                          aria-label={`Cerrar vacante ${vacancy.title}`}
+                        >
+                          {isDeleting ? (
+                            'Cerrando...'
+                          ) : (
+                            <>
+                              <span aria-hidden="true">🔒 </span>Cerrar
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

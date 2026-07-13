@@ -16,7 +16,7 @@ Reducir ruido técnico de runtime/build y documentar el camino de upgrade cuando
 ## Checklist operativo
 
 1. Ejecutar `npm run build` y revisar warnings nuevos.
-2. Ejecutar `npx tsc --noEmit` para validar strict typing.
+2. Ejecutar `npm run typecheck` para validar strict typing.
 3. Ejecutar `npm run lint` para degradaciones de calidad.
 4. Registrar warnings no resueltos con causa y next step en este documento.
 

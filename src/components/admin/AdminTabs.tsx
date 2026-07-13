@@ -6,7 +6,7 @@
 'use client'
 import AppIcon from '@/components/ui/AppIcon'
 
-export type AdminTab = 'vacancies' | 'applications' | 'contacts' | 'settings'
+export type AdminTab = 'vacancies' | 'applications' | 'candidates' | 'contacts' | 'settings'
 
 interface TabButtonProps {
   isActive: boolean
@@ -65,6 +65,7 @@ interface AdminTabsProps {
   stats?: {
     activeVacancies?: number
     pendingApplications?: number
+    totalCandidates?: number
     pendingContacts?: number
   }
 }
@@ -79,7 +80,7 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
         aria-label="Navegación principal del panel admin"
         className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur"
       >
-        <div className="mx-auto max-w-7xl grid grid-cols-4 gap-2">
+        <div className="mx-auto max-w-7xl grid grid-cols-5 gap-2">
         <TabButton
           isActive={activeTab === 'vacancies'}
           onClick={() => onTabChange('vacancies')}
@@ -97,6 +98,16 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           label="Postulaciones"
           mobileLabel="Postulac."
           badge={stats.pendingApplications}
+          compact
+          iconOnly
+        />
+        <TabButton
+          isActive={activeTab === 'candidates'}
+          onClick={() => onTabChange('candidates')}
+          icon="users"
+          label="Candidatos"
+          mobileLabel="Cand."
+          badge={stats.totalCandidates}
           compact
           iconOnly
         />
@@ -136,6 +147,13 @@ export default function AdminTabs({ activeTab, onTabChange, className = '', stat
           icon="file"
           label="Postulaciones"
           badge={stats.pendingApplications}
+        />
+        <TabButton
+          isActive={activeTab === 'candidates'}
+          onClick={() => onTabChange('candidates')}
+          icon="users"
+          label="Candidatos"
+          badge={stats.totalCandidates}
         />
         <TabButton
           isActive={activeTab === 'contacts'}

@@ -8,8 +8,11 @@ import {
   updateApplicationStatus,
   deleteApplication,
   downloadApplicationsCsv,
-  type Application
+  downloadCandidatesCsv,
+  type Application,
+  type CreateApplicationResponse
 } from '../api/applications'
+import { isApiRequestError } from '../api/errors'
 
 describe('Applications API Service', () => {
   beforeEach(() => {
@@ -18,7 +21,7 @@ describe('Applications API Service', () => {
 
   it('getApplications devuelve el array de postulaciones', async () => {
     const mockData: Application[] = [
-      { id: '1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'PENDING', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
+      { id: '1', candidateId: 'c1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'PENDING', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
     ]
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({
@@ -40,7 +43,7 @@ describe('Applications API Service', () => {
   })
 
   it('getApplicationById devuelve una postulación', async () => {
-    const mockApp: Application = { id: '1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'PENDING', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
+    const mockApp: Application = { id: '1', candidateId: 'c1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'PENDING', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -52,12 +55,15 @@ describe('Applications API Service', () => {
     expect(result).toEqual(mockApp)
   })
 
-  it('createApplication devuelve la postulación creada', async () => {
-    const mockApp: Application = { id: '1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'PENDING', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
+  it('createApplication devuelve el payload real de confirmación', async () => {
+    const mockResponse: CreateApplicationResponse = {
+      message: 'Postulación enviada exitosamente',
+      applicationId: '1'
+    }
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve(mockApp)
+        json: () => Promise.resolve(mockResponse)
       })
     ))
 
@@ -67,23 +73,18 @@ describe('Applications API Service', () => {
       email: 'a@a.com',
       phone: '123'
     })
-    expect(result).toEqual(mockApp)
+    expect(result).toEqual(mockResponse)
   })
 
   it('createApplication permite enviar postulación espontánea sin vacancyId', async () => {
-    const mockApp: Application = {
-      id: '2',
-      candidateName: 'Ana',
-      email: 'ana@a.com',
-      phone: '123',
-      status: 'PENDING',
-      submittedAt: '',
-      vacancy: undefined
+    const mockResponse: CreateApplicationResponse = {
+      message: 'Postulación enviada exitosamente',
+      applicationId: '2'
     }
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve(mockApp)
+        json: () => Promise.resolve(mockResponse)
       })
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -94,7 +95,7 @@ describe('Applications API Service', () => {
       phone: '123'
     })
 
-    expect(result).toEqual(mockApp)
+    expect(result).toEqual(mockResponse)
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
@@ -133,8 +134,40 @@ describe('Applications API Service', () => {
     })).rejects.toThrow('El teléfono debe tener entre 8 y 15 dígitos')
   })
 
+  it('createApplication preserva status y code en errores de API', async () => {
+    try {
+      vi.stubGlobal('fetch', vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 409,
+          json: () => Promise.resolve({
+            error: 'Ya existe una postulación',
+            code: 'DUPLICATE_SUBMISSION'
+          })
+        })
+      ))
+
+      await createApplication({
+        vacancyId: 'v1',
+        candidateName: 'Juan',
+        email: 'a@a.com',
+        phone: '123'
+      })
+    } catch (error) {
+      expect(isApiRequestError(error)).toBe(true)
+      expect(error).toMatchObject({
+        message: 'Ya existe una postulación',
+        status: 409,
+        code: 'DUPLICATE_SUBMISSION'
+      })
+      return
+    }
+
+    throw new Error('Expected createApplication to throw')
+  })
+
   it('updateApplicationStatus actualiza y devuelve la postulación', async () => {
-    const mockApp: Application = { id: '1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'ACCEPTED', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
+    const mockApp: Application = { id: '1', candidateId: 'c1', candidateName: 'Juan', email: 'a@a.com', phone: '123', status: 'ACCEPTED', submittedAt: '', vacancy: { id: 'v1', title: 'Dev' } }
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -194,6 +227,42 @@ describe('Applications API Service', () => {
       vacancyId: 'cmc7q8v1r0000v5r4f9k0m2n3',
       sortBy: 'submittedAt',
       sortDirection: 'desc'
+    })
+
+    expect(clickMock).toHaveBeenCalled()
+    expect(createObjectURL).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalled()
+    appendChildSpy.mockRestore()
+  })
+
+  it('downloadCandidatesCsv descarga archivo con la búsqueda actual', async () => {
+    const createObjectURL = vi.fn(() => 'blob:mock-url')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true })
+
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild')
+    const clickMock = vi.fn()
+    const realAnchor = document.createElement('a')
+    vi.spyOn(realAnchor, 'click').mockImplementation(clickMock)
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'a') return realAnchor
+      return originalCreateElement(tagName)
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['test']))
+        })
+      )
+    )
+
+    await downloadCandidatesCsv({
+      search: 'ana'
     })
 
     expect(clickMock).toHaveBeenCalled()

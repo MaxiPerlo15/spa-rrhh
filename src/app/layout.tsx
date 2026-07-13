@@ -4,7 +4,9 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import CookieNotice from "@/components/CookieNotice";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { CspNonceProvider } from "@/contexts/CspNonceContext";
 import { SentryUserContext } from "@/components/SentryUserContext";
+import { headers } from "next/headers";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -67,23 +69,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get('x-nonce')
+
   return (
     <html lang="es">
       <body
         className={`${manrope.variable} ${sora.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <SentryUserContext /> 
-          <ToastProvider>
-            {children}
-            <CookieNotice />
-          </ToastProvider>
-        </AuthProvider>
+        <CspNonceProvider value={nonce}>
+          <AuthProvider>
+            <SentryUserContext /> 
+            <ToastProvider>
+              {children}
+              <CookieNotice />
+            </ToastProvider>
+          </AuthProvider>
+        </CspNonceProvider>
       </body>
     </html>
   );

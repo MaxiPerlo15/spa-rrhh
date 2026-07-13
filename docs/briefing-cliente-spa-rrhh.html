@@ -1,0 +1,1645 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Briefing — Propuesta Comercial · Meinardi & Perlo RRHH</title>
+  <meta name="description" content="Propuesta comercial de plataforma de gestión de recursos humanos para Meinardi & Perlo: alcance, funcionalidades implementadas y próximos pasos." />
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --paper: #ffffff;
+      --ink: #101828;
+      --muted: #667085;
+      --soft: #eef4ff;
+      --soft-2: #f8fafc;
+      --line: #d9e2ef;
+      --brand: #0f2f4a;
+      --brand-2: #1f5f8b;
+      --accent: #2563eb;
+      --ok: #067647;
+      --ok-bg: #ecfdf3;
+      --warn: #b54708;
+      --warn-bg: #fffaeb;
+      --cross: #b42318;
+      --cross-bg: #fef3f2;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow: 0 18px 60px rgba(16, 24, 40, .08);
+      --shadow-soft: 0 10px 30px rgba(16, 24, 40, .06);
+      --max: 1320px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f7fbff 0%, var(--bg) 36%, #eef2f7 100%);
+      line-height: 1.55;
+      font-size: 17px;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .page {
+      width: min(var(--max), calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 72px;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(15, 47, 74, .96), rgba(31, 95, 139, .92)),
+        radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 30%);
+      color: #fff;
+      border-radius: var(--radius-xl);
+      padding: 44px 44px 36px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-icon {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.12);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,.7);
+    }
+
+    .hero-icon svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -120px;
+      top: -120px;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.08);
+    }
+
+    .hero-kicker {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: rgba(255,255,255,.7);
+      margin-bottom: 6px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(32px, 4.5vw, 50px);
+      line-height: 1;
+      letter-spacing: -.05em;
+    }
+
+    .hero h2 {
+      margin: 8px 0 0;
+      font-size: clamp(18px, 2.2vw, 26px);
+      font-weight: 500;
+      color: rgba(255,255,255,.85);
+      letter-spacing: -.02em;
+    }
+
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-meta-item {
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 14px 16px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-meta-label {
+      display: block;
+      color: rgba(255,255,255,.6);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 4px;
+    }
+
+    .hero-meta-value {
+      font-weight: 700;
+      color: #fff;
+      font-size: 15px;
+    }
+
+    /* ===== NAV ===== */
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 22px 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      padding: 14px 0;
+      backdrop-filter: blur(14px);
+    }
+
+    .nav a {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.78);
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      color: #344054;
+      box-shadow: 0 4px 14px rgba(16,24,40,.04);
+      transition: border-color .15s, background .15s;
+    }
+
+    .nav a:hover {
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    /* ===== SECTIONS (shared) ===== */
+    .section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-soft);
+      padding: 24px;
+      margin-top: 22px;
+      position: relative;
+    }
+
+    .section-header {
+      margin-bottom: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-icon {
+      position: absolute;
+      top: 32px;
+      right: 28px;
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand);
+    }
+
+    .section-icon svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .section-kicker {
+      color: var(--brand-2);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.12;
+      letter-spacing: -.035em;
+      color: var(--brand);
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: -.015em;
+      color: #182230;
+    }
+
+    p { margin: 0 0 12px; color: #475467; font-size: 16px; }
+
+    /* ===== PROBLEMA ===== */
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .panel-actual {
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+      border-left: 5px solid var(--cross);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+    }
+
+    .panel-deseada {
+      background: var(--ok-bg);
+      border: 1px solid #abefc6;
+      border-left: 5px solid var(--ok);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+    }
+
+    .panel-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+
+    .panel-actual .panel-label { color: var(--cross); }
+    .panel-deseada .panel-label { color: var(--ok); }
+
+    .panel-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .panel-list li {
+      position: relative;
+      padding-left: 26px;
+      color: #475467;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .panel-actual .panel-list li::before {
+      content: "✗";
+      position: absolute;
+      left: 0;
+      color: var(--cross);
+      font-weight: 700;
+    }
+
+    .panel-deseada .panel-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    /* ===== SOLUCIÓN ===== */
+    .solution-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .solution-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      background: var(--soft-2);
+      position: relative;
+    }
+
+    .solution-card h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-right: 80px;
+    }
+
+    .solution-card .badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .badge-public { background: #e0f2fe; color: #0369a1; }
+    .badge-admin { background: #ede9fe; color: #6d28d9; }
+
+    .solution-card p { font-size: 17px; color: #667085; margin: 10px 0 16px; line-height: 1.55; }
+
+    .solution-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .solution-card ul li {
+      position: relative;
+      padding-left: 24px;
+      font-size: 17px;
+      color: #475467;
+      line-height: 1.5;
+    }
+
+    .solution-card ul li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    /* ===== CUs — PORTAL PÚBLICO ===== */
+    .cu-section-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0 14px;
+    }
+
+    .cu-section-label .badge {
+      display: inline-flex;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .cu-grid-public,
+    .cu-grid-admin {
+      display: grid;
+      gap: 18px;
+    }
+
+    .cu-grid-public { gap: 20px; }
+
+    .cu-card-public {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: var(--soft-2);
+      overflow: hidden;
+    }
+
+    .cu-card-public .cu-body-pub {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 320px;
+    }
+
+    .cu-card-public .cu-info {
+      padding: 28px 24px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .cu-card-public .cu-info h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 4px;
+    }
+
+    .cu-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .cu-card-public .cu-info p {
+      font-size: 16px;
+      color: #667085;
+      margin: 2px 0 4px;
+      line-height: 1.5;
+    }
+
+    .cu-card-public .cu-info .cu-step {
+      font-size: 18px;
+      color: #344054;
+      line-height: 1.45;
+    }
+
+    .cu-steps-compact {
+      display: grid;
+      gap: 16px;
+      margin: 20px 0 0;
+    }
+
+    .cu-step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: #475467;
+      line-height: 1.4;
+    }
+
+    .cu-step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--soft);
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .cu-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: auto;
+    }
+
+    .cu-tag {
+      display: inline-flex;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    .cu-tag.ok { background: var(--ok-bg); color: var(--ok); border-color: #abefc6; }
+    .cu-tag.warn { background: var(--warn-bg); color: var(--warn); border-color: #fedf89; }
+    .cu-tag.scope { background: #eff8ff; color: #175cd3; border-color: #b2ddff; }
+    .cu-tag.note { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+
+    /* ===== SHOT (image container) ===== */
+    .shot {
+      width: 100%;
+      min-height: 100%;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.9), rgba(241,245,249,.92)),
+        repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(15,47,74,.025) 10px, rgba(15,47,74,.025) 20px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .shot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .shot-grid {
+      display: flex;
+      flex-direction: row;
+      height: 280px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .shot-grid-dual {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    }
+
+    .shot-grid .shot {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .shot-grid-dual .shot-primary img {
+      object-position: left top;
+    }
+
+    .shot-grid-dual .shot-secondary img {
+      object-position: center top;
+    }
+
+    .shot-grid .shot img {
+      object-fit: cover;
+      object-position: center center;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ===== CUs — ADMIN ===== */
+    .cu-grid-admin {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .cu-card-admin {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--soft-2);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cu-card-admin .cu-info-compact {
+      padding: 20px 22px 22px;
+    }
+
+    .cu-card-admin .cu-info-compact h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+
+    .cu-card-admin .cu-info-compact .cu-num {
+      width: 26px;
+      height: 26px;
+      font-size: 12px;
+    }
+
+    .cu-card-admin .cu-info-compact > p {
+      font-size: 15px;
+      color: #667085;
+      margin: 2px 0 4px;
+      line-height: 1.45;
+    }
+
+    .cu-card-admin .cu-info-compact .cu-steps-compact {
+      margin: 16px 0 0;
+    }
+
+    .cu-card-admin .cu-info-compact .cu-step {
+      font-size: 16px;
+      color: #475467;
+    }
+
+    .cu-note {
+      display: inline-flex;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      background: #fef9c3;
+      color: #854d0e;
+      border-color: #fde68a;
+      margin-top: 4px;
+    }
+
+    .cu-note.improvement {
+      background: #f0f4ff;
+      color: #4338ca;
+      border-color: #c7d2fe;
+    }
+
+    /* ===== TABLE ===== */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th {
+      background: var(--brand);
+      color: #fff;
+      text-align: left;
+      padding: 12px 14px;
+      font-size: 13px;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 13px 14px;
+      border-top: 1px solid var(--line);
+      color: #475467;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    .check { color: var(--ok); font-weight: 800; font-size: 18px; }
+    .cross { color: var(--cross); font-weight: 800; font-size: 18px; }
+
+    .req-group {
+      font-weight: 700;
+      color: var(--brand);
+    }
+
+    /* ===== Cobertura funcional — 2‑column grid ===== */
+    .req-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .req-col {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .req-col-header {
+      background: var(--brand);
+      color: #fff;
+      padding: 13px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+
+    .req-items {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .req-items li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 16px;
+      color: #475467;
+      line-height: 1.45;
+    }
+
+    .req-items li:nth-child(even) { background: #f8fafc; }
+
+    .req-items .check { flex-shrink: 0; margin-top: 1px; }
+    .req-items .cross { flex-shrink: 0; margin-top: 1px; }
+
+    .req-full {
+      grid-column: 1 / -1;
+    }
+
+    .req-full .req-items li:last-child {
+      border-bottom: none;
+    }
+
+    /* ===== NEXT STEPS ===== */
+    .steps-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--soft-2);
+    }
+
+    .step-priority {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .step-priority .pill {
+      display: inline-flex;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .pill.high { background: #fef3f2; color: var(--cross); }
+    .pill.medium { background: var(--warn-bg); color: var(--warn); }
+    .pill.low { background: var(--ok-bg); color: var(--ok); }
+
+    /* ===== DELIVERABLES & COSTS ===== */
+    .sub-section {
+      margin-top: 24px;
+    }
+
+    .sub-section h3 {
+      font-size: 20px;
+      color: var(--brand);
+      margin: 0 0 12px;
+    }
+
+    .sub-section > p {
+      font-size: 15px;
+      color: #667085;
+      margin: 0 0 14px;
+      line-height: 1.5;
+    }
+
+    .deliverable-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .deliverable-list {
+      display: grid;
+      gap: 10px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .deliverable-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--soft-2);
+      font-size: 15px;
+      color: #475467;
+      line-height: 1.45;
+    }
+
+    .deliverable-list li .d-check {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--ok-bg);
+      color: var(--ok);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .deliverable-list li .d-check svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .deliverable-list li strong {
+      color: var(--ink);
+    }
+
+    .deliverable-timer {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--soft-2);
+      padding: 32px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .deliverable-timer .timer-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand);
+    }
+
+    .deliverable-timer .timer-icon svg {
+      width: 30px;
+      height: 30px;
+    }
+
+    .deliverable-timer .timer-label {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .deliverable-timer .timer-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--brand);
+      letter-spacing: -.03em;
+      line-height: 1.1;
+    }
+
+    .cost-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .cost-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      background: var(--soft-2);
+    }
+
+    .cost-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand);
+      margin-bottom: 12px;
+    }
+
+    .cost-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .cost-card h4 {
+      font-size: 15px;
+      color: var(--brand);
+      margin: 0 0 4px;
+    }
+
+    .cost-card .cost-amount {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--brand);
+      letter-spacing: -.03em;
+      margin: 6px 0;
+    }
+
+    .cost-card .cost-note {
+      font-size: 13px;
+      color: #98a2b3;
+      margin: 0;
+    }
+
+    .cost-card .cost-detail {
+      font-size: 13px;
+      color: #667085;
+      margin: 6px 0 0;
+      line-height: 1.4;
+    }
+
+    .step-item h3 { font-size: 16px; margin: 0; }
+
+    .prox-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .prox-list {
+      display: grid;
+      gap: 10px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .prox-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--soft-2);
+      font-size: 15px;
+      color: #475467;
+      line-height: 1.45;
+    }
+
+    .prox-list li .p-icon {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .prox-list li .p-icon.step {
+      background: var(--soft);
+      color: var(--accent);
+    }
+
+    .prox-list li .p-icon.future {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
+    .prox-list li .p-icon svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .prox-list li strong {
+      color: var(--ink);
+    }
+
+    .prox-list li .future-items {
+
+    /* ===== FOOTER ===== */
+    .footer {
+      margin-top: 32px;
+      color: #98a2b3;
+      text-align: center;
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 24px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 960px) {
+      .cu-card-public .cu-body-pub { grid-template-columns: 1fr; min-height: auto; }
+      .cu-grid-admin { grid-template-columns: 1fr; }
+      .req-grid { grid-template-columns: 1fr; }
+      .cost-grid { grid-template-columns: 1fr; }
+      .deliverable-grid { grid-template-columns: 1fr; }
+      .prox-grid { grid-template-columns: 1fr; }
+      .shot-grid-dual { grid-template-columns: 1fr; height: auto; }
+      .shot-grid-dual .shot { min-height: 220px; }
+    }
+
+    @media (max-width: 900px) {
+      .hero { padding: 30px; }
+      .split, .solution-grid { grid-template-columns: 1fr; }
+      .step-item { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .section, .hero { box-shadow: none; break-inside: avoid; }
+      .cu-card-public, .cu-card-admin { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+      <h1>Plataforma de Gestión RRHH</h1>
+      <h2>Briefing · Meinardi &amp; Perlo RRHH</h2>
+      <div class="hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 2 7l10 5 10-5-10-5Z"/>
+          <path d="M2 17 12 22 22 17"/>
+          <path d="M2 12 12 17 22 12"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ===== EL PROBLEMA ===== -->
+    <section class="section" id="problema">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">01 · Diagnóstico</div>
+          <h2>El problema</h2>
+        </div>
+      </div>
+      <div class="split">
+        <div class="panel-actual">
+          <span class="panel-label">Situación actual</span>
+          <ul class="panel-list">
+            <li>Gestión manual de postulaciones: candidatos llegan por email, LinkedIn y WhatsApp sin orden.</li>
+            <li>Ofertas laborales publicadas en múltiples canales sin un listado centralizado.</li>
+            <li>Seguimiento de candidatos disperso: no hay trazabilidad del estado de cada postulación.</li>
+            <li>Consultas comerciales mezcladas con postulaciones, sin un canal claro de contacto.</li>
+            <li>Sin registro de auditoría: no queda constancia de qué se hizo ni cuándo.</li>
+          </ul>
+        </div>
+        <div class="panel-deseada">
+          <span class="panel-label">Situación deseada</span>
+          <ul class="panel-list">
+            <li>Una plataforma que centralice todas las postulaciones en un solo lugar.</li>
+            <li>Ofertas laborales publicadas automáticamente desde un panel de administración.</li>
+            <li>Trazabilidad completa: cada candidato con su estado y seguimiento.</li>
+            <li>Formulario de contacto profesional que derive consultas al equipo interno.</li>
+            <li>Registro de auditoría de cada acción importante en el sistema.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LA SOLUCIÓN ===== -->
+    <section class="section" id="solucion">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+            <path d="M9 18h6"/>
+            <path d="M10 22h4"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">02 · Mi propuesta</div>
+          <h2>La solución</h2>
+        </div>
+      </div>
+      <p style="margin-bottom:18px;">
+        Propongo una plataforma web integral con dos caras complementarias:
+        un <strong>portal público</strong> para candidatos y visitantes, y un
+        <strong>panel administrativo</strong> para la gestión interna de Meinardi &amp; Perlo.
+      </p>
+      <div class="solution-grid">
+        <div class="solution-card">
+          <h3><span>Portal público</span></h3>
+          <span class="badge badge-public">Candidatos</span>
+          <p>La cara visible de la consultora. Todo lo que ve una persona que busca trabajo o quiere contactarlos.</p>
+          <ul>
+            <li>Página institucional con presentación de la consultora.</li>
+            <li>Listado de ofertas laborales activas con búsqueda y filtros.</li>
+            <li>Postulación a ofertas laborales específicas con carga de CV.</li>
+            <li>Postulación espontánea para perfiles sin oferta laboral asignada.</li>
+            <li>Formulario de contacto profesional.</li>
+          </ul>
+        </div>
+        <div class="solution-card">
+          <h3><span>Panel administrativo</span></h3>
+          <span class="badge badge-admin">Gestión interna</span>
+          <p>El motor de operación del sistema. Todo lo que necesitás para administrar el proceso de selección.</p>
+          <ul>
+            <li>Dashboard con visión general del estado del sistema.</li>
+            <li>Gestión completa de ofertas laborales (crear, editar, activar, cerrar).</li>
+            <li>Bandeja de postulaciones con filtros y cambio de estados.</li>
+            <li>Ficha consolidada de candidatos con historial por persona.</li>
+            <li>Bandeja de contactos con seguimiento de estado.</li>
+            <li>Exportación de datos a CSV, compatible con Excel y Google Sheets, para análisis externo.</li>
+            <li>Registro de auditoría de todas las acciones.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LO IMPLEMENTADO ===== -->
+    <section class="section" id="implementado">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="4" rx="1"/>
+            <path d="M15 4h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3"/>
+            <path d="m9 14 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">03 · Funcionalidades implementadas</div>
+          <h2>Lo implementado</h2>
+        </div>
+      </div>
+
+      <!-- ---- PORTAL PÚBLICO ---- -->
+      <div class="cu-section-label">
+        <span class="badge badge-public" style="background:#e0f2fe;color:#0369a1;">Portal público</span>
+        <span style="color:var(--muted);font-size:14px;">Lo que ve el candidato</span>
+      </div>
+
+      <div class="cu-grid-public">
+
+        <!-- PU 1 -->
+        <article class="cu-card-public">
+          <div class="cu-body-pub">
+            <div class="cu-info">
+              <h3><span class="cu-num">1</span> Portal institucional</h3>
+              <p><strong>Objetivo:</strong> Presentar la consultora y dirigir al visitante a las acciones clave: ofertas laborales, postulación o contacto.</p>
+              <div class="cu-steps-compact">
+                <div class="cu-step"><span class="cu-step-num">1</span><span>El visitante ingresa y ve la presentación institucional con servicios.</span></div>
+                <div class="cu-step"><span class="cu-step-num">2</span><span>Navega secciones: conoce la empresa, revisa ofertas laborales o accede al formulario de contacto.</span></div>
+                <div class="cu-step"><span class="cu-step-num">3</span><span>El sitio se adapta a cualquier dispositivo sin perder calidad visual.</span></div>
+              </div>
+            </div>
+            <div class="shot" data-src="briefing-assets/homepage.png"></div>
+          </div>
+        </article>
+
+        <!-- PU 2 -->
+        <article class="cu-card-public">
+          <div class="cu-body-pub">
+            <div class="cu-info">
+              <h3><span class="cu-num">2</span> Ofertas laborales</h3>
+              <p><strong>Objetivo:</strong> Publicar ofertas laborales activas y permitir que los candidatos las encuentren rápidamente.</p>
+              <div class="cu-steps-compact">
+                <div class="cu-step"><span class="cu-step-num">1</span><span>El candidato accede al listado de ofertas laborales activas ordenadas por fecha.</span></div>
+                <div class="cu-step"><span class="cu-step-num">2</span><span>Filtra por palabra clave, tipo de jornada, modalidad o ubicación.</span></div>
+                <div class="cu-step"><span class="cu-step-num">3</span><span>Selecciona una oferta laboral y ve detalle completo con botón de postulación.</span></div>
+              </div>
+            </div>
+            <div class="shot" data-src="briefing-assets/ofertas-laborales.png"></div>
+          </div>
+        </article>
+
+        <!-- PU 3 -->
+        <article class="cu-card-public">
+          <div class="cu-body-pub">
+            <div class="cu-info">
+              <h3><span class="cu-num">3</span> Postulación a ofertas laborales</h3>
+              <p><strong>Objetivo:</strong> Permitir que los candidatos apliquen a una oferta laboral específica adjuntando CV.</p>
+              <div class="cu-steps-compact">
+                <div class="cu-step"><span class="cu-step-num">1</span><span>Completa el formulario: nombre, email, teléfono, CV en PDF y carta opcional.</span></div>
+                <div class="cu-step"><span class="cu-step-num">2</span><span>Revisa los datos en una pantalla de confirmación antes de enviar.</span></div>
+                <div class="cu-step"><span class="cu-step-num">3</span><span>La postulación queda registrada y vinculada a la oferta laboral. El equipo la recibe en el panel.</span></div>
+              </div>
+            </div>
+            <div class="shot" data-src="briefing-assets/postulacion-particular.png"></div>
+          </div>
+        </article>
+
+        <!-- PU 4 -->
+        <article class="cu-card-public">
+          <div class="cu-body-pub">
+            <div class="cu-info">
+              <h3><span class="cu-num">4</span> Postulación espontánea</h3>
+              <p><strong>Objetivo:</strong> Captar talento incluso cuando no hay una oferta laboral activa publicada.</p>
+              <div class="cu-steps-compact">
+                <div class="cu-step"><span class="cu-step-num">1</span><span>Accede al formulario de postulación espontánea desde el sitio.</span></div>
+                <div class="cu-step"><span class="cu-step-num">2</span><span>Completa sus datos, adjunta CV e indica el área de interés.</span></div>
+                <div class="cu-step"><span class="cu-step-num">3</span><span>Queda en la base de candidatos disponible para futuras búsquedas.</span></div>
+              </div>
+            </div>
+            <div class="shot" data-src="briefing-assets/postulacion-espontanea.png"></div>
+          </div>
+        </article>
+
+        <!-- PU 5 -->
+        <article class="cu-card-public">
+          <div class="cu-body-pub">
+            <div class="cu-info">
+              <h3><span class="cu-num">5</span> Formulario de contacto</h3>
+              <p><strong>Objetivo:</strong> Centralizar consultas comerciales en un canal único y trazable.</p>
+              <div class="cu-steps-compact">
+                <div class="cu-step"><span class="cu-step-num">1</span><span>El visitante completa nombre, medio de contacto y mensaje.</span></div>
+                <div class="cu-step"><span class="cu-step-num">2</span><span>Revisa la información en pantalla de confirmación antes del envío.</span></div>
+                <div class="cu-step"><span class="cu-step-num">3</span><span>La consulta llega al panel donde el equipo puede responderla y cambiar su estado.</span></div>
+              </div>
+            </div>
+            <div class="shot" data-src="briefing-assets/contacto.png"></div>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- ---- PANEL ADMINISTRATIVO ---- -->
+      <div class="cu-section-label" style="margin-top:36px;">
+        <span class="badge badge-admin" style="background:#ede9fe;color:#6d28d9;">Panel administrativo</span>
+        <span style="color:var(--muted);font-size:14px;">La operación del equipo</span>
+      </div>
+
+      <div class="cu-grid-admin">
+
+          <!-- AD 6 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid">
+            <div class="shot" data-src="briefing-assets/login.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">6</span> Acceso al panel</h3>
+            <p><strong>Objetivo:</strong> Autenticación segura con recuperación de contraseña por email.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>El administrador ingresa email y contraseña</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>El sistema valida las credenciales y redirige al dashboard</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Opción de recuperación de contraseña si olvidó sus datos</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 7 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid shot-grid-dual">
+            <div class="shot shot-primary" data-src="briefing-assets/gestion-vacante.png"></div>
+            <div class="shot shot-secondary" data-src="briefing-assets/nueva-vacante.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">7</span> Gestión de ofertas laborales</h3>
+            <p><strong>Objetivo:</strong> Listado, creación, edición y eliminación de ofertas laborales desde el panel.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Accede al módulo de ofertas desde el panel lateral</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Visualiza listado completo con opciones de editar, activar o eliminar</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Crea nuevas ofertas con formulario completo (título, descripción, modalidad, requisitos)</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 8 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid shot-grid-dual">
+            <div class="shot shot-primary" data-src="briefing-assets/gestion-postulacion.png"></div>
+            <div class="shot shot-secondary" data-src="briefing-assets/postulacion.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">8</span> Gestión de postulaciones</h3>
+            <p><strong>Objetivo:</strong> Visualizar, filtrar y exportar postulaciones a CSV compatible con Excel y Google Sheets, con cambio de estado y descarga de CV.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Revisa postulaciones ordenadas por fecha con filtros por estado y vacante</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Cambia el estado: Pendiente → Revisando → Entrevistado → Aceptado / Rechazado</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Descarga el CV del candidato o exporta los datos a CSV para abrirlos en Excel o Google Sheets</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 9 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid shot-grid-dual">
+            <div class="shot shot-primary" data-src="briefing-assets/gestion-candidatos.png"></div>
+            <div class="shot shot-secondary" data-src="briefing-assets/registrar-candidato.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">9</span> Gestión de candidatos</h3>
+            <p><strong>Objetivo:</strong> Ficha consolidada por persona con historial de postulaciones y creación manual.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Accede a la ficha consolidada de cada persona con todo su historial</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Crea candidatos manualmente cuando la postulación llega por otro canal</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Visualiza la actividad completa del candidato en un solo lugar</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 10 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid">
+            <div class="shot" data-src="briefing-assets/gestion-contactos.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">10</span> Gestión de contactos</h3>
+            <p><strong>Objetivo:</strong> Centralizar consultas entrantes desde el formulario de contacto público.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Recibe consultas comerciales desde el formulario de contacto público</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Revisa el mensaje y responde al visitante</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Cambia el estado: Pendiente → Respondido → Archivado</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 11 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid">
+            <div class="shot" data-src="briefing-assets/notificaciones.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">11</span> Notificaciones + toasts</h3>
+            <p><strong>Objetivo:</strong> Feedback visual inmediato al realizar operaciones en el panel.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Recibe feedback visual inmediato al realizar cada operación</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Los toasts confirman acciones exitosas (crear, editar, eliminar)</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Alertan sobre eventos nuevos del sistema</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 12 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid">
+            <div class="shot" data-src="briefing-assets/configuraciones.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">12</span> Configuración básica</h3>
+            <p><strong>Objetivo:</strong> Cambiar datos del administrador y contraseña desde el panel.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>Accede a la sección de configuración desde el panel</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Modifica nombre, email o contraseña del administrador</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>Los cambios se guardan y aplican inmediatamente</span></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AD 13 -->
+        <article class="cu-card-admin">
+          <div class="shot-grid">
+            <div class="shot" data-src="briefing-assets/email.png"></div>
+          </div>
+          <div class="cu-info-compact">
+            <h3><span class="cu-num">13</span> Notificaciones por email</h3>
+            <p><strong>Objetivo:</strong> Alertas automáticas por correo electrónico ante eventos clave del sistema.</p>
+            <div class="cu-steps-compact">
+              <div class="cu-step"><span class="cu-step-num">1</span><span>El sistema envía emails automáticos ante eventos clave</span></div>
+              <div class="cu-step"><span class="cu-step-num">2</span><span>Nueva postulación o nuevo contacto generan una alerta por correo</span></div>
+              <div class="cu-step"><span class="cu-step-num">3</span><span>El equipo se mantiene informado sin necesidad de estar en el panel</span></div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ===== COBERTURA FUNCIONAL ===== -->
+    <section class="section" id="tabla">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <path d="m9 14 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">04 · Cobertura funcional</div>
+          <h2>Funcionalidades cubiertas y alcance del proyecto</h2>
+        </div>
+      </div>
+      <div class="req-grid">
+
+        <div class="req-col">
+          <div class="req-col-header">Portal público</div>
+          <ul class="req-items">
+            <li><span class="check">✓</span> Página institucional / Landing — presentación responsiva</li>
+            <li><span class="check">✓</span> Listado de ofertas laborales activas con filtros</li>
+            <li><span class="check">✓</span> Postulación a oferta laboral específica (formulario + CV)</li>
+            <li><span class="check">✓</span> Postulación espontánea sin oferta laboral asociada</li>
+            <li><span class="check">✓</span> Formulario de contacto centralizado</li>
+            <li><span class="check">✓</span> Diseño full responsiveness (celular, tablet y computadora)</li>
+          </ul>
+        </div>
+
+        <div class="req-col">
+          <div class="req-col-header">Panel administrativo</div>
+          <ul class="req-items">
+            <li><span class="check">✓</span> Autenticación segura con recuperación de contraseña</li>
+            <li><span class="check">✓</span> CRUD completo de ofertas laborales</li>
+            <li><span class="check">✓</span> Bandeja de postulaciones con filtros y cambio de estados</li>
+            <li><span class="check">✓</span> Exportación CSV compatible con Excel y Google Sheets, y descarga de CV</li>
+            <li><span class="check">✓</span> Gestión de candidatos con ficha consolidada</li>
+            <li><span class="check">✓</span> Bandeja de contactos con seguimiento de estados</li>
+            <li><span class="check">✓</span> Notificaciones visuales (toasts) en el panel</li>
+            <li><span class="check">✓</span> Configuración del panel (nombre, email, contraseña)</li>
+            <li><span class="check">✓</span> Registro de auditoría de acciones importantes</li>
+            <li><span class="check">✓</span> Tutorial interactivo al primer ingreso al panel</li>
+          </ul>
+        </div>
+
+        <div class="req-col req-full">
+          <div class="req-col-header">No contemplado en esta etapa</div>
+          <ul class="req-items">
+            <li><span class="cross">✗</span> No se soportan otros idiomas que no sean el nativo</li>
+            <li><span class="cross">✗</span> Candidatos como usuarios dentro del sistema</li>
+            <li><span class="cross">✗</span> Múltiples roles de administrador</li>
+            <li><span class="cross">✗</span> Reportes con gráficos</li>
+            <li><span class="cross">✗</span> Integración con LinkedIn / portales</li>
+            <li><span class="cross">✗</span> Notificaciones email al candidato</li>
+            <li><span class="cross">✗</span> Carga de CV al crear candidato manual</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== PRÓXIMOS PASOS ===== -->
+    <section class="section" id="proximos">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 22V2l15 7L4 16"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">05 · Próximos pasos</div>
+          <h2>Lo que sigue</h2>
+        </div>
+      </div>
+      <div class="prox-grid">
+        <ul class="prox-list">
+          <li>
+            <span class="p-icon step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>
+            <span><strong>Carga de imágenes institucionales y logo</strong><br>Fotografías del equipo, oficina y recursos visuales de la consultora.</span>
+          </li>
+          <li>
+            <span class="p-icon step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>
+            <span><strong>Refinación visual de secciones, textos y demás</strong><br>Ajustes de diseño y redacción final sobre el contenido del sitio.</span>
+          </li>
+          <li>
+            <span class="p-icon step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>
+            <span><strong>Definir sección "Empresas que confían"</strong><br>Selección de clientes para mostrar como casos de éxito o logos.</span>
+          </li>
+          <li>
+            <span class="p-icon future"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
+            <span><strong>Posibles nuevas funcionalidades</strong><br>Funcionalidades adicionales o cambios que puedan surgir una vez finalizado el alcance inicial. Se evaluarán y cotizarán por separado.</span>
+          </li>
+        </ul>
+        <div class="deliverable-timer">
+          <div class="timer-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M12 9v4l2.5 2.5"/>
+              <path d="M9 2h6"/>
+              <path d="M12 2v3"/>
+            </svg>
+          </div>
+          <span class="timer-label">Tiempo estimado</span>
+          <span class="timer-value">6 a 8 semanas<br>según lo que se incorpore</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ENTREGABLES ===== -->
+    <section class="section" id="entregables">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6 9 17l-5-5"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">06 · Entregables y plazos</div>
+          <h2>Lo que incluye esta propuesta</h2>
+        </div>
+      </div>
+
+      <div class="deliverable-grid">
+        <ul class="deliverable-list">
+          <li>
+            <span class="d-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Portal público completo</strong> — sitio institucional, ofertas laborales, postulación y contacto</span>
+          </li>
+          <li>
+            <span class="d-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Panel administrativo</strong> — login, gestión de ofertas, postulaciones, candidatos, contactos, notificaciones y configuración</span>
+          </li>
+          <li>
+            <span class="d-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Puesta en producción</strong> — despliegue en servidor, configuración de dominio y SSL</span>
+          </li>
+          <li>
+            <span class="d-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Manual de uso para el equipo</strong> — guía operativa del portal y panel administrativo</span>
+          </li>
+        </ul>
+        <div class="deliverable-timer">
+          <div class="timer-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M12 9v4l2.5 2.5"/>
+              <path d="M9 2h6"/>
+              <path d="M12 2v3"/>
+            </svg>
+          </div>
+          <span class="timer-label">Tiempo estimado</span>
+          <span class="timer-value">2 semanas<br>desde la aprobación</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== COSTOS ===== -->
+    <section class="section" id="costos">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
+            <path d="M7 7h.01"/>
+          </svg>
+        </div>
+        <div class="section-header-content">
+          <div class="section-kicker">07 · Estimación de costos</div>
+          <h2>Inversión referencial del proyecto</h2>
+        </div>
+      </div>
+
+      <div class="cost-grid">
+          <div class="cost-card">
+            <div class="cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="5" rx="1"/>
+                <rect x="2" y="9.5" width="20" height="5" rx="1"/>
+                <rect x="2" y="16" width="20" height="5" rx="1"/>
+                <circle cx="6" cy="5.5" r=".75" fill="currentColor"/>
+                <circle cx="6" cy="12" r=".75" fill="currentColor"/>
+                <circle cx="6" cy="18.5" r=".75" fill="currentColor"/>
+              </svg>
+            </div>
+            <h4>Hosting e infraestructura</h4>
+            <div class="cost-amount">~USD 25/mes</div>
+            <p class="cost-detail">Servidor, almacenamiento de archivos y ancho de banda. Costo mensual estimado.</p>
+          </div>
+          <div class="cost-card">
+            <div class="cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+                <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+              </svg>
+            </div>
+            <h4>Base de datos</h4>
+            <div class="cost-amount">~USD 5/mes</div>
+            <p class="cost-detail">Base de datos. Costo mensual estimado.</p>
+          </div>
+          <div class="cost-card">
+            <div class="cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+              </svg>
+            </div>
+            <h4>Mantenimiento y soporte</h4>
+            <div class="cost-amount">$65.000 ARS/mes</div>
+            <p class="cost-detail">Actualizaciones de seguridad, corrección de errores y soporte técnico. Primeros 2 meses incluidos en la entrega.</p>
+          </div>
+          <div class="cost-card">
+            <div class="cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                <path d="M12 2c-1.1 2-1.8 5.2-1.8 10s.7 8 1.8 10"/>
+                <path d="M2 12h20"/>
+              </svg>
+            </div>
+            <h4>Dominio y SSL</h4>
+            <div class="cost-amount">~$25.000 ARS/año</div>
+            <p class="cost-detail">Registro y renovación anual de dominio .com.ar. Certificado SSL incluido sin costo.</p>
+          </div>
+          <div class="cost-card">
+            <div class="cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                <circle cx="12" cy="12" r="2.5"/>
+                <path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>
+              </svg>
+            </div>
+            <h4>Nuevas implementaciones</h4>
+            <div class="cost-amount">A consultar</div>
+            <p class="cost-detail">Funcionalidades adicionales o cambios fuera del alcance inicial. Se cotiza según la funcionalidad requerida y se presupuesta antes de cada implementación.</p>
+          </div>
+        </div>
+
+    </section>
+
+  </main>
+
+  <script>
+    // Carga progresiva de capturas: imagen full-width sin márgenes ni etiquetas
+    document.querySelectorAll(".shot[data-src]").forEach((shot) => {
+      const src = shot.getAttribute("data-src");
+      if (!src) return;
+      const img = new Image();
+      img.src = src;
+      img.alt = src.split("/").pop().replace(/\.\w+$/, "");
+      img.onload = () => {
+        shot.innerHTML = "";
+        shot.appendChild(img);
+      };
+    });
+  </script>
+</body>
+</html>

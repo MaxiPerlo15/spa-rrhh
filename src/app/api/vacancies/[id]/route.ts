@@ -1,12 +1,164 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { auditAdminAction } from '@/lib/adminAudit'
-import { normalizeLocation } from '@/lib/utils'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
-import { toVacancyDto } from '@/lib/dto/vacancy'
+import { normalizeLocation } from '@/lib/utils'
+import { revalidatePublicVacanciesCache } from '@/lib/server/publicVacancies'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import {
+  type SpringVacancyResponse,
+  mapSpringToDto,
+  buildUpdatePayload,
+  parseSpringError,
+  getUnsupportedSpringVacancyFields,
+  rejectUnsupportedSpringVacancyFields,
+  SpringVacancyWriteError
+} from '@/lib/server/springVacancyGateway'
 
+class SpringVacancyNotFoundError extends Error {
+  constructor(id: string) {
+    super(`Spring vacancy not found: ${id}`)
+    this.name = 'SpringVacancyNotFoundError'
+  }
+}
+
+async function rejectFailedSpringVacancyStatusMutation(
+  response: Response,
+  id: string,
+  action: string,
+  businessRuleFallback: string
+) {
+  if (response.status === 404) {
+    throw new SpringVacancyNotFoundError(id)
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    if (response.status === 400 || response.status === 409) {
+      const message = parseSpringError(errorBody) || businessRuleFallback
+      throw new SpringVacancyWriteError(response.status, message)
+    }
+    throw new Error(`Spring backend rejected vacancy ${action} (${response.status}): ${errorBody}`)
+  }
+}
+
+async function closeVacancyInSpring(id: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy operations')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/close`, {
+    method: 'PATCH',
+    headers: getSpringBackendHeaders()
+  })
+
+  await rejectFailedSpringVacancyStatusMutation(
+    response,
+    id,
+    'close',
+    'No se pudo cerrar la vacante por una regla de negocio'
+  )
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+async function getVacancyFromSpring(id: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy operations')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}`, {
+    method: 'GET',
+    headers: getSpringBackendHeaders()
+  })
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Spring backend rejected vacancy lookup (${response.status}): ${errorBody}`)
+  }
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+async function activateVacancyInSpring(id: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy operations')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/activate`, {
+    method: 'PATCH',
+    headers: getSpringBackendHeaders()
+  })
+
+  await rejectFailedSpringVacancyStatusMutation(
+    response,
+    id,
+    'activation',
+    'No se pudo activar la vacante por una regla de negocio'
+  )
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+async function deactivateVacancyInSpring(id: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy operations')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/deactivate`, {
+    method: 'PATCH',
+    headers: getSpringBackendHeaders()
+  })
+
+  await rejectFailedSpringVacancyStatusMutation(
+    response,
+    id,
+    'deactivation',
+    'No se pudo desactivar la vacante por una regla de negocio'
+  )
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+async function updateVacancyInSpring(
+  id: string,
+  data: ReturnType<typeof buildUpdatePayload>
+) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required for vacancy operations')
+  }
+
+  const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getSpringBackendHeaders()
+    },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    await rejectFailedSpringVacancyStatusMutation(
+      response,
+      id,
+      'update',
+      'No se pudo actualizar la vacante por una regla de negocio'
+    )
+  }
+
+  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
 
 interface RouteParams {
   params: Promise<{
@@ -25,35 +177,26 @@ export async function GET(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Vacancy backend not configured' },
+        { status: 503 }
+      )
+    }
+
     const session = await auth()
     const isAdmin = session?.user?.role === 'ADMIN'
-    
-    const vacancy = isAdmin
-      ? await prisma.vacancy.findUnique({
-          where: { id },
-          include: {
-            applications: {
-              select: {
-                id: true,
-                candidateName: true,
-                status: true,
-                submittedAt: true
-              }
-            }
-          }
-        })
-      : await prisma.vacancy.findUnique({
-          where: { id }
-        })
 
-    if (!vacancy) {
+    const springVacancy = await getVacancyFromSpring(id)
+    if (!springVacancy || (!isAdmin && springVacancy.status !== 'active')) {
       return NextResponse.json(
         { error: 'Vacante no encontrada' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(toVacancyDto(vacancy))
+    return NextResponse.json(springVacancy)
   } catch (error) {
     logger.error('Error al obtener vacante', error)
     return NextResponse.json(
@@ -87,6 +230,18 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       )
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Vacancy backend not configured' },
+        { status: 503 }
+      )
+    }
+
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
@@ -99,44 +254,138 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     if (!bodyValidation.success) {
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
-    const normalizedBody = { ...bodyValidation.data }
 
+    const unsupportedFields = getUnsupportedSpringVacancyFields(bodyValidation.data)
+    if (unsupportedFields.length > 0) {
+      return rejectUnsupportedSpringVacancyFields(unsupportedFields)
+    }
+
+    const normalizedBody = { ...bodyValidation.data }
+    const originalLocation = bodyValidation.data.location
     if (normalizedBody.location) {
       normalizedBody.location = normalizeLocation(normalizedBody.location)
     }
 
-    const previousVacancy = await prisma.vacancy.findUnique({
-      where: { id },
-      select: {
-        status: true,
-        title: true
+    const requestedStatus = normalizedBody.status
+    const isOnlyStatusChange = Object.keys(normalizedBody).length === 1 && requestedStatus !== undefined
+    const hasBusinessFieldChange = Object.keys(normalizedBody).some((key) => key !== 'status')
+
+    if (requestedStatus !== undefined && hasBusinessFieldChange) {
+      return NextResponse.json(
+        { error: 'La modificación de datos y el cambio de estado deben realizarse por operaciones separadas' },
+        { status: 400 }
+      )
+    }
+
+    if (isOnlyStatusChange && (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE' || requestedStatus === 'CLOSED')) {
+      let vacancy = null
+      try {
+        vacancy = requestedStatus === 'ACTIVE'
+          ? await activateVacancyInSpring(id)
+          : requestedStatus === 'INACTIVE'
+            ? await deactivateVacancyInSpring(id)
+            : await closeVacancyInSpring(id)
+      } catch (error) {
+        if (error instanceof SpringVacancyNotFoundError) {
+          return NextResponse.json(
+            { error: 'Vacante no encontrada' },
+            { status: 404 }
+          )
+        }
+        if (error instanceof SpringVacancyWriteError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status }
+          )
+        }
+        throw error
       }
-    })
 
-    const vacancy = await prisma.vacancy.update({
-      where: { id },
-      data: normalizedBody
-    })
+      if (vacancy) {
+        await auditAdminAction({
+          request,
+          actor: {
+            id: session.user?.id,
+            email: session.user?.email
+          },
+          action: requestedStatus === 'ACTIVE'
+            ? 'vacancy.activate'
+            : requestedStatus === 'INACTIVE'
+              ? 'vacancy.deactivate'
+              : 'vacancy.close',
+          resourceType: 'vacancy',
+          resourceId: vacancy.id,
+          outcome: 'SUCCESS',
+          metadata: {
+            title: vacancy.title,
+            newStatus: vacancy.status,
+            backend: 'spring'
+          }
+        })
+        revalidatePublicVacanciesCache()
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'vacancy.update',
-      resourceType: 'vacancy',
-      resourceId: vacancy.id,
-      outcome: 'SUCCESS',
-      metadata: {
-        changedFields: Object.keys(normalizedBody),
-        previousStatus: previousVacancy?.status,
-        newStatus: vacancy.status,
-        title: vacancy.title
+        return NextResponse.json(vacancy)
       }
-    })
+    }
 
-    return NextResponse.json(toVacancyDto(vacancy))
+    if (isOnlyStatusChange) {
+      return NextResponse.json(
+        { error: 'Cambio de estado no soportado por el backend configurado' },
+        { status: 400 }
+      )
+    }
+
+    if (hasBusinessFieldChange) {
+      let springVacancy = null
+      try {
+        springVacancy = await updateVacancyInSpring(id, buildUpdatePayload({
+          title: bodyValidation.data.title,
+          description: bodyValidation.data.description,
+          location: originalLocation,
+          workday: bodyValidation.data.workday,
+          modality: bodyValidation.data.modality,
+          requirements: bodyValidation.data.requirements
+        }))
+      } catch (error) {
+        if (error instanceof SpringVacancyNotFoundError) {
+          return NextResponse.json(
+            { error: 'Vacante no encontrada' },
+            { status: 404 }
+          )
+        }
+        if (error instanceof SpringVacancyWriteError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status }
+          )
+        }
+        throw error
+      }
+
+      if (springVacancy) {
+        await auditAdminAction({
+          request,
+          actor: {
+            id: session.user?.id,
+            email: session.user?.email
+          },
+          action: 'vacancy.update',
+          resourceType: 'vacancy',
+          resourceId: springVacancy.id,
+          outcome: 'SUCCESS',
+          metadata: {
+            changedFields: Object.keys(normalizedBody).filter((field) => field !== 'status'),
+            title: springVacancy.title,
+            backend: 'spring'
+          }
+        })
+        revalidatePublicVacanciesCache()
+
+        return NextResponse.json(springVacancy)
+      }
+    }
+
+    throw new Error('Spring backend did not complete the vacancy update')
   } catch (error) {
     await auditAdminAction({
       request,
@@ -176,7 +425,7 @@ export async function PATCH(
   return updateVacancy(request, params)
 }
 
-// DELETE /api/vacancies/[id] - Eliminar vacante (admin)
+// DELETE /api/vacancies/[id] - Cerrar vacante conservando su historial (admin)
 export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
@@ -193,13 +442,25 @@ export async function DELETE(
           id: session?.user?.id,
           email: session?.user?.email
         },
-        action: 'vacancy.delete',
+        action: 'vacancy.close',
         resourceType: 'vacancy',
         outcome: 'DENIED'
       })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
+      )
+    }
+
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
+    if (!getBackendUrl()) {
+      return NextResponse.json(
+        { error: 'Vacancy backend not configured' },
+        { status: 503 }
       )
     }
 
@@ -210,35 +471,46 @@ export async function DELETE(
     const { id } = parsedParams.data
     resourceId = id
 
-    const existing = await prisma.vacancy.findUnique({
-      where: { id },
-      select: {
-        title: true,
-        status: true
+    let closedVacancy = null
+    try {
+      closedVacancy = await closeVacancyInSpring(id)
+    } catch (error) {
+      if (error instanceof SpringVacancyNotFoundError) {
+        return NextResponse.json(
+          { error: 'Vacante no encontrada' },
+          { status: 404 }
+        )
       }
-    })
-    
-    await prisma.vacancy.delete({
-      where: { id }
-    })
-
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'vacancy.delete',
-      resourceType: 'vacancy',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        title: existing?.title,
-        previousStatus: existing?.status
+      if (error instanceof SpringVacancyWriteError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status }
+        )
       }
-    })
+      throw error
+    }
 
-    return NextResponse.json({ message: 'Vacante eliminada exitosamente' })
+    if (closedVacancy) {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session.user?.id,
+          email: session.user?.email
+        },
+        action: 'vacancy.close',
+        resourceType: 'vacancy',
+        resourceId: id,
+        outcome: 'SUCCESS',
+        metadata: {
+          title: closedVacancy.title,
+          newStatus: closedVacancy.status,
+          backend: 'spring'
+        }
+      })
+      revalidatePublicVacanciesCache()
+
+      return NextResponse.json(closedVacancy)
+    }
   } catch (error) {
     await auditAdminAction({
       request,
@@ -246,7 +518,7 @@ export async function DELETE(
         id: session?.user?.id,
         email: session?.user?.email
       },
-      action: 'vacancy.delete',
+      action: 'vacancy.close',
       resourceType: 'vacancy',
       resourceId,
       outcome: 'ERROR',
@@ -254,9 +526,9 @@ export async function DELETE(
         error: error instanceof Error ? error.message : String(error)
       }
     })
-    logger.error('Error al eliminar vacante', error)
+    logger.error('Error al cerrar vacante', error)
     return NextResponse.json(
-      { error: 'Error al eliminar vacante' },
+      { error: 'Error al cerrar vacante' },
       { status: 500 }
     )
   }

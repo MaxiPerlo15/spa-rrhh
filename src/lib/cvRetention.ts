@@ -79,21 +79,28 @@ export async function purgeExpiredApplicationResumes(now = new Date()): Promise<
 
   let cursorId: string | undefined
   while (true) {
-    const expiredApplications = await prisma.application.findMany({
+    const expiredCandidates = await prisma.candidate.findMany({
       where: {
-        submittedAt: { lte: cutoff },
         OR: [
           { resumeKey: { not: null } },
           { resumeUrl: { not: null } },
           { resumeFileName: { not: null } }
-        ]
+        ],
+        applications: {
+          some: {
+            submittedAt: { lte: cutoff }
+          },
+          none: {
+            submittedAt: { gt: cutoff }
+          }
+        }
       },
       select: {
         id: true,
         resumeKey: true,
-        submittedAt: true
+        createdAt: true
       },
-      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       ...(cursorId
         ? {
             cursor: { id: cursorId },
@@ -103,42 +110,41 @@ export async function purgeExpiredApplicationResumes(now = new Date()): Promise<
       take: BATCH_SIZE
     })
 
-    if (expiredApplications.length === 0) break
-    cursorId = expiredApplications[expiredApplications.length - 1]?.id
+    if (expiredCandidates.length === 0) break
+    cursorId = expiredCandidates[expiredCandidates.length - 1]?.id
 
-    for (const application of expiredApplications) {
+    for (const candidate of expiredCandidates) {
       summary.scanned += 1
       summary.expired += 1
 
-      if (application.resumeKey) {
-        const deleteResult = await deleteResumeFromUploadThing(application.resumeKey)
+      if (candidate.resumeKey) {
+        const deleteResult = await deleteResumeFromUploadThing(candidate.resumeKey)
         if (deleteResult.deleted) {
           summary.deletedFiles += 1
+          try {
+            await prisma.candidate.update({
+              where: { id: candidate.id },
+              data: {
+                resumeKey: null,
+                resumeUrl: null,
+                resumeFileName: null
+              }
+            })
+            summary.cleanedRows += 1
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Error desconocido al limpiar metadata'
+            summary.errors.push(`candidate=${candidate.id}: ${message}`)
+          }
         } else {
           if (deleteResult.skipped) {
             summary.skipped += 1
           }
           if (deleteResult.error) {
-            summary.errors.push(`application=${application.id}: ${deleteResult.error}`)
+            summary.errors.push(`candidate=${candidate.id}: ${deleteResult.error}`)
           }
         }
       } else {
         summary.skipped += 1
-      }
-
-      try {
-        await prisma.application.update({
-          where: { id: application.id },
-          data: {
-            resumeKey: null,
-            resumeUrl: null,
-            resumeFileName: null
-          }
-        })
-        summary.cleanedRows += 1
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Error desconocido al limpiar metadata'
-        summary.errors.push(`application=${application.id}: ${message}`)
       }
     }
   }

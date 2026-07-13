@@ -17,13 +17,18 @@ const optionalTrimmedString = z
     return trimmed.length > 0 ? trimmed : undefined
   })
 
+const entityIdSchema = z.string().refine(
+  (value) => z.string().cuid().safeParse(value).success || z.string().uuid().safeParse(value).success,
+  'ID inválido'
+)
+
 export const routeIdSchema = z.object({
-  id: z.string().cuid('ID inválido')
+  id: entityIdSchema
 })
 
 const vacancyWorkdaySchema = z.enum(['FULL_TIME', 'PART_TIME', 'PROJECT_BASED', 'INTERNSHIP'])
 const vacancyModalitySchema = z.enum(['ON_SITE', 'REMOTE', 'HYBRID'])
-type VacancyStatus = 'ACTIVE' | 'CLOSED' | 'DRAFT'
+type VacancyStatus = 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT'
 
 const applicationStatusSchema = z.enum(['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED'])
 const contactStatusSchema = z.enum(['PENDING', 'RESPONDED', 'ARCHIVED'])
@@ -43,6 +48,22 @@ const emailSchema = z.string().trim().email('Email inválido').superRefine((valu
     })
   }
 })
+
+function isAllowedResumeUrl(value: string) {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return false
+
+    return (
+      url.hostname === 'ufs.sh' ||
+      url.hostname.endsWith('.ufs.sh') ||
+      url.hostname === 'utfs.io' ||
+      url.hostname.endsWith('.utfs.io')
+    )
+  } catch {
+    return false
+  }
+}
 
 const requiredPhoneSchema = z.string().trim().superRefine((value, context) => {
   const result = validateInternationalPhone(value, { required: true })
@@ -90,7 +111,7 @@ export const createVacancySchema = z.object({
 })
 
 const updateVacancyStatusSchema = z
-  .enum(['active', 'closed', 'draft', 'ACTIVE', 'CLOSED', 'DRAFT'])
+  .enum(['active', 'inactive', 'closed', 'draft', 'ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT'])
   .transform((status) => status.toUpperCase() as VacancyStatus)
 
 export const updateVacancySchema = z
@@ -127,10 +148,58 @@ export const createApplicationSchema = z.object({
   resumeKey: optionalTrimmedString,
   coverLetter: optionalTrimmedString,
   captchaToken: optionalTrimmedString
+}).superRefine((value, context) => {
+  const hasAnyResumeField = Boolean(value.resumeUrl || value.resumeFileName || value.resumeKey)
+  const hasAllResumeFields = Boolean(value.resumeUrl && value.resumeFileName && value.resumeKey)
+
+  if (hasAnyResumeField && !hasAllResumeFields) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeUrl'],
+      message: 'Debes enviar resumeUrl, resumeFileName y resumeKey juntos'
+    })
+  }
+
+  if (value.resumeUrl && !isAllowedResumeUrl(value.resumeUrl)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeUrl'],
+      message: 'resumeUrl inválido'
+    })
+  }
+
+  if (value.resumeFileName && !value.resumeFileName.toLowerCase().endsWith('.pdf')) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeFileName'],
+      message: 'El CV debe ser un PDF'
+    })
+  }
+
+  if (value.resumeKey && /[\s/\\]/.test(value.resumeKey)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeKey'],
+      message: 'resumeKey inválido'
+    })
+  }
 })
 
 export const updateApplicationStatusSchema = z.object({
   status: applicationStatusSchema
+})
+
+export const createAdminCandidateSchema = z.object({
+  candidateName: nonEmptyString,
+  email: emailSchema,
+  phone: requiredPhoneSchema,
+  notes: optionalTrimmedString
+})
+
+export const updateAdminCandidateSchema = z.object({
+  candidateName: nonEmptyString,
+  email: emailSchema,
+  phone: requiredPhoneSchema
 })
 
 export const contactsListQuerySchema = z.object({
@@ -180,6 +249,7 @@ export const resetPasswordSchema = z
 
 const notificationLevelSchema = z.enum(['INFO', 'SUCCESS', 'WARNING'])
 const adminNotificationActionTypeSchema = z.enum(['VACANCY', 'APPLICATION', 'CONTACT'])
+const resourceIdSchema = entityIdSchema
 
 export const adminNotificationsListQuerySchema = z.object({
   view: z.enum(['all', 'unread', 'read']).optional().default('all'),
@@ -213,7 +283,7 @@ export const createAdminNotificationSchema = z.object({
     .object({
       label: nonEmptyString.max(40, 'Texto de acción demasiado largo'),
       type: adminNotificationActionTypeSchema,
-      resourceId: z.string().cuid('ID de recurso inválido')
+      resourceId: resourceIdSchema
     })
     .optional()
 })

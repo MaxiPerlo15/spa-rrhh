@@ -26,8 +26,8 @@ test.describe('QA Matrix Smoke', () => {
 
     await expect(page.locator('nav').first()).toBeVisible()
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Conectamos')
-    await expect(page.getByRole('button', { name: /Ver Vacantes/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Contactanos/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Ver Ofertas Laborales/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Enviar CV/i })).toBeVisible()
     await expect(page.locator('footer')).toBeVisible()
   })
 

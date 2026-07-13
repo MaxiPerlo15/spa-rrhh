@@ -18,14 +18,21 @@ type RateLimitResponse = {
   allowed: boolean
   remaining: number
   retryAfterSeconds: number
+  degraded?: boolean
+}
+
+function buildProductionOutageRateLimit(windowMs: number): RateLimitResponse {
+  return {
+    allowed: false,
+    remaining: 0,
+    retryAfterSeconds: Math.max(1, Math.ceil(windowMs / 1000)),
+    degraded: true
+  }
 }
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
-const isProduction = process.env.NODE_ENV === 'production'
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
-const isStrictSharedStore = isProduction
-const SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS = 60
 
 async function executeUpstashCommand<T>(...command: (string | number)[]) {
   if (!upstashUrl || !upstashToken) {
@@ -96,27 +103,25 @@ export async function rateLimit({
   windowMs: number
   maxRequests: number
 }) {
+  // Allow E2E tests to bypass rate limiting entirely
+  if (process.env.E2E_BYPASS_RATE_LIMIT === 'true') {
+    return {
+      allowed: true,
+      remaining: maxRequests,
+      retryAfterSeconds: Math.ceil(windowMs / 1000)
+    }
+  }
+
   if (isSharedStoreEnabled) {
     try {
       return await sharedRateLimit({ key, windowMs, maxRequests })
     } catch {
-      if (isStrictSharedStore) {
-        return {
-          allowed: false,
-          remaining: 0,
-          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
-        }
+      if (process.env.NODE_ENV === 'production') {
+        return buildProductionOutageRateLimit(windowMs)
       }
-      // fallback a memoria solo en entorno no productivo
     }
-  }
-
-  if (isStrictSharedStore) {
-    return {
-      allowed: false,
-      remaining: 0,
-      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
-    }
+  } else if (process.env.NODE_ENV === 'production') {
+    return buildProductionOutageRateLimit(windowMs)
   }
 
   const now = Date.now()

@@ -1,404 +1,223 @@
-# SPA RRHH - Consultora de Recursos Humanos
+# spa-rrhh
 
 [![CI](https://github.com/MaxiPerlo15/spa-rrhh/actions/workflows/ci.yml/badge.svg)](https://github.com/MaxiPerlo15/spa-rrhh/actions/workflows/ci.yml)
 
-Sistema web completo para la consultora de Recursos Humanos **Meinardi&Perlo RRHH** de Las Varillas, Córdoba.
+Plataforma web para **Meinardi&Perlo RRHH** (Las Varillas, Córdoba) con portal público de vacantes y panel administrativo.
 
-## 🎯 Objetivo
+## Estado actual (v0.2.x)
 
-Plataforma digital que conecta talento con oportunidades laborales, facilitando:
-- Publicación y gestión de ofertas de empleo
-- Proceso de postulación simplificado para candidatos
-- Canal de comunicación directa entre empresas y la consultora
-- Panel de administración para gestión eficiente de vacantes, postulaciones y contactos
+- Estado funcional: operativo para flujo core de vacantes, postulaciones y contactos.
+- Última auditoría de documentación: **9 de marzo de 2026**.
+- Modelo operativo objetivo:
+  - `1-5` administradores.
+  - `<100` vacantes activas.
+  - `<500` postulaciones por mes.
 
-## ✨ Características Principales
+## Qué está implementado
 
-### Para Candidatos
-- Exploración de ofertas laborales con filtros avanzados (ubicación, jornada, modalidad)
-- Sistema de postulación con carga de CV
-- Página dedicada `/ofertas-laborales` con búsqueda en tiempo real
-- Visualización detallada de requisitos y beneficios
+- Portal público:
+  - Landing.
+  - `/ofertas-laborales` con filtros.
+  - Formulario de postulación y formulario de contacto.
+- Panel admin:
+  - Gestión de vacantes (crear, editar, activar/cerrar, eliminar).
+  - Gestión de postulaciones (filtros, detalle, estado, export CSV, eliminación).
+  - Gestión de contactos (filtros, detalle, cambio de estado, eliminación).
+  - Notificaciones de panel y configuración de cuenta.
+  - Onboarding/tutorial guiado.
+- Seguridad y operación:
+  - Autenticación con NextAuth.
+  - Validación de API con Zod.
+  - Protección anti-abuso en formularios públicos (Turnstile + rate limit).
+  - Auditoría técnica admin y tareas internas de retención.
+- Calidad:
+  - Tests unitarios con Vitest.
+  - E2E con Playwright (desktop + mobile).
+  - CI con quality gate final (`CI Success`).
 
-### Para Administradores
-- Panel de administración completo con autenticación
-- Gestión de vacantes (crear, editar, activar/cerrar)
-- Administración de postulaciones con cambio de estados
-- Gestión de consultas y mensajes de contacto
-- Paginación, búsqueda y filtros en todas las tablas
-- Dashboard con estadísticas en tiempo real
+## Limitaciones conocidas (pendientes de futuras versiones)
 
-### SEO y Optimización
-- Metadata completa (Open Graph, Twitter Cards)
-- Sitemap automático con prioridades
-- Robots.txt configurado
-- Schema.org structured data (ProfessionalService)
-- Favicon optimizado
+- No hay búsqueda semántica de candidatos.
+- No hay scoring automático de CV.
+- No hay integración con LinkedIn o portales externos.
+- No hay multiusuario con roles avanzados.
 
-## 🚀 Versiones
+## Arquitectura y operación (dev / preview / prod)
 
-### v0.2.1 - Sistema de Monitoreo y Mejoras de Calidad ✅
+- `development`:
+  - Ejecución local con `npm run dev`.
+  - Variables desde `.env`.
+- `preview`:
+  - Deploys por PR en Vercel.
+  - Validación funcional previa a merge.
+- `production`:
+  - Deploy desde `main` en Vercel.
+  - Rollback por redeploy de commit estable.
+  - Migraciones Prisma bajo estrategia `expand/contract`.
 
-**Funcionalidades implementadas:**
-- ✅ Seed de usuario admin configurable vía variables de entorno
-- ✅ E2E Testing con Playwright (auth, vacancies, applications)
-- ✅ Mejoras UX: Toast notifications, ConfirmDialog, animaciones scroll
-- ✅ Refactorización arquitectura: API service layer, custom hooks, componentes modulares
-- ✅ Notificaciones por email con Resend (postulaciones y contactos)
-- ✅ Almacenamiento seguro de CVs con UploadThing (presigned URLs)
-- ✅ Monitoreo y error tracking con Sentry
-- ✅ Logger centralizado para captura de errores
+Referencias operativas:
+- [CI-CD](docs/CI-CD.md)
+- [Deployment Vercel](docs/DEPLOYMENT-VERCEL.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security Hardening](docs/SECURITY-HARDENING.md)
 
-**Pendientes para v0.2.2:**
-- 🔄 Tests unitarios con Vitest (utilidades y helpers)
-- 🔄 Políticas de gestión de secrets en CI/CD
-- 🔄 Mejorar navegación del footer en página de ofertas laborales
+## Stack técnico
 
-**Características de Monitoreo (Sentry):**
-- Error tracking en cliente y servidor
-- Performance monitoring (10% sample rate)
-- Release tracking con Vercel Git SHA
-- User context para errores de admins
-- Logger centralizado en API routes, componentes y servicios
-- Protección de PII (datos de candidatos)
-- Botón de test en panel admin (solo desarrollo)
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 5
+- Tailwind CSS v4
+- Prisma + PostgreSQL
+- NextAuth
+- Vitest + React Testing Library
+- Playwright
 
-**Características de Email:**
-- Templates HTML profesionales con diseño responsive
-- Notificación automática al admin por nueva postulación
-- Notificación automática al admin por nuevo contacto
-- Modo desarrollo sin API key (simula en consola)
-- Integración con Resend API
+## Requisitos
 
-**Características de Almacenamiento de CVs:**
-- Subida segura con UploadThing (SDK v7)
-- Soporte para archivos PDF (máx. 4MB)
-- URLs públicas accesibles con CDN
-- Descarga directa desde panel admin
-- Componente de upload con preview y validación
-- Almacenamiento: resumeUrl, resumeFileName, resumeKey en BD
+- Node.js `>=20.19.0`
+- PostgreSQL
+- npm
 
-### v0.2.0 - Gestión Admin, UI/UX y Optimizaciones ✅
+## Setup rápido
 
-**Funcionalidades implementadas:**
-- Panel de administración con tabs (Vacantes, Postulaciones, Contactos)
-- Sistema de autenticación con NextAuth (roles ADMIN/USER)
-- Paginación de 10 items por página en todas las tablas
-- Búsqueda y filtros en postulaciones y contactos
-- Confirmaciones antes de eliminaciones
-- Normalización automática de ubicaciones
-- Página pública `/ofertas-laborales` con filtros avanzados
-- Sección "Servicios" con 4 servicios principales
-- Componentes reutilizables: `Pagination`, `ServiceCard`, `Servicios`
-
-**SEO y metadata:**
-- Sitemap.ts automático
-- Robots.ts para control de crawlers
-- Metadata completa con keywords
-- Schema.org JSON-LD
-
-**UI/UX:**
-- Navbar mejorado con animación en "RRHH"
-- Logos integrados (consultora + empresas asociadas)
-- Animaciones sutiles y efectos hover
-- Cards con soporte para imágenes reales vía Next.js Image
-- Diseño responsive optimizado
-
-**Assets:**
-- 4 imágenes de servicios
-- 2 logos (consultora + TBEH)
-- Icon.png optimizado para favicon
-
-### v0.1.0 - Landing Page y Backend Inicial ✅
-- Landing page completa con secciones: Hero, Nosotros, Vacantes, Empresas, Contacto
-- Backend con API REST
-- Base de datos PostgreSQL con Prisma
-- Modelos: Vacancy, Application, Contact
-- Seed con datos de ejemplo
-
-## 🛠️ Stack Tecnológico
-
-- **Frontend**: Next.js 16.0.10, React 19.2.1, TypeScript 5.x
-- **Estilos**: Tailwind CSS v4
-- **Backend**: Next.js API Routes
-- **Base de Datos**: PostgreSQL 16
-- **ORM**: Prisma 7.1.0
-- **Autenticación**: NextAuth.js
-- **Tipografías**: Geist Sans & Geist Mono
-- **Runtime**: Node.js 20.19+ (LTS)
-
-## 🚀 Instalación y Configuración
-
-### Prerequisitos
-- Node.js 20.19 o superior
-- PostgreSQL 16
-- npm, yarn, pnpm o bun
-
-### 1. Clonar el repositorio
 ```bash
 git clone https://github.com/MaxiPerlo15/spa-rrhh.git
 cd spa-rrhh
-```
-
-### 2. Instalar dependencias
-```bash
-npm install
-```
-
-### 3. Configurar variables de entorno
-
-```bash
+npm ci
 cp .env.example .env
 ```
 
-Edita `.env` con tus credenciales reales y secretos.
+Configurar `.env` y luego:
 
-Consulta la política completa y checklist en [`SECRETS_POLICY.md`](./SECRETS_POLICY.md).
-
-**Validación automática:**
-El proyecto incluye validación de entorno en [`src/lib/checkEnv.ts`](src/lib/checkEnv.ts), ejecutada al iniciar el runtime de servidor.
-Reglas principales:
-- Requeridas siempre: `DATABASE_URL`, `NEXTAUTH_SECRET`.
-- Requeridas en producción: `NEXTAUTH_URL`, `UPLOADTHING_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`.
-- Integración condicional: si configuras `RESEND_API_KEY`, también debes configurar `FROM_EMAIL`.
-
-**Variables requeridas y opcionales:**
-Revisa `.env.example` y la tabla en `SECRETS_POLICY.md` para conocer el detalle de cada variable, su uso y si es obligatoria u opcional.
-
-**Recomendaciones:**
-- Nunca subas `.env.local` ni `.env` con datos reales al repo.
-- Usa solo GitHub Secrets para CI/CD y producción.
-- Rota los secrets sensibles periódicamente.
-
-> **Nota**: Sin `RESEND_API_KEY` configurada, las notificaciones se simulan en consola (modo desarrollo).
-
-### 4. Configurar base de datos
 ```bash
-# Crear base de datos en PostgreSQL
-createdb spa_rrhh_db
-
-# Ejecutar migraciones
 npx prisma migrate dev
-
-# Generar cliente de Prisma
 npx prisma generate
-
-# Cargar datos iniciales (usuario admin + vacantes de ejemplo)
 npm run db:seed
-```
-
-**Credenciales por defecto** (solo desarrollo):
-- **Email**: `admin@sparrhh.com`
-- **Password**: `ChangeMe123!`
-
-Para personalizar las credenciales del admin inicial, agrega en `.env`:
-```bash
-ADMIN_EMAIL="tu-email@empresa.com"
-ADMIN_PASSWORD="TuPasswordSegura123!"
-```
-
-Para crear admins adicionales sin interfaz de gestión:
-
-```bash
-npm run admin:create -- --email admin2@empresa.com --password "TuPasswordSegura123!" --name "Admin Dos"
-```
-
-Ver más detalles en [docs/DATABASE-SETUP.md](docs/DATABASE-SETUP.md)
-
-Para hardening y respuesta a incidentes:
-- [docs/SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md)
-- [docs/INCIDENT-RUNBOOK.md](docs/INCIDENT-RUNBOOK.md)
-
-Documentación académica formal (IEEE 29148 + UML/C4):
-- [docs/academic/README.md](docs/academic/README.md)
-
-### 5. Ejecutar el servidor de desarrollo
-```bash
 npm run dev
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000) en el navegador.
+## Variables de entorno clave
 
-## 📁 Estructura del Proyecto
+Mínimas para runtime:
+- `DATABASE_URL`
+- `NEXTAUTH_SECRET`
 
-```
-spa-rrhh/
-├── docs/                  # Documentación
-├── prisma/
-│   ├── schema.prisma      # Esquema de base de datos
-│   ├── seed.ts            # Datos de prueba
-│   └── migrations/        # Historial de migraciones
-├── public/
-│   ├── hero-bg.webp       # Assets principales optimizados
-│   ├── servicio1-4.webp   # Imágenes de servicios optimizadas
-│   ├── logorrhh.webp      # Logo consultora optimizado
-│   └── logo-tbeh.webp     # Logo empresa asociada optimizado
-├── scripts/
-│   └── normalize-locations.ts  # Script de normalización
-├── src/
-│   ├── app/
-│   │   ├── admin/         # Panel de administración
-│   │   │   ├── page.tsx   # Dashboard con tabs
-│   │   │   └── signin/    # Página de login
-│   │   ├── api/           # API Routes
-│   │   │   ├── auth/      # NextAuth endpoints
-│   │   │   ├── vacancies/ # CRUD vacantes
-│   │   │   ├── applications/ # CRUD postulaciones
-│   │   │   └── contacts/  # CRUD contactos
-│   │   ├── ofertas-laborales/ # Página pública de ofertas
-│   │   ├── layout.tsx     # Layout principal con metadata
-│   │   ├── page.tsx       # Página principal
-│   │   ├── sitemap.ts     # Sitemap automático
-│   │   ├── robots.ts      # Robots.txt
-│   │   ├── icon.png       # Favicon
-│   │   └── globals.css    # Estilos globales + animaciones
-│   ├── components/
-│   │   ├── NavBar.tsx
-│   │   ├── Hero.tsx
-│   │   ├── FounderCard.tsx
-│   │   ├── Servicios.tsx
-│   │   ├── ServiceCard.tsx
-│   │   ├── VacancyCard.tsx
-│   │   ├── Pagination.tsx
-│   │   ├── Empresas.tsx
-│   │   ├── PostularForm.tsx
-│   │   ├── ContactForm.tsx
-│   │   ├── AuthProvider.tsx
-│   │   └── Footer.tsx
-│   ├── 
-- Sistema de usuarios con roles (ADMIN/USER)
-- Autenticación con NextAuth
+Notas de deploy Railway + Neon:
+- El runtime valida `DATABASE_URL` al arrancar (`src/instrumentation.ts` -> `src/lib/checkEnv.ts`).
+- En producción falla si `DATABASE_URL` apunta a localhost o desactiva SSL explícitamente.
+- Si detecta hostname de Neon sin pooler, emite warning porque este proyecto usa `pg.Pool` + `PrismaPg`.
+- Healthcheck recomendado para Railway: `GET /api/health` (devuelve `200` solo si app + DB responden, `503` si la DB no está lista).
 
-### Vacancy (Vacantes)
-```prisma
-- id, title, description, location
-- workday: FULL_TIME | PART_TIME | PROJECT_BASED | INTERNSHIP
-- modality: ON_SITE | REMOTE | HYBRID
-- salary, requirements, benefits (opcionales)
-- status: ACTIVE | CLOSED | DRAFT
-- timestamps
-```
+Optional for the hybrid Spring Boot flow:
+- `BACKEND_URL`
+- `BACKEND_INTERNAL_API_TOKEN` when `BACKEND_URL` is configured. The repo sends this token on server-to-server vacancy reads and writes, and Spring requires `RRHH_SECURITY_INTERNAL_API_TOKEN` for `/api/v1/vacancies/**` by default.
+- Real Railway private networking is an external deployment setting: set `BACKEND_URL` to the private host when Next and Spring run inside the same private network.
+- If Next runs outside the Railway private network, Spring still needs authenticated reachability from Next through a URL protected by this token; do not expose it without `RRHH_SECURITY_INTERNAL_API_TOKEN` configured.
 
-### Application (Postulaciones)
-```prisma
-- id, vacancyId
-- candidateName, email, phone
-- resumeData (Base64), resumeFileName
-- coverLetter (opcional)
-- status: PENDING | REVIEWING | INTERVIEWED | ACCEPTED | REJECTED
-- timestamps
-```
+Requeridas en producción:
+- `NEXTAUTH_URL`
+- `UPLOADTHING_TOKEN`
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `TURNSTILE_SECRET_KEY`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `AUDIT_CRON_SECRET`
+- `CV_RETENTION_CRON_SECRET`
+- `RESEND_API_KEY`
+- `FROM_EMAIL`
 
-### Contact (Consultas)
-```prisma
-- id, name, email, phone
-- subject, message
-- status: PENDING | RESPONDED | ARCHIVED
-- timestamps
-- vacancy: Vacancy
-- createdAt: DateTime
-```
+Contrato autoritativo:
+- [`src/lib/checkEnv.ts`](src/lib/checkEnv.ts)
 
-### Contact (Consultas)
-```prisma
-- id: String (UUID)
-- name: String
-- email: String
-- message: String
-- status: ContactStatus (PENDING, ANSWERED)
-- createdAt: DateTime
-```
+Ver detalle en:
+- [.env.example](.env.example)
+- [SECRETS_POLICY.md](SECRETS_POLICY.md)
 
-## 🔌 API Endpoints
-
-### Vacantes
-- `GET /api/vacancies` - Listar vacantes activas
-- `POST /api/vacancies` - Crear vacante (admin)
-- `GET /api/vacancies/[id]` - Obtener vacante por ID
-- `PUT /api/vacancies/[id]` - Actualizar vacante (admin)
-- `DELETE /api/vacancies/[id]` - Eliminar vacante (admin)
-
-### Postulaciones
-- `GET /api/applications` - Listar postulaciones (admin)
-- `POST /api/applications` - Crear postulación (público)
-
-### Contactos
-- `GET /api/contacts` - Listar consultas (admin)
-- `POST /api/contacts` - Enviar consulta (público)
-
-## 🎨 Paleta de Colores
-
-**Azul Francia** (Tema principal):
-- Primary: `#0055A4` (Azul Francia)
-- Secondary: `#EF4135` (Rojo complementario)
-- Gradientes y variantes en componentes
-
-## 📜 Scripts Disponibles
+## Scripts
 
 ```bash
-npm run dev          # Servidor de desarrollo
-npm run build        # Build de producción
-npm run start        # Ejecutar build de producción
-npm run lint         # Ejecutar ESLint
+# App
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run typecheck
 
-# Testing
-npm run test         # Ejecutar todos los tests E2E
-npm run test:unit    # Tests unitarios (placeholder)
-npm run test:e2e     # Tests E2E con Playwright
-npm run test:e2e:ui  # Tests E2E en modo UI interactivo
-npm run test:e2e:headed  # Tests E2E con navegador visible
-npm run test:e2e:debug   # Tests E2E en modo debug
-npm run test:report  # Ver reporte de tests E2E
+# Unit tests / coverage
+npm run test:unit
+npm run test:coverage
 
-# Base de datos
-npm run db:seed      # Cargar datos iniciales (admin + vacantes)
-npm run db:reset     # Reset completo de DB + seed
-npm run db:verify    # Verificar que admin existe
-npx prisma studio    # Explorador visual de BD
-npx prisma migrate dev  # Crear/aplicar migración
-npx prisma generate  # Generar cliente de Prisma
+# E2E
+npm run test:e2e
+npm run test:e2e:matrix
+npm run test:e2e:mobile
+npm run test:e2e:mobile:chrome
+npm run test:e2e:mobile:safari
+
+# Calidad / entorno
+npm run env:check
+npm run env:check:prod
+npm run predeploy:check
+
+# Datos
+npm run db:seed
+npm run db:reset
+npm run db:verify
+npm run admin:create -- --email admin2@empresa.com --password "PasswordSegura123!" --name "Admin Dos"
+
+# Mantenimiento
+npm run audit:purge
+npm run cv:purge
 ```
 
-## 🗺️ Roadmap
+## API (resumen)
 
-### v0.1.0 (Actual) ✅
-- Landing page completa
-- Sistema de postulaciones
-- API REST backend
-- Base de datos PostgreSQL + Prisma
+Rutas principales:
 
-### v0.2.0 (Próximo)
-- Panel de administración
-- Autenticación y autorización (NextAuth)
-- Dashboard con métricas
-- Gestión visual de vacantes, postulaciones y consultas
+- `GET/POST /api/vacancies`
+- `GET/PUT/PATCH/DELETE /api/vacancies/[id]`
+- `GET/POST /api/applications`
+- `GET /api/applications/export`
+- `GET/PATCH/DELETE /api/applications/[id]`
+- `GET/POST /api/contacts`
+- `GET/PATCH/DELETE /api/contacts/[id]`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET/PATCH /api/admin/settings`
+- `GET/POST/DELETE /api/admin/notifications`
+- `PATCH/DELETE /api/admin/notifications/[id]`
+- `GET /api/admin/audit`
+- `POST /api/internal/audit-retention`
+- `POST /api/internal/cv-retention`
 
-### v0.3.0
-- Sistema de notificaciones por email (Resend/Nodemailer)
-- Confirmaciones de postulación
-- Alertas a administradores
+## Calidad en CI (checks obligatorios)
 
-### v1.0.0
-- Optimización para producción
-- Tests unitarios e integración
-- Deploy en Vercel/Railway
-- Documentación completa de API
+- `Lint and Build`
+- `Unit Tests`
+- `Coverage`
+- `NPM Audit`
+- `API Smoke`
+- `E2E Tests`
+- `CI Success`
 
-## 🐛 Issues Conocidos
+Detalle: [docs/CI-CD.md](docs/CI-CD.md)
 
-- Panel de administración pendiente (v0.2.0)
-- Sin autenticación (endpoints admin son públicos actualmente)
-- Sin sistema de emails automatizados
+## Estado de backlog (Linear)
 
-## 👥 Equipo
+Pendiente operativo actual:
+- `MIS-120`: QA final mobile en dispositivos reales (bloqueado hasta deployment real).
 
-Desarrollado por Maxi Perlo
+Pendiente de futuras features:
+- `MIS-171`: búsqueda semántica de candidatos.
+- `MIS-172`: scoring automático de CV.
+- `MIS-173`: integración con LinkedIn/portales externos.
+- `MIS-174`: multiusuario con roles avanzados.
 
-## 📞 Contacto
+## Documentación relacionada
 
-Para consultas sobre el proyecto: [Agregar información de contacto]
-
----
-
-**Versión**: 0.1.0  
-**Última actualización**: Diciembre 2024
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/DATABASE-SETUP.md](docs/DATABASE-SETUP.md)
+- [docs/E2E-TESTING.md](docs/E2E-TESTING.md)
+- [docs/QA-MATRIX.md](docs/QA-MATRIX.md)
+- [docs/MOBILE-REAL-DEVICE-QA.md](docs/MOBILE-REAL-DEVICE-QA.md)
+- [docs/DEPLOYMENT-VERCEL.md](docs/DEPLOYMENT-VERCEL.md)

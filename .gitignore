@@ -20,9 +20,13 @@
 # production
 /build
 
+# Spring Boot / Maven build output
+/backend/target/
+
 # misc
 .DS_Store
 *.pem
+.atl/
 
 # debug
 npm-debug.log*

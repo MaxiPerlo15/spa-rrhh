@@ -6,7 +6,7 @@ const deleteFilesMock = vi.fn()
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    application: {
+    candidate: {
       findMany: findManyMock,
       update: updateMock
     }
@@ -36,14 +36,14 @@ describe('cvRetention', () => {
     expect(cutoff.toISOString()).toBe('2025-09-05T00:00:00.000Z')
   })
 
-  it('purga CV expirado y limpia metadata aunque falle borrado remoto', async () => {
+  it('no limpia metadata si falla el borrado remoto', async () => {
     process.env.UPLOADTHING_TOKEN = 'test-token'
     findManyMock
       .mockResolvedValueOnce([
         {
-          id: 'app-1',
+          id: 'cand-1',
           resumeKey: 'cv-key-1',
-          submittedAt: new Date('2025-01-01T00:00:00.000Z')
+          createdAt: new Date('2025-01-01T00:00:00.000Z')
         }
       ])
       .mockResolvedValueOnce([])
@@ -55,17 +55,39 @@ describe('cvRetention', () => {
 
     expect(findManyMock).toHaveBeenCalled()
     expect(deleteFilesMock).toHaveBeenCalledWith('cv-key-1')
+    expect(updateMock).not.toHaveBeenCalled()
+    expect(summary.expired).toBe(1)
+    expect(summary.cleanedRows).toBe(0)
+    expect(summary.deletedFiles).toBe(0)
+    expect(summary.errors.some((error) => error.includes('remote failure'))).toBe(true)
+  })
+
+  it('limpia metadata cuando el borrado remoto fue exitoso', async () => {
+    process.env.UPLOADTHING_TOKEN = 'test-token'
+    findManyMock
+      .mockResolvedValueOnce([
+        {
+          id: 'cand-2',
+          resumeKey: 'cv-key-2',
+          createdAt: new Date('2025-01-01T00:00:00.000Z')
+        }
+      ])
+      .mockResolvedValueOnce([])
+    deleteFilesMock.mockResolvedValueOnce({ success: true, deletedCount: 1 })
+    updateMock.mockResolvedValue({ id: 'app-2' })
+
+    const { purgeExpiredApplicationResumes } = await import('../cvRetention')
+    const summary = await purgeExpiredApplicationResumes(new Date('2026-03-04T00:00:00.000Z'))
+
     expect(updateMock).toHaveBeenCalledWith({
-      where: { id: 'app-1' },
+      where: { id: 'cand-2' },
       data: {
         resumeKey: null,
         resumeUrl: null,
         resumeFileName: null
       }
     })
-    expect(summary.expired).toBe(1)
+    expect(summary.deletedFiles).toBe(1)
     expect(summary.cleanedRows).toBe(1)
-    expect(summary.deletedFiles).toBe(0)
-    expect(summary.errors.some((error) => error.includes('remote failure'))).toBe(true)
   })
 })

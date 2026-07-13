@@ -1,6 +1,21 @@
 const DEFAULT_ALLOWED_HEADERS = ['Content-Type', 'Authorization', 'X-Requested-With']
 const DEFAULT_ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 
+const PUBLIC_CORS_ROUTE_RULES = [
+  {
+    pattern: /^\/api\/vacancies(?:\/[^/]+)?$/,
+    methods: new Set(['GET'])
+  },
+  {
+    pattern: /^\/api\/applications$/,
+    methods: new Set(['POST'])
+  },
+  {
+    pattern: /^\/api\/contacts$/,
+    methods: new Set(['POST'])
+  }
+] as const
+
 function normalizeToOrigin(value: string): string | null {
   try {
     return new URL(value).origin
@@ -35,8 +50,6 @@ function readAllowedOriginsFromEnv() {
   return origins
 }
 
-const allowedOrigins = readAllowedOriginsFromEnv()
-
 function isLocalDevelopmentOrigin(origin: string) {
   if (process.env.NODE_ENV === 'production') return false
 
@@ -50,12 +63,25 @@ function isLocalDevelopmentOrigin(origin: string) {
 
 export function isAllowedOrigin(origin: string | null) {
   if (!origin) return true
-  return allowedOrigins.has(origin) || isLocalDevelopmentOrigin(origin)
+  return readAllowedOriginsFromEnv().has(origin) || isLocalDevelopmentOrigin(origin)
 }
 
-export function applyCorsHeaders(headers: Headers, origin: string, requestedHeaders?: string | null) {
+export function isPublicCorsRequest(pathname: string, method: string) {
+  return PUBLIC_CORS_ROUTE_RULES.some(({ pattern, methods }) => pattern.test(pathname) && methods.has(method.toUpperCase()))
+}
+
+export function applyCorsHeaders(
+  headers: Headers,
+  origin: string,
+  requestedHeaders?: string | null,
+  options?: { allowCredentials?: boolean }
+) {
   headers.set('Access-Control-Allow-Origin', origin)
-  headers.set('Access-Control-Allow-Credentials', 'true')
+  if (options?.allowCredentials) {
+    headers.set('Access-Control-Allow-Credentials', 'true')
+  } else {
+    headers.delete('Access-Control-Allow-Credentials')
+  }
   headers.set('Access-Control-Allow-Methods', DEFAULT_ALLOWED_METHODS.join(', '))
   headers.set('Access-Control-Allow-Headers', requestedHeaders || DEFAULT_ALLOWED_HEADERS.join(', '))
   headers.set('Access-Control-Max-Age', '86400')

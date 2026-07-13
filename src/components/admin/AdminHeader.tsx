@@ -22,7 +22,7 @@ interface HeaderNotification {
 }
 
 interface AdminHeaderProps {
-  activeTab: 'vacancies' | 'applications' | 'contacts' | 'settings'
+  activeTab: 'vacancies' | 'applications' | 'candidates' | 'contacts' | 'settings'
   userEmail?: string
   onSignOut: () => void
   onBackFromSettings: () => void
@@ -132,6 +132,18 @@ export default function AdminHeader({
       onOpenNotifications()
     }
   }
+
+  useEffect(() => {
+    if (!isNotificationsMenuOpen) return
+
+    const intervalId = window.setInterval(() => {
+      setNotificationsReferenceNow(Date.now())
+    }, 60_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isNotificationsMenuOpen])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)')
@@ -492,6 +504,7 @@ export default function AdminHeader({
               <p className="text-[11px] text-blue-100/90 leading-none truncate">
                 {activeTab === 'vacancies' && 'Vacantes'}
                 {activeTab === 'applications' && 'Postulaciones'}
+                {activeTab === 'candidates' && 'Candidatos'}
                 {activeTab === 'contacts' && 'Contactos'}
                 {activeTab === 'settings' && 'Configuración'}
               </p>

@@ -26,6 +26,8 @@
 | CU-020 | Gestionar notificaciones | Administrador | Sistema | Leer/marcar/eliminar notificaciones | Proceso automático |
 | CU-021 | Consultar auditoría | Administrador | Sistema | Trazabilidad operativa | Reportería/Estadística |
 | CU-022 | Ejecutar purga de auditoría | Proceso programado | Sistema | Cumplir retención | Proceso automático |
+| CU-023 | Exportar postulaciones | Administrador | Sistema | Descargar postulaciones filtradas | Reportería/Estadística |
+| CU-024 | Exportar candidatos | Administrador | Sistema | Descargar candidatos consolidados | Reportería/Estadística |
 
 ## 2. Diagrama General de CU
 
@@ -43,6 +45,8 @@ flowchart LR
   A --> CU19[CU-019 Configuración]
   A --> CU20[CU-020 Notificaciones]
   A --> CU21[CU-021 Auditoría]
+  A --> CU23[CU-023 Exportar Postulaciones]
+  A --> CU24[CU-024 Exportar Candidatos]
 
   CRON[Scheduler] --> CU22[CU-022 Purga Auditoría]
 ```
@@ -56,7 +60,7 @@ flowchart LR
 - CU-005, CU-006
 
 ### 3.3 Reportería/Estadística
-- CU-021
+- CU-021, CU-023, CU-024
 
 ### 3.4 CRUD/ABCM (separados)
 - Vacantes: CU-007 (Alta), CU-008 (Consulta), CU-009 (Modificación), CU-010 (Baja)
@@ -65,3 +69,43 @@ flowchart LR
 
 ### 3.5 Procesos automáticos
 - CU-020, CU-022
+
+## 4. Especificación resumida de nuevos CU
+
+### 4.1 CU-023 Exportar postulaciones
+
+- Actor principal: `Administrador`
+- Objetivo: descargar un archivo con las postulaciones visibles según filtros activos para análisis o respaldo externo.
+- Precondiciones:
+  - existe sesión admin válida
+  - el administrador accede al módulo de postulaciones
+- Flujo principal:
+  1. el administrador filtra u ordena postulaciones
+  2. selecciona la acción `Exportar CSV`
+  3. el sistema recopila el conjunto filtrado
+  4. el sistema genera el archivo descargable
+  5. el sistema inicia la descarga
+- Flujos alternativos:
+  - si no hay registros filtrados, la acción permanece deshabilitada
+  - si ocurre un error, el sistema informa que no pudo exportar
+- Postcondición:
+  - el administrador obtiene un archivo con el estado actual de las postulaciones exportadas
+
+### 4.2 CU-024 Exportar candidatos
+
+- Actor principal: `Administrador`
+- Objetivo: descargar un archivo con candidatos consolidados, incluyendo contacto, CV y resumen de postulaciones.
+- Precondiciones:
+  - existe sesión admin válida
+  - el administrador accede al módulo de candidatos
+- Flujo principal:
+  1. el administrador filtra candidatos por búsqueda textual
+  2. selecciona la acción `Exportar CSV`
+  3. el sistema consolida candidatos a partir de sus postulaciones asociadas
+  4. el sistema genera el archivo descargable
+  5. el sistema inicia la descarga
+- Flujos alternativos:
+  - si no hay candidatos visibles, la acción permanece deshabilitada
+  - si ocurre un error, el sistema informa que no pudo exportar
+- Postcondición:
+  - el administrador obtiene un archivo con los candidatos visibles al momento de la exportación

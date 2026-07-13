@@ -1,24 +1,6 @@
-import bcrypt from 'bcrypt'
-
-type PrismaUserDelegate = {
-  findUnique: (args: {
-    where: { email: string }
-    select?: { id?: true; name?: true; email?: true; role?: true }
-  }) => Promise<{ id: string; name: string | null; email?: string; role?: string } | null>
-  update: (args: {
-    where: { id: string }
-    data: { passwordHash: string; role: 'ADMIN'; name?: string }
-    select: { id: true; email: true; name: true; role: true }
-  }) => Promise<{ id: string; email: string; name: string | null; role: string }>
-  create: (args: {
-    data: { email: string; name: string; passwordHash: string; role: 'ADMIN' }
-    select: { id: true; email: true; name: true; role: true }
-  }) => Promise<{ id: string; email: string; name: string | null; role: string }>
-}
-
-type PrismaLike = {
-  user: PrismaUserDelegate
-}
+// NOTE: Prisma-based admin user creation removed in Phase 4 (PR 4).
+// Admin user creation is now Spring-only via POST /api/v1/admin/users.
+// Rollback: re-enable Prisma fallback by restoring the legacy path below.
 
 export type AdminUserInput = {
   email: string
@@ -30,45 +12,38 @@ export function normalizeAdminEmail(email: string) {
   return email.trim().toLowerCase()
 }
 
-export async function createOrUpdateAdminUser(prisma: PrismaLike, input: AdminUserInput) {
+/**
+ * Creates or updates an admin user via Spring backend API.
+ * Requires SPRING_AUTH_ENABLED=true and BACKEND_URL to be set.
+ */
+export async function createOrUpdateAdminUser(_prisma: unknown, input: AdminUserInput) {
   const normalizedEmail = normalizeAdminEmail(input.email)
   const normalizedName = input.name?.trim()
-  const passwordHash = await bcrypt.hash(input.password, 10)
 
-  const existing = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-    select: { id: true, name: true }
-  })
-
-  if (existing) {
-    return prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        passwordHash,
-        role: 'ADMIN',
-        ...(normalizedName ? { name: normalizedName } : {})
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true
-      }
-    })
+  const backendUrl = process.env.BACKEND_URL?.trim().replace(/\/+$/, '')
+  if (!backendUrl) {
+    throw new Error('BACKEND_URL is required when SPRING_AUTH_ENABLED is true')
   }
 
-  return prisma.user.create({
-    data: {
-      email: normalizedEmail,
-      name: normalizedName || 'Administrador',
-      passwordHash,
-      role: 'ADMIN'
+  const response = await fetch(`${backendUrl}/api/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(process.env.BACKEND_INTERNAL_API_TOKEN
+        ? { 'X-Backend-Api-Key': process.env.BACKEND_INTERNAL_API_TOKEN }
+        : {})
     },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true
-    }
+    body: JSON.stringify({
+      email: normalizedEmail,
+      password: input.password,
+      name: normalizedName || 'Administrador'
+    })
   })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Spring user creation failed: ${response.status} ${error}`)
+  }
+
+  return response.json()
 }

@@ -5,8 +5,10 @@ import {
   createContact,
   updateContactStatus,
   deleteContact,
-  type Contact
+  type Contact,
+  type CreateContactResponse
 } from '../api/contacts'
+import { isApiRequestError } from '../api/errors'
 
 describe('Contacts API Service', () => {
   beforeEach(() => {
@@ -49,12 +51,15 @@ describe('Contacts API Service', () => {
     expect(result).toEqual(mockContact)
   })
 
-  it('createContact devuelve el contacto creado', async () => {
-    const mockContact: Contact = { id: '1', name: 'Ana', email: 'ana@mail.com', phone: '123', subject: 'Hola', message: 'Mensaje', status: 'PENDING', createdAt: '' }
+  it('createContact devuelve el payload real de confirmación', async () => {
+    const mockResponse: CreateContactResponse = {
+      message: 'Mensaje enviado exitosamente',
+      contactId: '1'
+    }
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve(mockContact)
+        json: () => Promise.resolve(mockResponse)
       })
     ))
 
@@ -65,7 +70,7 @@ describe('Contacts API Service', () => {
       subject: 'Hola',
       message: 'Mensaje'
     })
-    expect(result).toEqual(mockContact)
+    expect(result).toEqual(mockResponse)
   })
 
   it('createContact lanza error si la respuesta no es ok', async () => {
@@ -103,6 +108,39 @@ describe('Contacts API Service', () => {
       subject: 'Hola',
       message: 'Mensaje'
     })).rejects.toThrow('El dominio del email no está permitido')
+  })
+
+  it('createContact preserva status y code en errores de API', async () => {
+    try {
+      vi.stubGlobal('fetch', vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 409,
+          json: () => Promise.resolve({
+            error: 'Mensaje duplicado',
+            code: 'DUPLICATE_SUBMISSION'
+          })
+        })
+      ))
+
+      await createContact({
+        name: 'Ana',
+        email: 'ana@mail.com',
+        phone: '123',
+        subject: 'Hola',
+        message: 'Mensaje'
+      })
+    } catch (error) {
+      expect(isApiRequestError(error)).toBe(true)
+      expect(error).toMatchObject({
+        message: 'Mensaje duplicado',
+        status: 409,
+        code: 'DUPLICATE_SUBMISSION'
+      })
+      return
+    }
+
+    throw new Error('Expected createContact to throw')
   })
 
   it('updateContactStatus actualiza y devuelve el contacto', async () => {

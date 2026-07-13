@@ -3,6 +3,7 @@
  * Centraliza todas las llamadas a la API relacionadas con vacantes
  */
 import { apiFetch } from './http'
+import { VacancyStatusMachine } from '@/domain/vacancy/VacancyStatusMachine'
 
 export interface Vacancy {
   id: string
@@ -106,23 +107,38 @@ export async function updateVacancy(id: string, data: UpdateVacancyData): Promis
   return normalizeVacancy(vacancy)
 }
 
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const error = await response.json() as { error?: string }
+    return error.error || fallback
+  } catch {
+    return fallback
+  }
+}
+
 /**
- * Elimina una vacante
+ * Cierra una vacante conservando su historial.
  */
-export async function deleteVacancy(id: string): Promise<void> {
+export async function deleteVacancy(id: string): Promise<Vacancy> {
   const response = await apiFetch(`/api/vacancies/${id}`, {
     method: 'DELETE'
   })
   
   if (!response.ok) {
-    throw new Error('Error al eliminar la vacante')
+    throw new Error(await readApiError(response, 'Error al cerrar la vacante'))
   }
+
+  const vacancy = await response.json()
+  return normalizeVacancy(vacancy)
 }
 
 /**
- * Alterna el estado de una vacante (active/closed)
+ * Alterna el estado operativo de una vacante (active/inactive).
  */
 export async function toggleVacancyStatus(vacancy: Vacancy): Promise<Vacancy> {
-  const newStatus = vacancy.status === 'active' ? 'closed' : 'active'
+  const currentStatus = vacancy.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT'
+  const newStatus = currentStatus === 'ACTIVE'
+    ? VacancyStatusMachine.deactivate(currentStatus)
+    : VacancyStatusMachine.activate(currentStatus)
   return updateVacancy(vacancy.id, { status: newStatus })
 }

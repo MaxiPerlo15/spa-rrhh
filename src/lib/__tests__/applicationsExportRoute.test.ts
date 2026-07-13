@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
 const findManyMock = vi.fn()
-const buildApplicationsCsvMock = vi.fn()
+const executeMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
@@ -17,8 +17,10 @@ vi.mock('@/lib/prisma', () => ({
   }
 }))
 
-vi.mock('@/lib/csv/applicationsExport', () => ({
-  buildApplicationsCsv: buildApplicationsCsvMock
+vi.mock('@/application/exports/ExportApplicationsUseCase', () => ({
+  ExportApplicationsUseCase: class {
+    execute = executeMock
+  }
 }))
 
 describe('/api/applications/export', () => {
@@ -44,16 +46,28 @@ describe('/api/applications/export', () => {
     })
     findManyMock.mockResolvedValue([
       {
-        candidateName: 'Ana',
-        email: 'ana@empresa.com',
-        phone: '+54 9 351 1111111',
+        candidateId: 'cand-1',
         submittedAt: new Date('2026-03-04T00:00:00.000Z'),
+        candidate: {
+          id: 'cand-1',
+          name: 'Ana',
+          lastName: null,
+          email: 'ana@empresa.com',
+          phone: '+54 9 351 1111111',
+          resumeUrl: null,
+          resumeFileName: null,
+          resumeKey: null
+        },
         vacancy: {
           title: 'Diseñadora UX'
         }
       }
     ])
-    buildApplicationsCsvMock.mockReturnValue('\uFEFFcsv-test')
+    executeMock.mockReturnValue({
+      fileName: 'postulaciones-2026-05-03.csv',
+      mimeType: 'text/csv; charset=utf-8',
+      content: '\uFEFFcsv-test'
+    })
 
     const { GET } = await import('@/app/api/applications/export/route')
     const request = new NextRequest(

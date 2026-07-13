@@ -129,7 +129,7 @@ describe('authAttemptGuard', () => {
     expect(fetchMock).toHaveBeenCalled()
   })
 
-  it('en producción bloquea por fail-closed si Upstash falla', async () => {
+  it('en producción bloquea si Upstash falla', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('network error')
     })
@@ -146,18 +146,20 @@ describe('authAttemptGuard', () => {
 
     const lockState = await getAttemptLock(scope, identity)
     expect(lockState.blocked).toBe(true)
-    expect(lockState.retryAfterSeconds).toBeGreaterThan(0)
+    expect(lockState.retryAfterSeconds).toBe(60)
+    expect(lockState.degraded).toBe(true)
 
     const failureState = await recordAttemptFailure(scope, identity)
     expect(failureState.blocked).toBe(true)
-    expect(failureState.retryAfterSeconds).toBeGreaterThan(0)
-    expect(failureState.failures).toBe(0)
+    expect(failureState.retryAfterSeconds).toBe(60)
+    expect(failureState.failures).toBe(1)
+    expect(failureState.degraded).toBe(true)
 
     await clearAttemptFailures(scope, identity)
     expect(fetchMock).toHaveBeenCalled()
   })
 
-  it('en producción bloquea por fail-closed si faltan credenciales Upstash', async () => {
+  it('en producción bloquea si faltan credenciales Upstash', async () => {
     const { getAttemptLock, recordAttemptFailure } = await loadGuard({
       NODE_ENV: 'production',
       UPSTASH_REDIS_REST_URL: undefined,
@@ -166,11 +168,14 @@ describe('authAttemptGuard', () => {
 
     const lockState = await getAttemptLock('login', 'prod-no-store')
     expect(lockState.blocked).toBe(true)
-    expect(lockState.retryAfterSeconds).toBeGreaterThan(0)
+    expect(lockState.retryAfterSeconds).toBe(60)
+    expect(lockState.degraded).toBe(true)
 
     const failureState = await recordAttemptFailure('login', 'prod-no-store')
     expect(failureState.blocked).toBe(true)
-    expect(failureState.failures).toBe(0)
+    expect(failureState.retryAfterSeconds).toBe(60)
+    expect(failureState.failures).toBe(1)
+    expect(failureState.degraded).toBe(true)
   })
 
   it('usa lock distribuido cuando Upstash responde PTTL positivo', async () => {

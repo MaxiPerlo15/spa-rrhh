@@ -11,12 +11,21 @@ import {
   getResumeUploadErrorMessage
 } from '@/lib/uploadPolicy'
 
-interface PostularFormProps {
-  vacancyId?: string | null
-  vacancyTitle?: string
-  mode?: 'vacancy' | 'spontaneous'
-  onClose: () => void
-}
+type PostularFormProps =
+  | {
+      vacancyId: string
+      vacancyTitle?: string
+      mode?: 'vacancy'
+      onClose: () => void
+    }
+  | {
+      vacancyId?: null
+      vacancyTitle?: string
+      mode: 'spontaneous'
+      onClose: () => void
+    }
+
+const DRAFT_TTL_MS = 30 * 60 * 1000
 
 export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }: PostularFormProps) {
   const resolvedMode = mode ?? (vacancyId ? 'vacancy' : 'spontaneous')
@@ -47,6 +56,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [captchaToken, setCaptchaToken] = useState('')
+  const [isReviewingSubmission, setIsReviewingSubmission] = useState(false)
   const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
   const draftStorageKey = useMemo(
     () => `postular_form_draft:${vacancyId ?? 'spontaneous'}`,
@@ -99,14 +109,27 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
       const serializedDraft = window.localStorage.getItem(draftStorageKey)
       if (!serializedDraft) return
 
-      const parsedDraft = JSON.parse(serializedDraft) as Partial<typeof formData>
+      const parsedDraft = JSON.parse(serializedDraft) as {
+        savedAt?: number
+        data?: Partial<typeof formData>
+      }
+      if (
+        typeof parsedDraft.savedAt !== 'number' ||
+        !parsedDraft.data ||
+        Date.now() - parsedDraft.savedAt > DRAFT_TTL_MS
+      ) {
+        window.localStorage.removeItem(draftStorageKey)
+        return
+      }
+
+      const draftData = parsedDraft.data
       setFormData((prev) => ({
-        candidateName: typeof parsedDraft.candidateName === 'string' ? parsedDraft.candidateName : prev.candidateName,
-        email: typeof parsedDraft.email === 'string' ? parsedDraft.email : prev.email,
-        phone: typeof parsedDraft.phone === 'string' ? parsedDraft.phone : prev.phone,
-        coverLetter: typeof parsedDraft.coverLetter === 'string' ? parsedDraft.coverLetter : prev.coverLetter,
+        candidateName: typeof draftData.candidateName === 'string' ? draftData.candidateName : prev.candidateName,
+        email: typeof draftData.email === 'string' ? draftData.email : prev.email,
+        phone: typeof draftData.phone === 'string' ? draftData.phone : prev.phone,
+        coverLetter: typeof draftData.coverLetter === 'string' ? draftData.coverLetter : prev.coverLetter,
         acceptedPrivacy:
-          typeof parsedDraft.acceptedPrivacy === 'boolean' ? parsedDraft.acceptedPrivacy : prev.acceptedPrivacy
+          typeof draftData.acceptedPrivacy === 'boolean' ? draftData.acceptedPrivacy : prev.acceptedPrivacy
       }))
     } catch {
       window.localStorage.removeItem(draftStorageKey)
@@ -114,7 +137,23 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
   }, [draftStorageKey])
 
   useEffect(() => {
-    window.localStorage.setItem(draftStorageKey, JSON.stringify(formData))
+    const hasPersistableData = Object.entries(formData).some(([key, value]) => {
+      if (key === 'acceptedPrivacy') return value === true
+      return typeof value === 'string' && value.trim().length > 0
+    })
+
+    if (!hasPersistableData) {
+      window.localStorage.removeItem(draftStorageKey)
+      return
+    }
+
+    window.localStorage.setItem(
+      draftStorageKey,
+      JSON.stringify({
+        savedAt: Date.now(),
+        data: formData
+      })
+    )
   }, [draftStorageKey, formData])
 
   useEffect(() => {
@@ -134,9 +173,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
     }
   }, [isSubmitting, onClose])
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-
+  const validateBeforeSubmit = () => {
     const nextErrors = {
       candidateName: validateField('candidateName', formData.candidateName),
       email: validateField('email', formData.email),
@@ -150,19 +187,29 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
 
     if (nextErrors.candidateName || nextErrors.email || nextErrors.phone) {
       showError('Revisa los campos marcados para continuar.')
-      return
+      return false
     }
 
+    if (!resumeInfo) {
+      showError('Debes subir tu CV')
+      return false
+    }
+
+    if (captchaEnabled && !captchaToken) {
+      showError('Completa la verificación captcha para continuar.')
+      return false
+    }
+
+    return true
+  }
+
+  const submitApplication = async () => {
     if (!resumeInfo) {
       showError('Debes subir tu CV')
       return
     }
 
-    if (captchaEnabled && !captchaToken) {
-      showError('Completa la verificación captcha para continuar.')
-      return
-    }
-
+    const currentResumeInfo = resumeInfo
     setIsSubmitting(true)
 
     try {
@@ -172,14 +219,18 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
         email: formData.email,
         phone: formData.phone,
         acceptedPrivacy: formData.acceptedPrivacy,
-        resumeUrl: resumeInfo.url,
-        resumeFileName: resumeInfo.name,
-        resumeKey: resumeInfo.key,
+        resumeUrl: currentResumeInfo.url,
+        resumeFileName: currentResumeInfo.name,
+        resumeKey: currentResumeInfo.key,
         coverLetter: formData.coverLetter,
         captchaToken
       })
 
-      showSuccess(`✅ Postulación enviada exitosamente para ${effectiveVacancyTitle}`)
+      showSuccess(
+        resolvedMode === 'vacancy'
+          ? `✅ Postulación enviada exitosamente para ${effectiveVacancyTitle}`
+          : '✅ Candidatura espontánea enviada exitosamente'
+      )
       window.localStorage.removeItem(draftStorageKey)
       setTimeout(() => {
         closeWithAnimation()
@@ -207,6 +258,21 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+
+    if (!validateBeforeSubmit()) {
+      return
+    }
+
+    if (resolvedMode === 'spontaneous') {
+      setIsReviewingSubmission(true)
+      return
+    }
+
+    await submitApplication()
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -261,6 +327,12 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{resolvedHeading}</h2>
             <p className="text-gray-600 mt-1 whitespace-pre-line">{resolvedSubtitle}</p>
+            {resolvedMode === 'vacancy' && vacancyId && (
+              <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+                <p className="font-semibold">Vacante seleccionada</p>
+                <p className="mt-1">{effectiveVacancyTitle}</p>
+              </div>
+            )}
           </div>
           <button
             onClick={closeWithAnimation}
@@ -273,7 +345,61 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
           </button>
         </div>
 
-        {/* Formulario */}
+        {isReviewingSubmission ? (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-primary-100 bg-primary-50 p-5">
+              <h3 className="text-lg font-semibold text-primary-950">Revisá tu candidatura antes de enviarla</h3>
+              <p className="mt-1 text-sm text-primary-900">
+                Confirmá que los datos sean correctos. Cuando continúes, la candidatura quedará registrada sin asociarse a una vacante específica.
+              </p>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</p>
+                <p className="mt-1 text-sm text-gray-900">{formData.candidateName}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</p>
+                <p className="mt-1 text-sm text-gray-900">{formData.email}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Teléfono</p>
+                <p className="mt-1 text-sm text-gray-900">{formData.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">CV adjunto</p>
+                <p className="mt-1 text-sm text-gray-900">{resumeInfo?.name}</p>
+              </div>
+              {formData.coverLetter.trim() && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mensaje</p>
+                  <p className="mt-1 whitespace-pre-line text-sm text-gray-900">{formData.coverLetter}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsReviewingSubmission(false)}
+                className="btn-motion w-full sm:flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Volver a editar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void submitApplication()
+                }}
+                disabled={isSubmitting}
+                className="btn-motion w-full sm:flex-1 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Enviando...' : 'Confirmar candidatura'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Nombre */}
           <div>
@@ -346,6 +472,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
             )}
           </div>
 
+          <TurnstileWidget action="application_form" onTokenChange={setCaptchaToken} />
+
           {/* Upload CV */}
           <div>
             <p className="block text-sm font-medium text-gray-700 mb-2">
@@ -354,6 +482,8 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
             {!resumeInfo ? (
               <UploadButton
                 endpoint="resumeUploader"
+                input={{ captchaToken }}
+                disabled={isSubmitting || (captchaEnabled && !captchaToken)}
                 appearance={{
                   container: 'w-full',
                   button: 'w-full rounded-lg bg-primary-500 px-4 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:bg-gray-300 disabled:text-gray-600',
@@ -401,6 +531,11 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
                 </button>
               </div>
             )}
+            {captchaEnabled && !captchaToken && !resumeInfo && (
+              <p className="mt-2 text-xs text-amber-700">
+                Completa el captcha antes de subir el CV.
+              </p>
+            )}
           </div>
 
           {/* Carta de Presentación */}
@@ -425,7 +560,6 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
           </div>
 
           {/* Botones */}
-          <TurnstileWidget action="application_form" onTokenChange={setCaptchaToken} />
           <div className="space-y-2">
             <label htmlFor="application-accepted-privacy" className="flex items-start gap-3 text-sm text-gray-700">
               <input
@@ -474,6 +608,7 @@ export default function PostularForm({ vacancyId, vacancyTitle, mode, onClose }:
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   )

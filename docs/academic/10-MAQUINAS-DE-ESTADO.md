@@ -6,9 +6,12 @@
 stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> ACTIVE: publicar
+  ACTIVE --> INACTIVE: desactivar
+  INACTIVE --> ACTIVE: activar
   ACTIVE --> CLOSED: cerrar
-  CLOSED --> ACTIVE: reactivar
+  INACTIVE --> CLOSED: cerrar
   ACTIVE --> [*]: eliminar
+  INACTIVE --> [*]: eliminar
   CLOSED --> [*]: eliminar
   DRAFT --> [*]: eliminar
 ```

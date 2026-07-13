@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { adminAuditListQuerySchema, formatValidationError } from '@/lib/apiValidation'
-import { isMissingTableOrColumnError } from '@/lib/prismaError'
+import { canUseSchemaDriftFallback } from '@/lib/prismaError'
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,7 +90,10 @@ export async function GET(request: NextRequest) {
         }
       })
     } catch (error) {
-      if (!isMissingTableOrColumnError(error)) throw error
+      if (!canUseSchemaDriftFallback(error)) throw error
+      logger.warn('Fallback temporal de auditoría admin por schema drift', {
+        route: 'GET /api/admin/audit'
+      })
 
       return NextResponse.json({
         items: [],

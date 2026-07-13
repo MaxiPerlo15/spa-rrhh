@@ -13,7 +13,6 @@ This document tracks the production hardening baseline implemented for:
 ## MIS-67: Security Headers and CSP
 
 Global headers are configured in `next.config.ts` for all routes:
-- `Content-Security-Policy`
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
@@ -23,6 +22,20 @@ Current CSP allowlists include only required external domains:
 - Cloudflare Turnstile
 - UploadThing + file CDN domains
 - Sentry ingest domains
+
+As of March 10, 2026, CSP is delivered from `src/proxy.ts` for every HTML route:
+- per-request nonce for app and admin pages
+- `script-src` with per-request nonce
+- `strict-dynamic` for runtime scripts
+- nonce propagation to `next/script` consumers (`schema.org`, Turnstile)
+
+Why this changed:
+- a static CSP in `next.config.ts` forced a global `unsafe-inline` exception
+- route-level CSP from proxy allows stronger `script-src` without keeping a weak baseline for the whole app
+
+Operational note:
+- `/api/*` routes do not emit CSP because they are not HTML surfaces
+- CORS and origin validation remain handled in `src/proxy.ts`
 
 ## MIS-68: NextAuth Cookie and Session Hardening
 
@@ -111,6 +124,7 @@ Implementado:
 
 Notas:
 - Si la migración de `personKey` aún no está aplicada, el backend degrada sin romper.
+- En producción, estos fallbacks ya no se aceptan silenciosamente. Si falta una migración, la ruta debe fallar de forma visible.
 
 Configuration:
 - `FORM_ALLOWED_EMAIL_DOMAINS`: comma-separated email domain allowlist.
@@ -133,7 +147,7 @@ Implemented baseline:
   - token expiration (`PASSWORD_RESET_TOKEN_TTL_MINUTES`)
   - invalidated after successful password change
 - Real delivery requirement:
-  - forgot-password now returns error when reset email cannot be sent
+  - forgot-password keeps a generic public response even when email delivery fails
   - reset token is removed if delivery fails (no dangling usable token)
 - Anti-abuse controls:
   - rate limiting in forgot/reset endpoints
@@ -178,9 +192,31 @@ Observability hooks:
   - `auth.login.throttled`
   - `auth.forgot_password.throttled`
   - `auth.forgot_password.delivery_failed`
-  - `auth.forgot_password.unknown_identity`
-  - `auth.reset_password.throttled`
-  - `auth.reset_password.invalid_token`
+- `auth.forgot_password.unknown_identity`
+- `auth.reset_password.throttled`
+- `auth.reset_password.invalid_token`
+
+## Dependency Risk Acceptance
+
+Status as of March 10, 2026:
+- `npm audit --audit-level=high` pasa
+- no quedan advisories `high` ni `critical`
+- los advisories remanentes son `moderate` y provienen del tooling transitive de Prisma, no de runtime directo de la app
+
+Current accepted residual risk:
+- `@prisma/dev`
+- `@mrleebo/prisma-ast`
+- `chevrotain`
+- `lodash`
+
+Acceptance rationale:
+- el remanente está en la cadena interna de tooling de Prisma
+- la salida automática de `npm audit fix --force` propone un movimiento de Prisma incoherente para este repositorio
+- forzar ese cambio solo para silenciar el reporte sería peor ingeniería que registrar el riesgo residual de forma explícita
+
+Required follow-up:
+- revisitar este punto en el próximo upgrade planificado de Prisma
+- no bajar el gate de CI por debajo de `npm audit --audit-level=high`
 
 ## MIS-98: Auditoría de acciones críticas del panel admin
 

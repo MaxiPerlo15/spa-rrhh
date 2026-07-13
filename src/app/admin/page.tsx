@@ -12,14 +12,27 @@ import DashboardStats from '@/components/admin/DashboardStats'
 import AdminOnboardingDialog from '@/components/admin/AdminOnboardingDialog'
 import AdminVacanciesSection from '@/components/admin/sections/AdminVacanciesSection'
 import AdminApplicationsSection from '@/components/admin/sections/AdminApplicationsSection'
+import AdminCandidatesSection from '@/components/admin/sections/AdminCandidatesSection'
 import AdminContactsSection from '@/components/admin/sections/AdminContactsSection'
 import AdminSettingsSection from '@/components/admin/sections/AdminSettingsSection'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import { useMobileKeyboardAssist } from '@/hooks/useMobileKeyboardAssist'
 import type { Vacancy } from '@/lib/api/vacancies'
 import type { Application } from '@/lib/api/applications'
-import { downloadApplicationsCsv } from '@/lib/api/applications'
+import { downloadApplicationsCsv, downloadCandidatesCsv } from '@/lib/api/applications'
 import type { Contact } from '@/lib/api/contacts'
+import { applicationStatusLabels, buildApplicationStatusChangeSummary } from '@/lib/applicationStatus'
+import { buildCandidateSummaries, type CandidateSummary } from '@/lib/candidates'
+import { buildContactStatusChangeSummary, contactStatusLabels } from '@/lib/contactStatus'
+import {
+  buildFilteredApplications,
+  buildFilteredCandidates,
+  buildFilteredContacts,
+  buildFilteredVacancies,
+  findFirstApplicationWithResumeId,
+  findFirstItemId,
+  paginateItems,
+} from '@/application/admin/dashboardCollections'
 import * as Sentry from '@sentry/nextjs'
 
 const ONBOARDING_STORAGE_KEY = 'admin_onboarding_completed_v1'
@@ -73,6 +86,20 @@ type ConfirmDialogConfig = {
   type?: 'danger' | 'warning' | 'info'
 }
 
+type CandidateFormData = {
+  candidateName: string
+  email: string
+  phone: string
+  notes: string
+}
+
+const EMPTY_CANDIDATE_FORM: CandidateFormData = {
+  candidateName: '',
+  email: '',
+  phone: '',
+  notes: ''
+}
+
 type AdminSettingsResponse = {
   profile: {
     id: string
@@ -85,6 +112,9 @@ type AdminSettingsResponse = {
     notifyNewApplications: boolean
     notifyNewContacts: boolean
     notifySecurityAlerts: boolean
+  }
+  backend?: {
+    springVacanciesEnabled?: boolean
   }
   updatedAt: string
 }
@@ -253,6 +283,8 @@ export default function AdminDashboard() {
     error,
     fetchDashboardData,
     createVacancy: createVacancyApi,
+    createCandidate,
+    updateCandidate,
     updateVacancy: updateVacancyApi,
     deleteVacancy: deleteVacancyApi,
     toggleVacancyStatus,
@@ -260,12 +292,12 @@ export default function AdminDashboard() {
     deleteApplication: deleteApplicationApi,
     updateContactStatus,
     deleteContact: deleteContactApi
-  } = useAdminDashboard()
+  } = useAdminDashboard({ enabled: status === 'authenticated' })
   
   const [activeTab, setActiveTab] = useState<AdminTab>('vacancies')
   const [lastNonSettingsTab, setLastNonSettingsTab] = useState<AdminTab>('vacancies')
   const [searchVacancies, setSearchVacancies] = useState<string>('')
-  const [filterVacancyStatus, setFilterVacancyStatus] = useState<'all' | 'active' | 'closed'>('all')
+  const [filterVacancyStatus, setFilterVacancyStatus] = useState<'all' | 'active' | 'inactive' | 'closed'>('all')
   const [sortVacanciesBy, setSortVacanciesBy] = useState<VacancySortKey>('createdAt')
   const [sortVacanciesDirection, setSortVacanciesDirection] = useState<SortDirection>('desc')
 
@@ -276,14 +308,18 @@ export default function AdminDashboard() {
 
   const [filterContactStatus, setFilterContactStatus] = useState<string>('all')
   const [searchApplications, setSearchApplications] = useState<string>('')
+  const [searchCandidates, setSearchCandidates] = useState<string>('')
   const [searchContacts, setSearchContacts] = useState<string>('')
   const [sortContactsBy, setSortContactsBy] = useState<ContactSortKey>('createdAt')
   const [sortContactsDirection, setSortContactsDirection] = useState<SortDirection>('desc')
   const [currentVacancyPage, setCurrentVacancyPage] = useState(1)
   const [currentApplicationPage, setCurrentApplicationPage] = useState(1)
+  const [currentCandidatePage, setCurrentCandidatePage] = useState(1)
   const [currentContactPage, setCurrentContactPage] = useState(1)
   const itemsPerPage = 10
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateCandidateModal, setShowCreateCandidateModal] = useState(false)
+  const [editingCandidate, setEditingCandidate] = useState<CandidateSummary | null>(null)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
   const [showApplicationDetail, setShowApplicationDetail] = useState(false)
@@ -301,6 +337,7 @@ export default function AdminDashboard() {
   const [pendingApplicationStatusId, setPendingApplicationStatusId] = useState<string | null>(null)
   const [pendingDeleteApplicationId, setPendingDeleteApplicationId] = useState<string | null>(null)
   const [isExportingApplicationsCsv, setIsExportingApplicationsCsv] = useState(false)
+  const [isExportingCandidatesCsv, setIsExportingCandidatesCsv] = useState(false)
   const [pendingContactStatusId, setPendingContactStatusId] = useState<string | null>(null)
   const [pendingDeleteContactId, setPendingDeleteContactId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -313,6 +350,7 @@ export default function AdminDashboard() {
     requirements: '',
     benefits: ''
   })
+  const [candidateFormData, setCandidateFormData] = useState<CandidateFormData>(EMPTY_CANDIDATE_FORM)
   const [isSaving, setIsSaving] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(0)
@@ -332,6 +370,7 @@ export default function AdminDashboard() {
     notifySecurityAlerts: true
   })
   const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [springVacancyMode, setSpringVacancyMode] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [auditTimeline, setAuditTimeline] = useState<AdminAuditLogItem[]>([])
   const [auditTimelineLoading, setAuditTimelineLoading] = useState(false)
@@ -646,64 +685,24 @@ export default function AdminDashboard() {
   }, [auditFilters.action, auditFilters.actorEmail, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.resourceType, auditTimelinePage, status])
 
   const filteredVacancies = useMemo(() => {
-    let next = [...vacancies]
-
-    if (filterVacancyStatus !== 'all') {
-      next = next.filter((vacancy) => vacancy.status === filterVacancyStatus)
-    }
-
-    if (searchVacancies.trim()) {
-      const search = searchVacancies.toLowerCase()
-      next = next.filter((vacancy) =>
-        vacancy.title.toLowerCase().includes(search) || vacancy.location.toLowerCase().includes(search)
-      )
-    }
-
-    next.sort((a, b) => {
-      const factor = sortVacanciesDirection === 'asc' ? 1 : -1
-      if (sortVacanciesBy === 'createdAt') {
-        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * factor
-      }
-      if (sortVacanciesBy === 'status') {
-        return a.status.localeCompare(b.status) * factor
-      }
-      return a[sortVacanciesBy].localeCompare(b[sortVacanciesBy], 'es', { sensitivity: 'base' }) * factor
+    return buildFilteredVacancies({
+      vacancies,
+      filterStatus: filterVacancyStatus,
+      search: searchVacancies,
+      sortBy: sortVacanciesBy,
+      sortDirection: sortVacanciesDirection
     })
-
-    return next
   }, [filterVacancyStatus, searchVacancies, sortVacanciesBy, sortVacanciesDirection, vacancies])
 
   const filteredApplications = useMemo(() => {
-    let next = [...applications]
-
-    if (filterStatus !== 'all') {
-      next = next.filter((app) => app.status === filterStatus)
-    }
-    if (filterApplicationsVacancyId !== 'all') {
-      next = next.filter((app) => app.vacancy?.id === filterApplicationsVacancyId)
-    }
-    if (searchApplications.trim()) {
-      const search = searchApplications.toLowerCase()
-      next = next.filter(
-        (app) =>
-          app.candidateName.toLowerCase().includes(search) ||
-          app.email.toLowerCase().includes(search) ||
-          (app.vacancy?.title ?? 'espontánea').toLowerCase().includes(search)
-      )
-    }
-
-    next.sort((a, b) => {
-      const factor = sortApplicationsDirection === 'asc' ? 1 : -1
-      if (sortApplicationsBy === 'submittedAt') {
-        return (new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()) * factor
-      }
-      if (sortApplicationsBy === 'status') {
-        return a.status.localeCompare(b.status) * factor
-      }
-      return a.candidateName.localeCompare(b.candidateName, 'es', { sensitivity: 'base' }) * factor
+    return buildFilteredApplications({
+      applications,
+      filterStatus,
+      filterVacancyId: filterApplicationsVacancyId,
+      search: searchApplications,
+      sortBy: sortApplicationsBy,
+      sortDirection: sortApplicationsDirection
     })
-
-    return next
   }, [
     applications,
     filterStatus,
@@ -714,54 +713,44 @@ export default function AdminDashboard() {
   ])
 
   const filteredContacts = useMemo(() => {
-    let next = [...contacts]
-
-    if (filterContactStatus !== 'all') {
-      next = next.filter((contact) => contact.status === filterContactStatus)
-    }
-    if (searchContacts.trim()) {
-      const search = searchContacts.toLowerCase()
-      next = next.filter(
-        (contact) =>
-          contact.name.toLowerCase().includes(search) ||
-          contact.email.toLowerCase().includes(search) ||
-          contact.subject.toLowerCase().includes(search)
-      )
-    }
-
-    next.sort((a, b) => {
-      const factor = sortContactsDirection === 'asc' ? 1 : -1
-      if (sortContactsBy === 'createdAt') {
-        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * factor
-      }
-      if (sortContactsBy === 'status') {
-        return a.status.localeCompare(b.status) * factor
-      }
-      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }) * factor
+    return buildFilteredContacts({
+      contacts,
+      filterStatus: filterContactStatus,
+      search: searchContacts,
+      sortBy: sortContactsBy,
+      sortDirection: sortContactsDirection
     })
-
-    return next
   }, [contacts, filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection])
 
+  const candidates = useMemo(() => buildCandidateSummaries(applications), [applications])
+
+  const filteredCandidates = useMemo(() => {
+    return buildFilteredCandidates(candidates, searchCandidates)
+  }, [candidates, searchCandidates])
+
   const paginatedVacancies = useMemo(
-    () => filteredVacancies.slice((currentVacancyPage - 1) * itemsPerPage, currentVacancyPage * itemsPerPage),
+    () => paginateItems(filteredVacancies, currentVacancyPage, itemsPerPage),
     [currentVacancyPage, filteredVacancies, itemsPerPage]
   )
   const paginatedApplications = useMemo(
-    () => filteredApplications.slice((currentApplicationPage - 1) * itemsPerPage, currentApplicationPage * itemsPerPage),
+    () => paginateItems(filteredApplications, currentApplicationPage, itemsPerPage),
     [currentApplicationPage, filteredApplications, itemsPerPage]
   )
+  const paginatedCandidates = useMemo(
+    () => paginateItems(filteredCandidates, currentCandidatePage, itemsPerPage),
+    [currentCandidatePage, filteredCandidates, itemsPerPage]
+  )
   const paginatedContacts = useMemo(
-    () => filteredContacts.slice((currentContactPage - 1) * itemsPerPage, currentContactPage * itemsPerPage),
+    () => paginateItems(filteredContacts, currentContactPage, itemsPerPage),
     [currentContactPage, filteredContacts, itemsPerPage]
   )
-  const firstVacancyId = useMemo(() => paginatedVacancies[0]?.id ?? null, [paginatedVacancies])
-  const firstApplicationId = useMemo(() => paginatedApplications[0]?.id ?? null, [paginatedApplications])
+  const firstVacancyId = useMemo(() => findFirstItemId(paginatedVacancies), [paginatedVacancies])
+  const firstApplicationId = useMemo(() => findFirstItemId(paginatedApplications), [paginatedApplications])
   const firstApplicationWithCvId = useMemo(
-    () => paginatedApplications.find((application) => Boolean(application.resumeUrl))?.id ?? null,
+    () => findFirstApplicationWithResumeId(paginatedApplications),
     [paginatedApplications]
   )
-  const firstContactId = useMemo(() => paginatedContacts[0]?.id ?? null, [paginatedContacts])
+  const firstContactId = useMemo(() => findFirstItemId(paginatedContacts), [paginatedContacts])
 
   const tutorialStepsByKind = useMemo<Record<TutorialKind, DomainStep[]>>(() => {
     const vacancySteps = [...DOMAIN_TUTORIALS_BASE.vacancies]
@@ -771,7 +760,7 @@ export default function AdminDashboard() {
           target: 'vacancy-toggle-btn',
           tab: 'vacancies',
           title: 'Acción Cerrar/Activar',
-          body: 'Este botón cambia visibilidad pública de la vacante (activa/cerrada).'
+          body: 'Este botón cambia visibilidad pública de la vacante (activa/inactiva).'
         },
         {
           target: 'vacancy-edit-btn',
@@ -789,8 +778,8 @@ export default function AdminDashboard() {
         {
           target: 'vacancy-delete-btn',
           tab: 'vacancies',
-          title: 'Acción Eliminar',
-          body: 'El botón eliminar inicia confirmación y borra vacante junto con postulaciones asociadas.'
+          title: 'Acción Cerrar',
+          body: 'El botón cerrar oculta la vacante del sitio público y conserva su historial de postulaciones.'
         }
       )
     } else {
@@ -896,6 +885,7 @@ export default function AdminDashboard() {
           notifyNewContacts: data.preferences.notifyNewContacts,
           notifySecurityAlerts: data.preferences.notifySecurityAlerts
         })
+        setSpringVacancyMode(Boolean(data.backend?.springVacanciesEnabled))
         setSettingsLoaded(true)
       } catch (error) {
         console.error('Error al cargar configuración admin', error)
@@ -918,7 +908,7 @@ export default function AdminDashboard() {
       const parsed = JSON.parse(raw) as {
         vacancies?: {
           search?: string
-          status?: 'all' | 'active' | 'closed'
+          status?: 'all' | 'active' | 'inactive' | 'closed'
           sortBy?: VacancySortKey
           sortDirection?: SortDirection
         }
@@ -928,6 +918,9 @@ export default function AdminDashboard() {
           vacancyId?: string
           sortBy?: ApplicationSortKey
           sortDirection?: SortDirection
+        }
+        candidates?: {
+          search?: string
         }
         contacts?: {
           search?: string
@@ -949,6 +942,9 @@ export default function AdminDashboard() {
         setFilterApplicationsVacancyId(parsed.applications.vacancyId ?? 'all')
         setSortApplicationsBy(parsed.applications.sortBy ?? 'submittedAt')
         setSortApplicationsDirection(parsed.applications.sortDirection ?? 'desc')
+      }
+      if (parsed.candidates) {
+        setSearchCandidates(parsed.candidates.search ?? '')
       }
       if (parsed.contacts) {
         setSearchContacts(parsed.contacts.search ?? '')
@@ -980,6 +976,9 @@ export default function AdminDashboard() {
             sortBy: sortApplicationsBy,
             sortDirection: sortApplicationsDirection
           },
+          candidates: {
+            search: searchCandidates
+          },
           contacts: {
             search: searchContacts,
             status: filterContactStatus,
@@ -997,6 +996,7 @@ export default function AdminDashboard() {
     filterStatus,
     filterVacancyStatus,
     searchApplications,
+    searchCandidates,
     searchContacts,
     searchVacancies,
     sortApplicationsBy,
@@ -1210,25 +1210,29 @@ export default function AdminDashboard() {
   }, [filterStatus, filterApplicationsVacancyId, searchApplications, sortApplicationsBy, sortApplicationsDirection])
 
   useEffect(() => {
+    setCurrentCandidatePage(1)
+  }, [searchCandidates])
+
+  useEffect(() => {
     setCurrentContactPage(1)
   }, [filterContactStatus, searchContacts, sortContactsBy, sortContactsDirection])
 
   const handleDeleteVacancy = async (id: string, title: string) => {
     openConfirmDialog({
       isOpen: true,
-      title: 'Eliminar vacante',
-      message: `¿Estás seguro de eliminar la vacante "${title}"?\n\nEsta acción también eliminará todas las postulaciones asociadas y no se puede deshacer.`,
-      type: 'danger',
-      confirmText: 'Eliminar vacante',
+      title: 'Cerrar vacante',
+      message: `¿Deseas cerrar la vacante "${title}"?\n\nLa vacante dejará de mostrarse en el sitio público y se conservará el historial de postulaciones.`,
+      type: 'warning',
+      confirmText: 'Cerrar vacante',
       onConfirm: async () => {
         setPendingDeleteVacancyId(id)
         try {
           await deleteVacancyApi(id)
-          showSuccess('Vacante eliminada exitosamente')
-          addNotification('Vacante eliminada', `Se eliminó la vacante "${title}".`, 'warning')
+          showSuccess('Vacante cerrada exitosamente')
+          addNotification('Vacante cerrada', `Se cerró la vacante "${title}" y se conservó su historial.`, 'warning')
         } catch (error) {
-          console.error('Error deleting vacancy:', error)
-          showError('Error al eliminar la vacante')
+          console.error('Error closing vacancy:', error)
+          showError(error instanceof Error ? error.message : 'Error al cerrar la vacante')
         } finally {
           setPendingDeleteVacancyId(null)
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
@@ -1240,23 +1244,28 @@ export default function AdminDashboard() {
   const handleStatusToggle = async (vacancy: Vacancy) => {
     if (pendingToggleVacancyId) return
 
+    if (vacancy.status === 'closed') {
+      showError('Una vacante cerrada no puede volver a activarse')
+      return
+    }
+
     const isClosing = vacancy.status === 'active'
     openConfirmDialog({
       isOpen: true,
-      title: isClosing ? 'Cerrar vacante' : 'Activar vacante',
+      title: isClosing ? 'Desactivar vacante' : 'Activar vacante',
       message: isClosing
-        ? `¿Deseas cerrar la vacante "${vacancy.title}"?\n\nAl cerrarla dejará de mostrarse en la página pública.`
+        ? `¿Deseas desactivar la vacante "${vacancy.title}"?\n\nAl desactivarla dejará de mostrarse en la página pública.`
         : `¿Deseas activar la vacante "${vacancy.title}"?\n\nAl activarla volverá a mostrarse en la página pública.`,
       type: 'danger',
-      confirmText: isClosing ? 'Sí, cerrar vacante' : 'Sí, activar vacante',
+      confirmText: isClosing ? 'Sí, desactivar vacante' : 'Sí, activar vacante',
       onConfirm: async () => {
         setPendingToggleVacancyId(vacancy.id)
         try {
           await toggleVacancyStatus(vacancy)
-          showSuccess(`Vacante ${isClosing ? 'cerrada' : 'activada'} exitosamente`)
+          showSuccess(`Vacante ${isClosing ? 'desactivada' : 'activada'} exitosamente`)
           addNotification(
             'Estado de vacante actualizado',
-            `La vacante "${vacancy.title}" fue ${isClosing ? 'cerrada' : 'activada'}.`,
+            `La vacante "${vacancy.title}" fue ${isClosing ? 'desactivada' : 'activada'}.`,
             'info',
             {
               label: 'Ver vacantes',
@@ -1266,7 +1275,7 @@ export default function AdminDashboard() {
           )
         } catch (error) {
           console.error('Error toggling status:', error)
-          showError('Error al cambiar el estado de la vacante')
+          showError(error instanceof Error ? error.message : 'Error al cambiar el estado de la vacante')
         } finally {
           setPendingToggleVacancyId(null)
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
@@ -1320,6 +1329,116 @@ export default function AdminDashboard() {
     })
   }
 
+  const handleOpenCreateCandidateModal = () => {
+    setCandidateFormData(EMPTY_CANDIDATE_FORM)
+    setEditingCandidate(null)
+    setShowCreateCandidateModal(true)
+  }
+
+  const handleOpenEditCandidateModal = (candidate: CandidateSummary) => {
+    setCandidateFormData({
+      candidateName: candidate.candidateName,
+      email: candidate.email,
+      phone: candidate.phone,
+      notes: ''
+    })
+    setEditingCandidate(candidate)
+    setShowCreateCandidateModal(true)
+  }
+
+  const handleCloseCreateCandidateModal = () => {
+    setShowCreateCandidateModal(false)
+    setEditingCandidate(null)
+    setCandidateFormData(EMPTY_CANDIDATE_FORM)
+  }
+
+  const handleSubmitCandidate = (event: React.FormEvent) => {
+    event.preventDefault()
+
+    const candidateName = candidateFormData.candidateName.trim()
+    const email = candidateFormData.email.trim()
+    const phone = candidateFormData.phone.trim()
+    const notes = candidateFormData.notes.trim()
+
+    if (!candidateName || !email || !phone) {
+      showError('Nombre, email y teléfono son obligatorios.')
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError('Ingresá un email válido.')
+      return
+    }
+
+    openConfirmDialog({
+      isOpen: true,
+      title: editingCandidate ? 'Confirmar modificación de candidato' : 'Confirmar registro de candidato',
+      message: [
+        editingCandidate
+          ? 'Se actualizará la identidad del candidato en todas sus postulaciones asociadas:'
+          : 'Se registrará un candidato manual con estos datos:',
+        '',
+        `Nombre: ${candidateName}`,
+        `Email: ${email}`,
+        `Teléfono: ${phone}`,
+        editingCandidate
+          ? `Postulaciones afectadas: ${editingCandidate.applications.length}`
+          : 'Origen: Registro manual del administrador',
+        editingCandidate ? 'Se conservarán estados, vacantes y CVs asociados.' : (notes ? `Notas: ${notes}` : 'Notas: Sin observaciones')
+      ].join('\n'),
+      type: 'info',
+      confirmText: editingCandidate ? 'Confirmar modificación' : 'Registrar candidato',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          let notificationResourceId = ''
+
+          if (editingCandidate) {
+            const updatedApplications = await updateCandidate(editingCandidate.id, {
+                candidateName,
+                email,
+                phone
+              })
+            notificationResourceId = updatedApplications[0]?.id || ''
+          } else {
+            const createdCandidate = await createCandidate({
+                candidateName,
+                email,
+                phone,
+                notes: notes || undefined
+              })
+            notificationResourceId = createdCandidate.id
+          }
+          handleCloseCreateCandidateModal()
+          showSuccess(editingCandidate ? 'Candidato actualizado exitosamente' : 'Candidato registrado exitosamente')
+          addNotification(
+            editingCandidate ? 'Candidato actualizado' : 'Nuevo candidato',
+            editingCandidate
+              ? `Se actualizó la identidad de "${candidateName}".`
+              : `Se registró manualmente a "${candidateName}".`,
+            'success',
+            {
+              label: 'Ver postulaciones',
+              type: 'APPLICATION',
+              resourceId: notificationResourceId
+            }
+          )
+        } catch (error) {
+          console.error('Error saving candidate:', error)
+          showError(
+            error instanceof Error
+              ? error.message
+              : editingCandidate
+                ? 'Error al actualizar el candidato'
+                : 'Error al registrar el candidato'
+          )
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      }
+    })
+  }
+
   const handleSubmitVacancy = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
@@ -1351,50 +1470,87 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleStatusChange = async (applicationId: string, newStatus: Application['status']) => {
+  const handleStatusChange = (applicationId: string, newStatus: Application['status']) => {
     if (pendingApplicationStatusId) return
-    setPendingApplicationStatusId(applicationId)
-    try {
-      await updateApplicationStatus(applicationId, newStatus)
-      showSuccess('Estado actualizado exitosamente')
-      addNotification('Postulación actualizada', `Se cambió el estado a ${statusLabels[newStatus]}.`, 'info', {
-        label: 'Ver postulación',
-        type: 'APPLICATION',
-        resourceId: applicationId
-      })
-    } catch (error) {
-      console.error('Error updating application status:', error)
-      showError('Error al actualizar el estado')
-    } finally {
-      setPendingApplicationStatusId(null)
+
+    const application = applications.find((item) => item.id === applicationId)
+    if (!application) {
+      showError('No se encontró la postulación seleccionada.')
+      return
     }
+
+    if (application.status === newStatus) {
+      showInfo(`La postulación ya se encuentra en estado ${statusLabels[newStatus]}.`)
+      return
+    }
+
+    runConfirmedAction({
+      config: {
+        isOpen: true,
+        title: 'Confirmar cambio de estado',
+        message: buildApplicationStatusChangeSummary(application, newStatus),
+        type: 'warning',
+        confirmText: 'Confirmar cambio',
+        cancelText: 'Cancelar'
+      },
+      before: () => {
+        setPendingApplicationStatusId(applicationId)
+      },
+      action: async () => {
+        const updatedApplication = await updateApplicationStatus(applicationId, newStatus)
+        if (selectedApplication?.id === applicationId) {
+          setSelectedApplication(updatedApplication)
+          setShowApplicationDetail(false)
+        }
+      },
+      onSuccess: () => {
+        showSuccess('Estado actualizado exitosamente')
+        addNotification('Postulación actualizada', `Se cambió el estado a ${statusLabels[newStatus]}.`, 'info', {
+          label: 'Ver postulación',
+          type: 'APPLICATION',
+          resourceId: applicationId
+        })
+      },
+      onError: (error) => {
+        console.error('Error updating application status:', error)
+        showError('Error al actualizar el estado')
+      },
+      after: () => {
+        setPendingApplicationStatusId(null)
+      }
+    })
   }
 
   const handleDeleteApplication = async (applicationId: string, candidateName: string) => {
     if (pendingDeleteApplicationId) return
-    openConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar postulación',
-      message: `¿Estás seguro de eliminar la postulación de "${candidateName}"?\n\nEsta acción no se puede deshacer.`,
-      type: 'danger',
-      confirmText: 'Eliminar postulación',
-      onConfirm: async () => {
+    runConfirmedAction({
+      config: {
+        isOpen: true,
+        title: 'Eliminar postulación',
+        message: `¿Estás seguro de eliminar la postulación de "${candidateName}"?\n\nEsta acción no se puede deshacer.`,
+        type: 'danger',
+        confirmText: 'Eliminar postulación'
+      },
+      before: () => {
         setPendingDeleteApplicationId(applicationId)
-        try {
-          await deleteApplicationApi(applicationId)
-          showSuccess('Postulación eliminada exitosamente')
-          addNotification('Postulación eliminada', `Se eliminó la postulación de "${candidateName}".`, 'warning')
-          if (selectedApplication?.id === applicationId) {
-            setShowApplicationDetail(false)
-            setSelectedApplication(null)
-          }
-        } catch (error) {
-          console.error('Error deleting application:', error)
-          showError('Error al eliminar la postulación')
-        } finally {
-          setPendingDeleteApplicationId(null)
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+      },
+      action: async () => {
+        await deleteApplicationApi(applicationId)
+        if (selectedApplication?.id === applicationId) {
+          setShowApplicationDetail(false)
+          setSelectedApplication(null)
         }
+      },
+      onSuccess: () => {
+        showSuccess('Postulación eliminada exitosamente')
+        addNotification('Postulación eliminada', `Se eliminó la postulación de "${candidateName}".`, 'warning')
+      },
+      onError: (error) => {
+        console.error('Error deleting application:', error)
+        showError('Error al eliminar la postulación')
+      },
+      after: () => {
+        setPendingDeleteApplicationId(null)
       }
     })
   }
@@ -1439,28 +1595,76 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleExportCandidatesCsv = async () => {
+    if (isExportingCandidatesCsv) return
+    setIsExportingCandidatesCsv(true)
+    try {
+      await downloadCandidatesCsv({
+        search: searchCandidates.trim() || undefined
+      })
+      showSuccess('CSV de candidatos exportado correctamente.')
+    } catch (error) {
+      console.error('Error exportando candidatos CSV', error)
+      showError('No se pudo exportar el CSV de candidatos.')
+    } finally {
+      setIsExportingCandidatesCsv(false)
+    }
+  }
+
   const handleContactStatusChange = async (contactId: string, newStatus: Contact['status']) => {
     if (pendingContactStatusId) return
-    setPendingContactStatusId(contactId)
-    try {
-      await updateContactStatus(contactId, newStatus)
-      showSuccess('Estado del contacto actualizado')
-      addNotification(
-        'Contacto actualizado',
-        `Se cambió el estado del contacto a ${contactStatusLabels[newStatus]}.`,
-        'info',
-        {
-          label: 'Ver contacto',
-          type: 'CONTACT',
-          resourceId: contactId
-        }
-      )
-    } catch (error) {
-      console.error('Error al actualizar estado del contacto:', error)
-      showError('Error al actualizar el estado del contacto')
-    } finally {
-      setPendingContactStatusId(null)
+
+    const contact = contacts.find((item) => item.id === contactId)
+    if (!contact) {
+      showError('No se encontró el contacto seleccionado.')
+      return
     }
+
+    if (contact.status === newStatus) {
+      showInfo(`El contacto ya se encuentra en estado ${contactStatusLabels[newStatus]}.`)
+      return
+    }
+
+    runConfirmedAction({
+      config: {
+        isOpen: true,
+        title: 'Confirmar gestión de contacto',
+        message: buildContactStatusChangeSummary(contact, newStatus),
+        type: 'warning',
+        confirmText: 'Confirmar cambio',
+        cancelText: 'Cancelar'
+      },
+      before: () => {
+        setPendingContactStatusId(contactId)
+      },
+      action: async () => {
+        const updatedContact = await updateContactStatus(contactId, newStatus)
+        if (selectedContact?.id === contactId) {
+          setSelectedContact(updatedContact)
+          setShowContactDetail(false)
+        }
+      },
+      onSuccess: () => {
+        showSuccess('Estado del contacto actualizado')
+        addNotification(
+          'Contacto actualizado',
+          `Se cambió el estado del contacto a ${contactStatusLabels[newStatus]}.`,
+          'info',
+          {
+            label: 'Ver contacto',
+            type: 'CONTACT',
+            resourceId: contactId
+          }
+        )
+      },
+      onError: (error) => {
+        console.error('Error al actualizar estado del contacto:', error)
+        showError('Error al actualizar el estado del contacto')
+      },
+      after: () => {
+        setPendingContactStatusId(null)
+      }
+    })
   }
 
   const handleViewContactDetails = (contact: Contact) => {
@@ -1469,25 +1673,30 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteContact = async (contactId: string, contactName: string) => {
-    openConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar contacto',
-      message: `¿Estás seguro de eliminar el contacto de "${contactName}"?\n\nEsta acción no se puede deshacer.`,
-      type: 'danger',
-      confirmText: 'Eliminar contacto',
-      onConfirm: async () => {
+    runConfirmedAction({
+      config: {
+        isOpen: true,
+        title: 'Eliminar contacto',
+        message: `¿Estás seguro de eliminar el contacto de "${contactName}"?\n\nEsta acción no se puede deshacer.`,
+        type: 'danger',
+        confirmText: 'Eliminar contacto'
+      },
+      before: () => {
         setPendingDeleteContactId(contactId)
-        try {
-          await deleteContactApi(contactId)
-          showSuccess('Contacto eliminado exitosamente')
-          addNotification('Contacto eliminado', `Se eliminó el contacto de "${contactName}".`, 'warning')
-        } catch (error) {
-          console.error('Error al eliminar contacto:', error)
-          showError('Error al eliminar el contacto')
-        } finally {
-          setPendingDeleteContactId(null)
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
-        }
+      },
+      action: async () => {
+        await deleteContactApi(contactId)
+      },
+      onSuccess: () => {
+        showSuccess('Contacto eliminado exitosamente')
+        addNotification('Contacto eliminado', `Se eliminó el contacto de "${contactName}".`, 'warning')
+      },
+      onError: (error) => {
+        console.error('Error al eliminar contacto:', error)
+        showError('Error al eliminar el contacto')
+      },
+      after: () => {
+        setPendingDeleteContactId(null)
       }
     })
   }
@@ -1510,6 +1719,38 @@ export default function AdminDashboard() {
   const openConfirmDialog = (config: ConfirmDialogConfig) => {
     setIsConfirmLoading(false)
     setConfirmDialog(config)
+  }
+
+  const runConfirmedAction = ({
+    config,
+    before,
+    action,
+    onSuccess,
+    onError,
+    after
+  }: {
+    config: Omit<ConfirmDialogConfig, 'onConfirm'>
+    before?: () => void
+    action: () => Promise<void>
+    onSuccess?: () => void
+    onError: (error: unknown) => void
+    after?: () => void
+  }) => {
+    openConfirmDialog({
+      ...config,
+      onConfirm: async () => {
+        before?.()
+        try {
+          await action()
+          onSuccess?.()
+        } catch (error) {
+          onError(error)
+        } finally {
+          after?.()
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      }
+    })
   }
 
   const handleSignOut = () => {
@@ -1552,6 +1793,7 @@ export default function AdminDashboard() {
     const tutorialByTab: Record<AdminTab, TutorialKind> = {
       vacancies: 'vacancies',
       applications: 'applications',
+      candidates: 'applications',
       contacts: 'contacts',
       settings: 'vacancies'
     }
@@ -1766,12 +2008,6 @@ export default function AdminDashboard() {
       : ''
   const guidedModalZClass = isGuidedMode ? 'z-[73]' : 'z-50'
 
-  const contactStatusLabels = {
-    'PENDING': 'Pendiente',
-    'RESPONDED': 'Respondido',
-    'ARCHIVED': 'Archivado'
-  }
-
   const contactStatusColors = {
     'PENDING': 'bg-yellow-100 text-yellow-800',
     'RESPONDED': 'bg-green-100 text-green-800',
@@ -1800,13 +2036,7 @@ const handleTestSentry = () => {
   }
 }
 
-  const statusLabels = {
-    'PENDING': 'Pendiente',
-    'REVIEWING': 'En Revisión',
-    'INTERVIEWED': 'Entrevistado',
-    'ACCEPTED': 'Aceptado',
-    'REJECTED': 'Rechazado'
-  }
+  const statusLabels = applicationStatusLabels
 
   const statusColors = {
     'PENDING': 'bg-yellow-100 text-yellow-800',
@@ -1906,6 +2136,7 @@ const handleTestSentry = () => {
           stats={{
             activeVacancies: stats.activeVacancies,
             pendingApplications: applications.filter(a => a.status === 'PENDING').length,
+            totalCandidates: candidates.length,
             pendingContacts: stats.pendingContacts
           }}
         />
@@ -1969,6 +2200,25 @@ const handleTestSentry = () => {
               void handleExportApplicationsCsv()
             }}
             isExportingCsv={isExportingApplicationsCsv}
+          />
+        )}
+
+        {activeTab === 'candidates' && (
+          <AdminCandidatesSection
+            candidates={candidates}
+            filteredCandidates={filteredCandidates}
+            paginatedCandidates={paginatedCandidates}
+            currentCandidatePage={currentCandidatePage}
+            itemsPerPage={itemsPerPage}
+            setCurrentCandidatePage={setCurrentCandidatePage}
+            searchCandidates={searchCandidates}
+            setSearchCandidates={setSearchCandidates}
+            onOpenCreateCandidate={handleOpenCreateCandidateModal}
+            onEditCandidate={handleOpenEditCandidateModal}
+            onExportCsv={() => {
+              void handleExportCandidatesCsv()
+            }}
+            isExportingCsv={isExportingCandidatesCsv}
           />
         )}
 
@@ -2115,7 +2365,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleContactStatusChange(selectedContact.id, 'PENDING')
-                      setShowContactDetail(false)
                     }}
                     className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
                   >
@@ -2124,7 +2373,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleContactStatusChange(selectedContact.id, 'RESPONDED')
-                      setShowContactDetail(false)
                     }}
                     className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors font-medium"
                   >
@@ -2133,7 +2381,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleContactStatusChange(selectedContact.id, 'ARCHIVED')
-                      setShowContactDetail(false)
                     }}
                     className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors font-medium"
                   >
@@ -2248,7 +2495,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'PENDING')
-                      setShowApplicationDetail(false)
                     }}
                     className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
                   >
@@ -2257,7 +2503,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'REVIEWING')
-                      setShowApplicationDetail(false)
                     }}
                     className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors font-medium"
                   >
@@ -2266,7 +2511,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'INTERVIEWED')
-                      setShowApplicationDetail(false)
                     }}
                     className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors font-medium"
                   >
@@ -2275,7 +2519,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'ACCEPTED')
-                      setShowApplicationDetail(false)
                     }}
                     className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors font-medium"
                   >
@@ -2284,7 +2527,6 @@ const handleTestSentry = () => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedApplication.id, 'REJECTED')
-                      setShowApplicationDetail(false)
                     }}
                     className="px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 transition-colors font-medium"
                   >
@@ -2304,6 +2546,138 @@ const handleTestSentry = () => {
       )}
 
       {/* Create/Edit Modal */}
+      {showCreateCandidateModal && (
+        <div
+          className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
+          onClick={(event) => {
+            if (!isGuidedMode && event.target === event.currentTarget) {
+              handleCloseCreateCandidateModal()
+            }
+          }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+            <form onSubmit={handleSubmitCandidate} className="p-4 sm:p-6">
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Registrar candidato</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {editingCandidate
+                      ? 'La edición se aplicará a todas las postulaciones asociadas a esta identidad.'
+                      : 'Este alta crea una postulación manual sin vacante asociada.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseCreateCandidateModal}
+                  className="rounded-md px-2 text-2xl text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label="Cerrar formulario de candidato"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="candidateName" className="mb-1 block text-sm font-medium text-gray-700">
+                    Nombre y apellido *
+                  </label>
+                  <input
+                    id="candidateName"
+                    name="candidateName"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={candidateFormData.candidateName}
+                    onChange={(event) =>
+                      setCandidateFormData((prev) => ({ ...prev, candidateName: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                    placeholder="Ej: Ana Pérez"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="candidateEmail" className="mb-1 block text-sm font-medium text-gray-700">
+                      Email *
+                    </label>
+                    <input
+                      id="candidateEmail"
+                      name="candidateEmail"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={candidateFormData.email}
+                      onChange={(event) =>
+                        setCandidateFormData((prev) => ({ ...prev, email: event.target.value }))
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                      placeholder="ana@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="candidatePhone" className="mb-1 block text-sm font-medium text-gray-700">
+                      Teléfono *
+                    </label>
+                    <input
+                      id="candidatePhone"
+                      name="candidatePhone"
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={candidateFormData.phone}
+                      onChange={(event) =>
+                        setCandidateFormData((prev) => ({ ...prev, phone: event.target.value }))
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                      placeholder="+54 9 351 555-5555"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  {!editingCandidate && (
+                    <>
+                      <label htmlFor="candidateNotes" className="mb-1 block text-sm font-medium text-gray-700">
+                        Observaciones
+                      </label>
+                      <textarea
+                        id="candidateNotes"
+                        name="candidateNotes"
+                        rows={4}
+                        value={candidateFormData.notes}
+                        onChange={(event) =>
+                          setCandidateFormData((prev) => ({ ...prev, notes: event.target.value }))
+                        }
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                        placeholder="Origen del contacto, experiencia resumida o próxima acción."
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseCreateCandidateModal}
+                  className="w-full rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 sm:w-auto"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-full rounded-lg bg-primary-500 px-6 py-2 text-white transition-colors hover:bg-primary-600 sm:w-auto"
+                >
+                  {editingCandidate ? 'Revisar modificación' : 'Revisar y registrar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showCreateModal && (
         <div
           className={`fixed inset-0 ${guidedModalZClass} flex items-center justify-center p-4 ${isGuidedMode ? 'bg-black/40' : 'bg-black/55 backdrop-blur-sm'}`}
@@ -2417,22 +2791,29 @@ const handleTestSentry = () => {
                   </div>
                 </div>
 
-                {/* Salario */}
-                <div>
-                  <label htmlFor="salary" className="block text-sm font-medium text-gray-700 mb-1">
-                    Salario
-                  </label>
-                  <input
-                    type="text"
-                    id="salary"
-                    name="salary"
-                    autoComplete="off"
-                    value={formData.salary}
-                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                    placeholder="Ej: $1,500,000 - $2,000,000 o A convenir"
-                  />
-                </div>
+                {settingsLoaded && springVacancyMode && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    El backend Spring activo no admite salario ni beneficios en vacantes. Esos campos se ocultan para evitar rechazos al guardar.
+                  </p>
+                )}
+
+                {settingsLoaded && !springVacancyMode && (
+                  <div>
+                    <label htmlFor="salary" className="block text-sm font-medium text-gray-700 mb-1">
+                      Salario
+                    </label>
+                    <input
+                      type="text"
+                      id="salary"
+                      name="salary"
+                      autoComplete="off"
+                      value={formData.salary}
+                      onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                      placeholder="Ej: $1,500,000 - $2,000,000 o A convenir"
+                    />
+                  </div>
+                )}
 
                 {/* Descripción */}
                 <div>
@@ -2469,22 +2850,23 @@ const handleTestSentry = () => {
                   />
                 </div>
 
-                {/* Beneficios */}
-                <div>
-                  <label htmlFor="benefits" className="block text-sm font-medium text-gray-700 mb-1">
-                    Beneficios
-                  </label>
-                  <textarea
-                    id="benefits"
-                    name="benefits"
-                    autoComplete="off"
-                    rows={3}
-                    value={formData.benefits}
-                    onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
-                    placeholder="Trabajo remoto, capacitaciones, días libres, etc."
-                  />
-                </div>
+                {settingsLoaded && !springVacancyMode && (
+                  <div>
+                    <label htmlFor="benefits" className="block text-sm font-medium text-gray-700 mb-1">
+                      Beneficios
+                    </label>
+                    <textarea
+                      id="benefits"
+                      name="benefits"
+                      autoComplete="off"
+                      rows={3}
+                      value={formData.benefits}
+                      onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                      placeholder="Trabajo remoto, capacitaciones, días libres, etc."
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Botones */}

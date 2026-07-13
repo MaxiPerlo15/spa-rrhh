@@ -4,8 +4,19 @@ type AttemptState = {
   lockUntil: number
 }
 
+type AttemptLockResult = {
+  blocked: boolean
+  retryAfterSeconds: number
+  degraded?: boolean
+}
+
+type AttemptFailureResult = AttemptLockResult & {
+  failures: number
+}
+
 const RESET_AFTER_MS = 24 * 60 * 60 * 1000
 const RESET_AFTER_SECONDS = Math.ceil(RESET_AFTER_MS / 1000)
+const PRODUCTION_OUTAGE_RETRY_AFTER_SECONDS = 60
 
 const LOCK_RULES: Array<{ minFailures: number; lockMs: number }> = [
   { minFailures: 10, lockMs: 2 * 60 * 60 * 1000 },
@@ -15,12 +26,9 @@ const LOCK_RULES: Array<{ minFailures: number; lockMs: number }> = [
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN
-const isProduction = process.env.NODE_ENV === 'production'
 const isSharedStoreEnabled = Boolean(upstashUrl && upstashToken)
-const isStrictSharedStore = isProduction
 const isDevBypassEnabled =
   process.env.NODE_ENV === 'development' && process.env.AUTH_ATTEMPT_GUARD_DEV_BYPASS !== 'false'
-const SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS = 60
 
 const globalForAttemptGuard = globalThis as unknown as {
   authAttemptStore?: Map<string, AttemptState>
@@ -72,6 +80,21 @@ function getLockMsByFailures(failures: number) {
   return rule?.lockMs ?? 0
 }
 
+function buildProductionOutageLockResult(): AttemptLockResult {
+  return {
+    blocked: true,
+    retryAfterSeconds: PRODUCTION_OUTAGE_RETRY_AFTER_SECONDS,
+    degraded: true
+  }
+}
+
+function buildProductionOutageFailureResult(): AttemptFailureResult {
+  return {
+    ...buildProductionOutageLockResult(),
+    failures: 1
+  }
+}
+
 function getFreshState(key: string, now: number): AttemptState {
   const existing = authAttemptStore.get(key)
   if (!existing) {
@@ -85,7 +108,7 @@ function getFreshState(key: string, now: number): AttemptState {
   return existing
 }
 
-async function memoryGetAttemptLock(scope: string, identity: string) {
+async function memoryGetAttemptLock(scope: string, identity: string): Promise<AttemptLockResult> {
   const now = Date.now()
   const key = buildKey(scope, identity)
   const state = getFreshState(key, now)
@@ -103,7 +126,7 @@ async function memoryGetAttemptLock(scope: string, identity: string) {
   }
 }
 
-async function sharedGetAttemptLock(scope: string, identity: string) {
+async function sharedGetAttemptLock(scope: string, identity: string): Promise<AttemptLockResult> {
   const { lockKey } = buildSharedKeys(scope, identity)
   const ttlMs = await executeUpstashCommand<number>('PTTL', lockKey)
 
@@ -120,7 +143,7 @@ async function sharedGetAttemptLock(scope: string, identity: string) {
   }
 }
 
-export async function getAttemptLock(scope: string, identity: string) {
+export async function getAttemptLock(scope: string, identity: string): Promise<AttemptLockResult> {
   if (isDevBypassEnabled) {
     return {
       blocked: false,
@@ -132,27 +155,18 @@ export async function getAttemptLock(scope: string, identity: string) {
     try {
       return await sharedGetAttemptLock(scope, identity)
     } catch {
-      if (isStrictSharedStore) {
-        return {
-          blocked: true,
-          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
-        }
+      if (process.env.NODE_ENV === 'production') {
+        return buildProductionOutageLockResult()
       }
-      // fallback local solo en entorno no productivo
     }
-  }
-
-  if (isStrictSharedStore) {
-    return {
-      blocked: true,
-      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS
-    }
+  } else if (process.env.NODE_ENV === 'production') {
+    return buildProductionOutageLockResult()
   }
 
   return memoryGetAttemptLock(scope, identity)
 }
 
-async function memoryRecordAttemptFailure(scope: string, identity: string) {
+async function memoryRecordAttemptFailure(scope: string, identity: string): Promise<AttemptFailureResult> {
   const now = Date.now()
   const key = buildKey(scope, identity)
   const state = getFreshState(key, now)
@@ -182,7 +196,7 @@ async function memoryRecordAttemptFailure(scope: string, identity: string) {
   }
 }
 
-async function sharedRecordAttemptFailure(scope: string, identity: string) {
+async function sharedRecordAttemptFailure(scope: string, identity: string): Promise<AttemptFailureResult> {
   const { failureKey, lockKey } = buildSharedKeys(scope, identity)
   const failures = await executeUpstashCommand<number>('INCR', failureKey)
 
@@ -203,28 +217,17 @@ async function sharedRecordAttemptFailure(scope: string, identity: string) {
   }
 }
 
-export async function recordAttemptFailure(scope: string, identity: string) {
+export async function recordAttemptFailure(scope: string, identity: string): Promise<AttemptFailureResult> {
   if (isSharedStoreEnabled) {
     try {
       return await sharedRecordAttemptFailure(scope, identity)
     } catch {
-      if (isStrictSharedStore) {
-        return {
-          blocked: true,
-          retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS,
-          failures: 0
-        }
+      if (process.env.NODE_ENV === 'production') {
+        return buildProductionOutageFailureResult()
       }
-      // fallback local solo en entorno no productivo
     }
-  }
-
-  if (isStrictSharedStore) {
-    return {
-      blocked: true,
-      retryAfterSeconds: SHARED_STORE_UNAVAILABLE_RETRY_AFTER_SECONDS,
-      failures: 0
-    }
+  } else if (process.env.NODE_ENV === 'production') {
+    return buildProductionOutageFailureResult()
   }
 
   return memoryRecordAttemptFailure(scope, identity)
@@ -244,16 +247,12 @@ export async function clearAttemptFailures(scope: string, identity: string) {
   if (isSharedStoreEnabled) {
     try {
       await sharedClearAttemptFailures(scope, identity)
-      return
     } catch {
-      if (isStrictSharedStore) {
-        return
-      }
-      // fallback local solo en entorno no productivo
+      await memoryClearAttemptFailures(scope, identity)
+      return
     }
-  }
 
-  if (isStrictSharedStore) {
+    await memoryClearAttemptFailures(scope, identity)
     return
   }
 

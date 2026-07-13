@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   adminNotificationsListQuerySchema,
   createAdminNotificationSchema,
   formatValidationError
 } from '@/lib/apiValidation'
 import { toAdminNotificationDto, type AdminNotificationDtoSource } from '@/lib/dto/adminNotification'
-import { isMissingTableOrColumnError } from '@/lib/prismaError'
+import { canUseSchemaDriftFallback } from '@/lib/prismaError'
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,7 +46,10 @@ export async function GET(request: NextRequest) {
         take: limit
       })
     } catch (error) {
-      if (!isMissingTableOrColumnError(error)) throw error
+      if (!canUseSchemaDriftFallback(error)) throw error
+      logger.warn('Fallback temporal de lectura de notificaciones por schema drift', {
+        route: 'GET /api/admin/notifications'
+      })
       items = await prisma.adminNotification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -85,6 +89,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
     const body = await request.json()
     const bodyValidation = createAdminNotificationSchema.safeParse(body)
     if (!bodyValidation.success) {
@@ -104,7 +113,10 @@ export async function POST(request: NextRequest) {
         }
       })
     } catch (error) {
-      if (!isMissingTableOrColumnError(error)) throw error
+      if (!canUseSchemaDriftFallback(error)) throw error
+      logger.warn('Fallback temporal de creación de notificaciones por schema drift', {
+        route: 'POST /api/admin/notifications'
+      })
       created = await prisma.adminNotification.create({
         data: {
           title: bodyValidation.data.title,
@@ -134,6 +146,11 @@ export async function DELETE(request: NextRequest) {
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
     }
 
     const view = request.nextUrl.searchParams.get('view')

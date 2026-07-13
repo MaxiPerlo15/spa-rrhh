@@ -14,6 +14,7 @@ import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import { scrollToHashWithOffset } from '@/lib/hashScroll'
 import { consumeInternalHashNavigationIntent } from '@/lib/hashNavigationIntent'
 import { getVacancies } from '@/lib/api/vacancies'
+import { useCspNonce } from '@/contexts/CspNonceContext'
 
 interface Vacancy {
   id: string
@@ -29,6 +30,7 @@ interface Vacancy {
 }
 
 export default function Home() {
+  const nonce = useCspNonce()
   const [selectedApplicationTarget, setSelectedApplicationTarget] = useState<{
     mode: 'vacancy' | 'spontaneous'
     vacancyId?: string | null
@@ -123,6 +125,7 @@ export default function Home() {
       <Script
         id="schema-org"
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
@@ -298,11 +301,18 @@ export default function Home() {
         </section>
 
         {/* Modal de postulación */}
-        {selectedApplicationTarget && (
+        {selectedApplicationTarget?.mode === 'vacancy' && selectedApplicationTarget.vacancyId && (
           <PostularForm
             vacancyId={selectedApplicationTarget.vacancyId}
             vacancyTitle={selectedApplicationTarget.vacancyTitle}
-            mode={selectedApplicationTarget.mode}
+            mode="vacancy"
+            onClose={closeModal}
+          />
+        )}
+        {selectedApplicationTarget?.mode === 'spontaneous' && (
+          <PostularForm
+            vacancyTitle={selectedApplicationTarget.vacancyTitle}
+            mode="spontaneous"
             onClose={closeModal}
           />
         )}

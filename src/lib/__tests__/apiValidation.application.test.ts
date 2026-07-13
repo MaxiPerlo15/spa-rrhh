@@ -22,5 +22,35 @@ describe('createApplicationSchema', () => {
     const parsed = createApplicationSchema.safeParse(basePayload)
     expect(parsed.success).toBe(true)
   })
-})
 
+  it('rechaza metadata de CV incompleta', () => {
+    const parsed = createApplicationSchema.safeParse({
+      ...basePayload,
+      resumeUrl: 'https://utfs.io/f/cv.pdf'
+    })
+
+    expect(parsed.success).toBe(false)
+  })
+
+  it('rechaza resumeUrl fuera de UploadThing', () => {
+    const parsed = createApplicationSchema.safeParse({
+      ...basePayload,
+      resumeUrl: 'https://evil.example/cv.pdf',
+      resumeFileName: 'cv.pdf',
+      resumeKey: 'cv-key'
+    })
+
+    expect(parsed.success).toBe(false)
+  })
+
+  it('acepta metadata de CV válida desde UploadThing', () => {
+    const parsed = createApplicationSchema.safeParse({
+      ...basePayload,
+      resumeUrl: 'https://utfs.io/f/cv.pdf',
+      resumeFileName: 'cv.pdf',
+      resumeKey: 'cv-key'
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+})

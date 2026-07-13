@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatValidationError, updateAdminSettingsSchema } from '@/lib/apiValidation'
 import { logger } from '@/lib/logger'
-import { isMissingTableOrColumnError } from '@/lib/prismaError'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
+import { canUseSchemaDriftFallback } from '@/lib/prismaError'
+import { getBackendUrl } from '@/lib/server/springBackend'
 
 function toAdminSettingsResponse(input: {
   user: { id: string; email: string; name: string | null; role: string }
@@ -27,6 +29,9 @@ function toAdminSettingsResponse(input: {
       notifyNewApplications: input.settings.notifyNewApplications,
       notifyNewContacts: input.settings.notifyNewContacts,
       notifySecurityAlerts: input.settings.notifySecurityAlerts
+    },
+    backend: {
+      springVacanciesEnabled: Boolean(getBackendUrl())
     },
     updatedAt: input.settings.updatedAt.toISOString()
   }
@@ -69,7 +74,10 @@ export async function GET() {
         }
       })
     } catch (error) {
-      if (!isMissingTableOrColumnError(error)) throw error
+      if (!canUseSchemaDriftFallback(error)) throw error
+      logger.warn('Fallback temporal de AdminSettings por schema drift', {
+        route: 'GET /api/admin/settings'
+      })
       settings = {
         notificationsEnabled: true,
         notifyNewApplications: true,
@@ -91,6 +99,11 @@ export async function PATCH(request: NextRequest) {
     const session = await auth()
     if (!session?.user?.id || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
     }
 
     const body = await request.json()
@@ -143,7 +156,11 @@ export async function PATCH(request: NextRequest) {
           }
         })
       } catch (error) {
-        if (!isMissingTableOrColumnError(error)) throw error
+        if (!canUseSchemaDriftFallback(error)) throw error
+        logger.warn('Fallback temporal de AdminSettings por schema drift', {
+          route: 'PATCH /api/admin/settings',
+          userId: user.id
+        })
         settings = {
           notificationsEnabled: notificationsEnabled ?? true,
           notifyNewApplications: notifyNewApplications ?? true,

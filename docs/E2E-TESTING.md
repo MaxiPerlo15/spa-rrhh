@@ -29,7 +29,7 @@ tests/e2e/
 - ✅ Listar vacantes en panel admin
 - ✅ Crear nueva vacante
 - ✅ Editar vacante existente
-- ✅ Cambiar estado (ACTIVE ↔ CLOSED)
+- ✅ Cambiar estado (ACTIVE ↔ INACTIVE) y cierre operativo
 - ✅ Eliminar vacante con confirmación
 - ✅ Paginación de lista
 - ✅ Búsqueda por título
@@ -117,7 +117,8 @@ NEXTAUTH_SECRET="your-secret"
 
 # Credenciales del admin (para tests de login)
 ADMIN_EMAIL="admin@sparrhh.com"
-ADMIN_PASSWORD="ChangeMe123!"
+# Use the unique password configured for the seeded admin; no shared default is provided.
+ADMIN_PASSWORD="your-local-admin-password"
 
 # URL base para tests (opcional)
 E2E_BASE_URL="http://localhost:3000"

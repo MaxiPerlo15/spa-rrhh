@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { auditAdminAction } from '@/lib/adminAudit'
+import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   formatValidationError,
   routeIdSchema,
   updateContactStatusSchema
 } from '@/lib/apiValidation'
 import { toContactAdminDto } from '@/lib/dto/contact'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
 interface RouteParams {
   params: Promise<{
     id: string
@@ -34,28 +35,54 @@ export async function GET(
       )
     }
 
-    const contact = await prisma.contact.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        subject: true,
-        message: true,
-        status: true,
-        createdAt: true
-      }
-    })
-
-    if (!contact) {
+    const backendUrl = getBackendUrl()
+    if (!backendUrl) {
       return NextResponse.json(
-        { error: 'Contacto no encontrado' },
-        { status: 404 }
+        { error: 'Spring backend not configured' },
+        { status: 503 }
       )
     }
 
-    return NextResponse.json(toContactAdminDto(contact))
+    let springResponse: Response
+    try {
+      springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
+        method: 'GET',
+        headers: getSpringBackendHeaders()
+      })
+    } catch (error) {
+      logger.error('Spring backend unreachable for contact detail', error)
+      return NextResponse.json(
+        { error: 'Spring backend unavailable' },
+        { status: 503 }
+      )
+    }
+
+    if (!springResponse.ok) {
+      try {
+        const errorJson = await springResponse.json()
+        return NextResponse.json(errorJson, { status: springResponse.status })
+      } catch {
+        const errorBody = await springResponse.text()
+        return NextResponse.json(
+          { error: errorBody || 'Error al obtener contacto' },
+          { status: springResponse.status }
+        )
+      }
+    }
+
+    const contact = await springResponse.json()
+    return NextResponse.json(
+      toContactAdminDto({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        subject: contact.subject,
+        message: contact.message,
+        status: contact.status,
+        createdAt: contact.createdAt
+      })
+    )
   } catch (error) {
     logger.error('Error al obtener contacto', error)
     return NextResponse.json(
@@ -98,35 +125,58 @@ export async function PATCH(
       )
     }
 
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
+
     const body = await request.json()
     const bodyValidation = updateContactStatusSchema.safeParse(body)
     if (!bodyValidation.success) {
       return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
     }
     const { status } = bodyValidation.data
-    const previous = await prisma.contact.findUnique({
-      where: { id },
-      select: {
-        status: true,
-        email: true,
-        subject: true
-      }
-    })
 
-    const contact = await prisma.contact.update({
-      where: { id },
-      data: { status },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        subject: true,
-        message: true,
-        status: true,
-        createdAt: true
+    const backendUrl = getBackendUrl()
+    if (!backendUrl) {
+      return NextResponse.json(
+        { error: 'Spring backend not configured' },
+        { status: 503 }
+      )
+    }
+
+    let springResponse: Response
+    try {
+      springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getSpringBackendHeaders()
+        },
+        body: JSON.stringify({ status })
+      })
+    } catch (error) {
+      logger.error('Spring backend unreachable for contact status update', error)
+      return NextResponse.json(
+        { error: 'Spring backend unavailable' },
+        { status: 503 }
+      )
+    }
+
+    if (!springResponse.ok) {
+      try {
+        const errorJson = await springResponse.json()
+        return NextResponse.json(errorJson, { status: springResponse.status })
+      } catch {
+        const errorBody = await springResponse.text()
+        return NextResponse.json(
+          { error: errorBody || 'Error al actualizar contacto' },
+          { status: springResponse.status }
+        )
       }
-    })
+    }
+
+    const contact = await springResponse.json()
 
     await auditAdminAction({
       request,
@@ -139,14 +189,22 @@ export async function PATCH(
       resourceId: id,
       outcome: 'SUCCESS',
       metadata: {
-        previousStatus: previous?.status,
-        newStatus: status,
-        contactEmail: previous?.email,
-        subject: previous?.subject
+        newStatus: status
       }
     })
 
-    return NextResponse.json(toContactAdminDto(contact))
+    return NextResponse.json(
+      toContactAdminDto({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        subject: contact.subject,
+        message: contact.message,
+        status: contact.status,
+        createdAt: contact.createdAt
+      })
+    )
   } catch (error) {
     await auditAdminAction({
       request,
@@ -203,18 +261,45 @@ export async function DELETE(
       )
     }
 
-    const existing = await prisma.contact.findUnique({
-      where: { id },
-      select: {
-        email: true,
-        status: true,
-        subject: true
-      }
-    })
+    const originRejection = rejectIfUntrustedOrigin(request)
+    if (originRejection) {
+      return originRejection
+    }
 
-    await prisma.contact.delete({
-      where: { id }
-    })
+    const backendUrl = getBackendUrl()
+    if (!backendUrl) {
+      return NextResponse.json(
+        { error: 'Spring backend not configured' },
+        { status: 503 }
+      )
+    }
+
+    let springResponse: Response
+    try {
+      springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
+        method: 'DELETE',
+        headers: getSpringBackendHeaders()
+      })
+    } catch (error) {
+      logger.error('Spring backend unreachable for contact delete', error)
+      return NextResponse.json(
+        { error: 'Spring backend unavailable' },
+        { status: 503 }
+      )
+    }
+
+    if (!springResponse.ok) {
+      try {
+        const errorJson = await springResponse.json()
+        return NextResponse.json(errorJson, { status: springResponse.status })
+      } catch {
+        const errorBody = await springResponse.text()
+        return NextResponse.json(
+          { error: errorBody || 'Error al eliminar contacto' },
+          { status: springResponse.status }
+        )
+      }
+    }
 
     await auditAdminAction({
       request,
@@ -225,12 +310,7 @@ export async function DELETE(
       action: 'contact.delete',
       resourceType: 'contact',
       resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        contactEmail: existing?.email,
-        previousStatus: existing?.status,
-        subject: existing?.subject
-      }
+      outcome: 'SUCCESS'
     })
 
     return NextResponse.json({ message: 'Contacto eliminado' })

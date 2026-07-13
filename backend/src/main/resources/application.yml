@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: rrhh-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/spa_rrhh_db
+    username: maxiperlo
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  session:
+    timeout: 30m
+    cookie:
+      name: SESSIONID
+      http-only: true
+      secure: true
+      same-site: lax
+
+server:
+  port: 8080
+
+rrhh:
+  security:
+    # Required from the environment; do not commit a default token.
+    internal-api-token: ${RRHH_SECURITY_INTERNAL_API_TOKEN}
+    allow-unauthenticated-mutations: false

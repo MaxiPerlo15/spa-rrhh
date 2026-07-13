@@ -7,6 +7,7 @@ import { ApiRequestError } from './errors'
 
 export interface Application {
   id: string
+  candidateId: string
   candidateName: string
   email: string
   phone: string
@@ -41,6 +42,28 @@ export interface ApplicationsExportFilters {
   vacancyId?: string
   sortBy?: 'submittedAt' | 'candidateName' | 'status'
   sortDirection?: 'asc' | 'desc'
+}
+
+export interface CandidatesExportFilters {
+  search?: string
+}
+
+export interface CreateApplicationResponse {
+  message: string
+  applicationId: string
+}
+
+export interface CreateAdminCandidateData {
+  candidateName: string
+  email: string
+  phone: string
+  notes?: string
+}
+
+export interface UpdateAdminCandidateData {
+  candidateName: string
+  email: string
+  phone: string
 }
 
 type ApiValidationError = {
@@ -90,7 +113,7 @@ export async function getApplicationById(id: string): Promise<Application> {
 /**
  * Crea una nueva postulación
  */
-export async function createApplication(data: CreateApplicationData): Promise<Application> {
+export async function createApplication(data: CreateApplicationData): Promise<CreateApplicationResponse> {
   const response = await apiFetch('/api/applications', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -99,9 +122,48 @@ export async function createApplication(data: CreateApplicationData): Promise<Ap
   
   if (!response.ok) {
     const payload = await getApiErrorPayload(response, 'Error al crear la postulación')
-    throw new ApiRequestError(payload.message, response.status, payload.code)
+    throw new ApiRequestError(payload.message, {
+      status: response.status,
+      code: payload.code
+    })
   }
   
+  return response.json()
+}
+
+export async function createAdminCandidate(data: CreateAdminCandidateData): Promise<Application> {
+  const response = await apiFetch('/api/admin/candidates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    const payload = await getApiErrorPayload(response, 'Error al registrar el candidato')
+    throw new ApiRequestError(payload.message, {
+      status: response.status,
+      code: payload.code
+    })
+  }
+
+  return response.json()
+}
+
+export async function updateAdminCandidate(id: string, data: UpdateAdminCandidateData): Promise<Application[]> {
+  const response = await apiFetch(`/api/admin/candidates/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    const payload = await getApiErrorPayload(response, 'Error al actualizar el candidato')
+    throw new ApiRequestError(payload.message, {
+      status: response.status,
+      code: payload.code
+    })
+  }
+
   return response.json()
 }
 
@@ -159,6 +221,29 @@ export async function downloadApplicationsCsv(filters: ApplicationsExportFilters
   const anchor = document.createElement('a')
   anchor.href = objectUrl
   anchor.download = `postulaciones-${date}.csv`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export async function downloadCandidatesCsv(filters: CandidatesExportFilters): Promise<void> {
+  const params = new URLSearchParams()
+  if (filters.search) params.set('search', filters.search)
+
+  const query = params.toString() ? `?${params.toString()}` : ''
+  const response = await apiFetch(`/api/admin/candidates/export${query}`)
+
+  if (!response.ok) {
+    throw new Error('Error al exportar candidatos')
+  }
+
+  const blob = await response.blob()
+  const date = new Date().toISOString().slice(0, 10)
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = `candidatos-${date}.csv`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
