@@ -3,8 +3,10 @@ package com.meinardi.rrhh.presentation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +18,7 @@ import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.infrastructure.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -149,22 +152,33 @@ class AuthControllerTest {
   // --- POST /api/v1/auth/logout ---
 
   @Test
-  void logoutReturns204AndInvalidatesSession() throws Exception {
-    when(sessionService.validateSession(any(HttpServletRequest.class)))
+  void logoutReturns204AndClearsTheBrowserSessionCookie() throws Exception {
+    when(sessionService.validateSession(any(HttpServletRequest.class), any(HttpServletResponse.class)))
         .thenReturn(Optional.of(testUsuario));
+    doAnswer(invocation -> {
+          invocation.getArgument(1, HttpServletResponse.class).addHeader("Set-Cookie", "SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+          return null;
+        })
+        .when(sessionService)
+        .invalidateSession(any(HttpServletRequest.class), any(HttpServletResponse.class));
 
-    mockMvc.perform(post("/api/v1/auth/logout")).andExpect(status().isNoContent());
+    mockMvc
+        .perform(post("/api/v1/auth/logout"))
+        .andExpect(status().isNoContent())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string("Set-Cookie", containsString("SESSIONID=")));
 
-    verify(sessionService).invalidateSession(any(HttpServletRequest.class));
+    verify(sessionService).invalidateSession(any(HttpServletRequest.class), any(HttpServletResponse.class));
   }
 
   @Test
   void logoutReturns401WhenNoSession() throws Exception {
-    when(sessionService.validateSession(any(HttpServletRequest.class)))
+    when(sessionService.validateSession(any(HttpServletRequest.class), any(HttpServletResponse.class)))
         .thenReturn(Optional.empty());
 
     mockMvc.perform(post("/api/v1/auth/logout")).andExpect(status().isUnauthorized());
 
-    verify(sessionService, never()).invalidateSession(any());
+    verify(sessionService, never()).invalidateSession(any(), any());
   }
 }

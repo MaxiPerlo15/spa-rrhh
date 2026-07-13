@@ -11,10 +11,13 @@ import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.infrastructure.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class SessionServiceTest {
 
@@ -26,7 +29,7 @@ class SessionServiceTest {
   @BeforeEach
   void setUp() {
     usuarioRepository = mock(UsuarioRepository.class);
-    sessionService = new SessionService(usuarioRepository);
+    sessionService = new SessionService(usuarioRepository, true);
 
     Permiso permiso = new Permiso("p1", "vacancies:read", "Read vacancies");
     testRol = new Rol("r1", "ADMIN", "Administrator", Set.of(permiso));
@@ -113,6 +116,18 @@ class SessionServiceTest {
     verify(httpSession).removeAttribute(SessionService.SESSION_USER_ID_KEY);
     verify(httpSession).removeAttribute(SessionService.SESSION_AUTHORIZATION_FINGERPRINT_KEY);
     verify(httpSession).invalidate();
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"true|SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure", "false|SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"}, delimiter = '|')
+  void invalidateSessionClearsTheConfiguredServletSessionCookie(boolean secure, String expectedCookie) {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(request.getSession(false)).thenReturn(mock(HttpSession.class));
+
+    new SessionService(usuarioRepository, secure).invalidateSession(request, response);
+
+    verify(response).addHeader("Set-Cookie", expectedCookie);
   }
 
   @Test

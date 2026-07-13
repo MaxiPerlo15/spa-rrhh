@@ -4,6 +4,7 @@ import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.infrastructure.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -58,12 +59,12 @@ public class AuthController {
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<Void> logout(HttpServletRequest request) {
+  public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
     return sessionService
-        .validateSession(request)
+        .validateSession(request, response)
         .map(
             usuario -> {
-              sessionService.invalidateSession(request);
+              sessionService.invalidateSession(request, response);
               return ResponseEntity.noContent().<Void>build();
             })
         .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());

@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,9 +20,13 @@ public class SessionService {
   static final String SESSION_AUTHORIZATION_FINGERPRINT_KEY = "authorizationFingerprint";
 
   private final UsuarioRepository usuarioRepository;
+  private final boolean sessionCookieSecure;
 
-  public SessionService(UsuarioRepository usuarioRepository) {
+  public SessionService(
+      UsuarioRepository usuarioRepository,
+      @Value("${server.servlet.session.cookie.secure:true}") boolean sessionCookieSecure) {
     this.usuarioRepository = usuarioRepository;
+    this.sessionCookieSecure = sessionCookieSecure;
   }
 
   public void createSession(HttpServletRequest request, Usuario usuario) {
@@ -69,10 +74,14 @@ public class SessionService {
       session.removeAttribute(SESSION_AUTHORIZATION_FINGERPRINT_KEY);
       session.invalidate();
       if (response != null) {
-        response.addHeader(
-            "Set-Cookie", "SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+        response.addHeader("Set-Cookie", expiredSessionCookie());
       }
     }
+  }
+
+  private String expiredSessionCookie() {
+    return "SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+        + (sessionCookieSecure ? "; Secure" : "");
   }
 
   static String authorizationFingerprint(Usuario usuario) {
