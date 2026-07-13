@@ -1,8 +1,9 @@
-spring:
-  session:
-    cookie:
-      # Only enabled when SPRING_PROFILES_ACTIVE=local is explicitly set.
-      secure: false
+server:
+  servlet:
+    session:
+      cookie:
+        # Only enabled when SPRING_PROFILES_ACTIVE=local is explicitly set.
+        secure: false
 
 rrhh:
   security:

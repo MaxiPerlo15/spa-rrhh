@@ -23,6 +23,9 @@ public class Usuario {
   @JoinColumn(name = "rol_id")
   private Rol rol;
 
+  @Column(nullable = false)
+  private boolean enabled = true;
+
   private String passwordResetToken;
 
   private Instant passwordResetTokenExpiry;
@@ -47,6 +50,8 @@ public class Usuario {
   public void setNombreUsuario(String nombreUsuario) { this.nombreUsuario = nombreUsuario; }
   public Rol getRol() { return rol; }
   public void setRol(Rol rol) { this.rol = rol; }
+  public boolean isEnabled() { return enabled; }
+  public void setEnabled(boolean enabled) { this.enabled = enabled; }
   public String getPasswordResetToken() { return passwordResetToken; }
   public void setPasswordResetToken(String passwordResetToken) { this.passwordResetToken = passwordResetToken; }
   public Instant getPasswordResetTokenExpiry() { return passwordResetTokenExpiry; }

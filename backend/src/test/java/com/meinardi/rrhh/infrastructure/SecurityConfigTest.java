@@ -3,6 +3,9 @@ package com.meinardi.rrhh.infrastructure;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.ApplicationAdminInputBoundary;
@@ -17,12 +20,21 @@ import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import com.meinardi.rrhh.presentation.AuthController;
+import com.meinardi.rrhh.domain.model.Permiso;
+import com.meinardi.rrhh.domain.model.Rol;
+import com.meinardi.rrhh.domain.model.Usuario;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -66,5 +78,31 @@ class SecurityConfigTest {
   @Test
   void logoutEndpointIsRegistered() throws Exception {
     mockMvc.perform(post("/api/v1/auth/logout")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void filterInstallsPermissionAuthoritiesAndClearsTheHolderAfterTheRequest() throws Exception {
+    SessionService sessionService = mock(SessionService.class);
+    Usuario usuario =
+        new Usuario(
+            "u1",
+            "admin@test.com",
+            "hashed-password",
+            "admin_user",
+            new Rol("r1", "ADMIN", "Administrator", Set.of(new Permiso("p1", "admin:access", "Admin access"))));
+    when(sessionService.validateSession(org.mockito.ArgumentMatchers.any(HttpServletRequest.class), org.mockito.ArgumentMatchers.any(HttpServletResponse.class)))
+        .thenReturn(Optional.of(usuario));
+    SessionAuthenticationFilter filter = new SessionAuthenticationFilter(sessionService);
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    FilterChain chain =
+        (ignoredRequest, ignoredResponse) ->
+            assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+                .extracting("authority")
+                .containsExactly("admin:access");
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
   }
 }

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.meinardi.rrhh.domain.model.Permiso;
 import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
+import com.meinardi.rrhh.infrastructure.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.Set;
@@ -17,15 +18,15 @@ import org.junit.jupiter.api.Test;
 
 class SessionServiceTest {
 
-  private static final String SESSION_USER_KEY = "authenticatedUser";
-
   private SessionService sessionService;
+  private UsuarioRepository usuarioRepository;
   private Usuario testUsuario;
   private Rol testRol;
 
   @BeforeEach
   void setUp() {
-    sessionService = new SessionService();
+    usuarioRepository = mock(UsuarioRepository.class);
+    sessionService = new SessionService(usuarioRepository);
 
     Permiso permiso = new Permiso("p1", "vacancies:read", "Read vacancies");
     testRol = new Rol("r1", "ADMIN", "Administrator", Set.of(permiso));
@@ -34,14 +35,14 @@ class SessionServiceTest {
   }
 
   @Test
-  void createSessionStoresUserInHttpSession() {
+  void createSessionStoresAnAuthorizationFingerprintWithTheUserId() {
     HttpSession httpSession = mock(HttpSession.class);
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getSession(true)).thenReturn(httpSession);
-
     sessionService.createSession(request, testUsuario);
-
-    verify(httpSession).setAttribute(SESSION_USER_KEY, testUsuario);
+    verify(httpSession)
+        .setAttribute(SessionService.SESSION_AUTHORIZATION_FINGERPRINT_KEY, SessionService.authorizationFingerprint(testUsuario));
+    verify(httpSession).setAttribute(SessionService.SESSION_USER_ID_KEY, "u1");
   }
 
   @Test
@@ -49,7 +50,10 @@ class SessionServiceTest {
     HttpSession httpSession = mock(HttpSession.class);
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getSession(false)).thenReturn(httpSession);
-    when(httpSession.getAttribute(SESSION_USER_KEY)).thenReturn(testUsuario);
+    when(httpSession.getAttribute(SessionService.SESSION_USER_ID_KEY)).thenReturn("u1");
+    when(httpSession.getAttribute(SessionService.SESSION_AUTHORIZATION_FINGERPRINT_KEY))
+        .thenReturn(SessionService.authorizationFingerprint(testUsuario));
+    when(usuarioRepository.findById("u1")).thenReturn(java.util.Optional.of(testUsuario));
 
     var result = sessionService.validateSession(request);
 
@@ -73,11 +77,29 @@ class SessionServiceTest {
     HttpSession httpSession = mock(HttpSession.class);
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getSession(false)).thenReturn(httpSession);
-    when(httpSession.getAttribute(SESSION_USER_KEY)).thenReturn(null);
+    when(httpSession.getAttribute(SessionService.SESSION_USER_ID_KEY)).thenReturn(null);
 
     var result = sessionService.validateSession(request);
 
     assertThat(result).isEmpty();
+  }
+
+  @Test
+  void validateSessionInvalidatesWhenPermissionsChangeAfterLogin() {
+    HttpSession httpSession = mock(HttpSession.class);
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getSession(false)).thenReturn(httpSession);
+    when(httpSession.getAttribute(SessionService.SESSION_USER_ID_KEY)).thenReturn("u1");
+    when(httpSession.getAttribute(SessionService.SESSION_AUTHORIZATION_FINGERPRINT_KEY))
+        .thenReturn(SessionService.authorizationFingerprint(testUsuario));
+    Usuario changedUsuario =
+        new Usuario("u1", "admin@test.com", "hashed-password", "admin_user", new Rol("r1", "ADMIN", "Administrator", Set.of()));
+    when(usuarioRepository.findById("u1")).thenReturn(java.util.Optional.of(changedUsuario));
+
+    var result = sessionService.validateSession(request);
+
+    assertThat(result).isEmpty();
+    verify(httpSession).invalidate();
   }
 
   @Test
@@ -88,7 +110,8 @@ class SessionServiceTest {
 
     sessionService.invalidateSession(request);
 
-    verify(httpSession).removeAttribute(SESSION_USER_KEY);
+    verify(httpSession).removeAttribute(SessionService.SESSION_USER_ID_KEY);
+    verify(httpSession).removeAttribute(SessionService.SESSION_AUTHORIZATION_FINGERPRINT_KEY);
     verify(httpSession).invalidate();
   }
 
@@ -101,5 +124,4 @@ class SessionServiceTest {
 
     verify(request, never()).getSession(true);
   }
-
 }

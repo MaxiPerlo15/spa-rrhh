@@ -1,9 +1,12 @@
 package com.meinardi.rrhh.infrastructure;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.ApplicationAdminInputBoundary;
@@ -17,8 +20,12 @@ import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
+import com.meinardi.rrhh.domain.model.Rol;
+import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.presentation.ApplicationRestController;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,10 +35,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpSession;
+import java.util.Optional;
+import java.util.Set;
 
 @WebMvcTest(ApplicationRestController.class)
 @AutoConfigureMockMvc(addFilters = true)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
     properties = {
       "rrhh.security.internal-api-token=test-api-token-123",
@@ -46,7 +57,6 @@ class SecurityConfigApplicationRoutesTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockitoBean private SessionService sessionService;
   @MockitoBean private com.meinardi.rrhh.infrastructure.UsuarioRepository usuarioRepository;
   @MockitoBean private PasswordEncoder passwordEncoder;
   @MockitoBean private CreateVacancyInputBoundary createVacancyInputBoundary;
@@ -60,6 +70,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private ApplicationListInputBoundary applicationListInputBoundary;
   @MockitoBean private ApplicationAdminInputBoundary applicationAdminInputBoundary;
   @MockitoBean private PasswordResetService passwordResetService;
+  @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
 
@@ -134,5 +145,78 @@ class SecurityConfigApplicationRoutesTest {
         .perform(
             get("/api/v1/applications").header("X-Backend-Api-Key", INVALID_TOKEN))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void adminRouteReturnsJson401WhenThereIsNoValidSession() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/admin/notifications"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+  }
+
+  @Test
+  void adminRoleLabelWithoutThePermissionReturnsJson403() throws Exception {
+    Usuario administratorWithoutPermission = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1"))
+        .thenReturn(Optional.of(administratorWithoutPermission));
+
+    mockMvc
+        .perform(get("/api/v1/admin/notifications").session(sessionFor(administratorWithoutPermission)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"deleted", "disabled", "malformed", "fingerprint-stale"})
+  void invalidSessionIsInvalidatedExpiresCookieAndReturnsJson401(String condition) throws Exception {
+    MockHttpSession session = "malformed".equals(condition) ? new MockHttpSession() : sessionFor(administrator());
+    if ("malformed".equals(condition)) {
+      session.setAttribute("authenticatedUserId", "u1");
+    } else if ("deleted".equals(condition)) {
+      org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.empty());
+    } else {
+      Usuario user = administrator();
+      if ("disabled".equals(condition)) user.setEnabled(false);
+      else user.setRol(new Rol("r1", "ADMIN", "Administrator", Set.of()));
+      org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+    }
+    assertInvalidSession(session);
+  }
+
+  private Usuario administrator() {
+    return new Usuario(
+        "u1",
+        "admin@test.com",
+        "password",
+        "admin",
+        new Rol(
+            "r1",
+            "ADMIN",
+            "Administrator",
+            Set.of(new com.meinardi.rrhh.domain.model.Permiso("p1", "admin:access", "Admin access"))));
+  }
+
+  private Usuario administratorWithoutPermission() {
+    return new Usuario(
+        "u1", "admin@test.com", "password", "admin", new Rol("r1", "ADMIN", "Administrator", Set.of()));
+  }
+
+  private MockHttpSession sessionFor(Usuario usuario) {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    sessionService.createSession(request, usuario);
+    return (MockHttpSession) request.getSession(false);
+  }
+
+  private void assertInvalidSession(MockHttpSession session) throws Exception {
+    mockMvc
+        .perform(get("/api/v1/admin/notifications").session(session))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"))
+        .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SESSIONID=")))
+        .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+    assertThat(session.isInvalid()).isTrue();
   }
 }
