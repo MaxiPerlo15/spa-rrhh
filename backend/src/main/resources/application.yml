@@ -5,6 +5,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/spa_rrhh_db
     username: maxiperlo
     password:
+  flyway:
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: update
