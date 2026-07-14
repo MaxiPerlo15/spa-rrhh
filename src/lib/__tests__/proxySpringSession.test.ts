@@ -73,7 +73,7 @@ describe('proxy — Spring session relay', () => {
       userId: 'user-1',
       email: 'admin@test.com',
       nombreUsuario: 'admin',
-      rol: { id: 'rol-1', nombre: 'ADMIN', permisos: [] }
+      rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
     })
 
     const request = makeRequest('/admin/dashboard', 'SESSIONID=abc123')

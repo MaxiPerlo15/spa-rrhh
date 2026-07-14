@@ -40,7 +40,7 @@ PR1a-fix excludes Next BFF, Flyway/reconciliation, admin adapters, retention/pol
 
 ## Slice 1b: Typed Next BFF Session States — Expand
 
-- [ ] 1.3 **RED→GREEN→REFACTOR** After PR1a-fix, cover `authorized|anonymous|forbidden|unavailable` in `src/lib/__tests__/{springSession.test.ts,proxyBranches.test.ts,proxySpringSession.test.ts}`; update only `src/lib/springSession.ts` and `src/proxy.ts` for anonymous redirects and 403/503; run focused Vitest and commit with code.
+- [x] 1.3 **RED→GREEN→REFACTOR** After PR1a-fix, cover `authorized|anonymous|forbidden|unavailable` in `src/lib/__tests__/{springSession.test.ts,proxyBranches.test.ts,proxySpringSession.test.ts}`; update only `src/lib/springSession.ts` and `src/proxy.ts` for anonymous redirects and 403/503; run focused Vitest and commit with code.
 
 ## Slice 1c: Flyway Adoption and Reconciliation Evidence — Expand
 

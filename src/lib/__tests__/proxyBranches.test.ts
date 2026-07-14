@@ -109,12 +109,54 @@ describe('proxy — Spring session branches', () => {
     expect(result.url).toContain('/admin/signin')
   })
 
-  it('redirects to /admin/signin when Spring session is invalid', async () => {
-    mocks.getSpringSessionMock.mockResolvedValue(null)
+  it('redirects to /admin/signin when Spring session is anonymous', async () => {
+    mocks.getSpringSessionMock.mockResolvedValue({ state: 'anonymous' })
     const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=abc123' })
     const result = await proxy(request, {} as never) as unknown as { type: string; url: string }
     expect(result.type).toBe('redirect')
     expect(result.url).toContain('/admin/signin')
+  })
+
+  it('passes an authorized browser session through with its CSP and SESSIONID forwarding intact', async () => {
+    mocks.getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      user: {
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
+    })
+    const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=abc123' })
+    const result = await proxy(request, {} as never) as unknown as {
+      type: string
+      opts: { request: { headers: Headers } }
+      headers: { set: ReturnType<typeof vi.fn> }
+    }
+
+    expect(result.type).toBe('next')
+    expect(mocks.getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=abc123')
+    expect(result.opts.request.headers.get('cookie')).toBe('SESSIONID=abc123')
+    expect(result.opts.request.headers.get('x-nonce')).toEqual(expect.any(String))
+    expect(result.headers.set).toHaveBeenCalledWith('Content-Security-Policy', expect.any(String))
+  })
+
+  it('returns 403 when Spring identifies an authenticated non-admin', async () => {
+    mocks.getSpringSessionMock.mockResolvedValue({ state: 'forbidden' })
+    const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=limited' })
+    const result = await proxy(request, {} as never) as unknown as { type: string; init: { status: number } }
+
+    expect(result.type).toBe('json')
+    expect(result.init).toEqual({ status: 403 })
+  })
+
+  it('returns 503 instead of redirecting when Spring session validation is unavailable', async () => {
+    mocks.getSpringSessionMock.mockResolvedValue({ state: 'unavailable' })
+    const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=abc123' })
+    const result = await proxy(request, {} as never) as unknown as { type: string; init: { status: number } }
+
+    expect(result.type).toBe('json')
+    expect(result.init).toEqual({ status: 503 })
   })
 })
 

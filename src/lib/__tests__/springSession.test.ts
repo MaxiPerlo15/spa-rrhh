@@ -11,7 +11,7 @@ describe('getSpringSession', () => {
     process.env.BACKEND_URL = 'https://spring.example.com'
   })
 
-  it('calls Spring /api/v1/auth/me with forwarded SESSIONID cookie', async () => {
+  it('returns an authorized state when Spring grants admin:access', async () => {
     const { getSpringSession } = await import('../springSession')
 
     fetchMock.mockResolvedValue({
@@ -20,7 +20,7 @@ describe('getSpringSession', () => {
         userId: 'user-1',
         email: 'admin@test.com',
         nombreUsuario: 'admin',
-        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['vacancies:read'] }
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
       })
     })
 
@@ -36,14 +36,17 @@ describe('getSpringSession', () => {
       }
     )
     expect(result).toEqual({
-      userId: 'user-1',
-      email: 'admin@test.com',
-      nombreUsuario: 'admin',
-      rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['vacancies:read'] }
+      state: 'authorized',
+      user: {
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
     })
   })
 
-  it('returns null when Spring returns 401', async () => {
+  it('returns an anonymous state when Spring returns 401', async () => {
     const { getSpringSession } = await import('../springSession')
 
     fetchMock.mockResolvedValue({
@@ -53,10 +56,10 @@ describe('getSpringSession', () => {
 
     const result = await getSpringSession('SESSIONID=expired')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ state: 'anonymous' })
   })
 
-  it('returns null when Spring returns 403', async () => {
+  it('returns a forbidden state when Spring returns 403', async () => {
     const { getSpringSession } = await import('../springSession')
 
     fetchMock.mockResolvedValue({
@@ -66,36 +69,71 @@ describe('getSpringSession', () => {
 
     const result = await getSpringSession('SESSIONID=forbidden')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ state: 'forbidden' })
   })
 
-  it('returns null when SPRING_AUTH_ENABLED is false', async () => {
+  it('returns unavailable when Spring returns a generic 5xx response', async () => {
+    const { getSpringSession } = await import('../springSession')
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502
+    })
+
+    expect(await getSpringSession('SESSIONID=upstream-error')).toEqual({ state: 'unavailable' })
+  })
+
+  it('returns a forbidden state when an authenticated user lacks admin:access', async () => {
+    const { getSpringSession } = await import('../springSession')
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        userId: 'user-1',
+        email: 'user@test.com',
+        nombreUsuario: 'user',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['vacancies:read'] }
+      })
+    })
+
+    expect(await getSpringSession('SESSIONID=limited')).toEqual({ state: 'forbidden' })
+  })
+
+  it('returns unavailable when Spring authentication is disabled', async () => {
     process.env.SPRING_AUTH_ENABLED = 'false'
     const { getSpringSession } = await import('../springSession')
 
     const result = await getSpringSession('SESSIONID=abc123')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ state: 'unavailable' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns null when BACKEND_URL is not set', async () => {
+  it('returns unavailable when BACKEND_URL is not set', async () => {
     delete process.env.BACKEND_URL
     const { getSpringSession } = await import('../springSession')
 
     const result = await getSpringSession('SESSIONID=abc123')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ state: 'unavailable' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns null when fetch throws a network error', async () => {
+  it('returns unavailable when the Spring session service cannot be reached', async () => {
     const { getSpringSession } = await import('../springSession')
 
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
 
     const result = await getSpringSession('SESSIONID=abc123')
 
-    expect(result).toBeNull()
+    expect(result).toEqual({ state: 'unavailable' })
+  })
+
+  it('returns unavailable when Spring returns a malformed session payload', async () => {
+    const { getSpringSession } = await import('../springSession')
+
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ userId: 'user-1' }) })
+
+    expect(await getSpringSession('SESSIONID=malformed')).toEqual({ state: 'unavailable' })
   })
 })

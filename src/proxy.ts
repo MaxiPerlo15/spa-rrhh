@@ -83,9 +83,15 @@ async function adminProxyWithSpringSession(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin/signin', request.url))
   }
 
-  const sessionUser = await getSpringSession(sessionCookie)
-  if (!sessionUser) {
+  const session = await getSpringSession(sessionCookie)
+  if (session.state === 'anonymous') {
     return NextResponse.redirect(new URL('/admin/signin', request.url))
+  }
+  if (session.state === 'forbidden') {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
+  if (session.state === 'unavailable') {
+    return NextResponse.json({ error: 'spring_session_unavailable' }, { status: 503 })
   }
 
   return withNonceCspResponse(request)
