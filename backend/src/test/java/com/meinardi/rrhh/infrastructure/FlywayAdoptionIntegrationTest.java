@@ -45,7 +45,7 @@ class FlywayAdoptionIntegrationTest {
 
     new FlywayCatalogAdopter(dataSource).adopt(flyway());
 
-    assertThat(flyway().info().current().getVersion().getVersion()).isEqualTo("1");
+    assertThat(flyway().info().current().getVersion().getVersion()).isEqualTo("2");
     assertThat(applicationObjects()).contains("User:id", "usuario:id", "vacante:id");
   }
 
@@ -63,13 +63,13 @@ class FlywayAdoptionIntegrationTest {
   }
 
   @Test
-  void recordsOnlyFlywayHistoryAndDoesNotMutateTheAdoptedApplicationSchema() throws Exception {
+  void appliesVersionTwoEvidenceWithoutChangingTheCapturedVersionOneObjects() throws Exception {
     createCapturedCatalogWithoutFlywayHistory();
     Set<String> before = applicationObjects();
 
     new FlywayCatalogAdopter(dataSource).adopt(flyway());
 
-    assertThat(applicationObjects()).isEqualTo(before);
+    assertThat(applicationObjects()).containsAll(before).contains("reconciliation_runs:catalog_fingerprint");
     assertThat(flywayHistoryExists()).isTrue();
   }
 
