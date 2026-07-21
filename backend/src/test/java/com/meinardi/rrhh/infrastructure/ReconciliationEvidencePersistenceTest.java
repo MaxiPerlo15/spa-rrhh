@@ -51,7 +51,7 @@ class ReconciliationEvidencePersistenceTest {
   @Test
   void persistsCanonicalBytesAndHashesBoundToCompleteSourceSnapshots() throws Exception {
     ReconciliationRun run =
-        runs.save(new ReconciliationRun("run-evidence", "a".repeat(64), Instant.parse("2026-07-13T00:00:00Z")));
+        runs.save(new ReconciliationRun("run-evidence", "a".repeat(64), "e".repeat(64), Instant.parse("2026-07-13T00:00:00Z")));
     ReconciliationItem item =
         items.save(
             ReconciliationItem.fromSnapshots(
@@ -62,6 +62,7 @@ class ReconciliationEvidencePersistenceTest {
         item.getAdminSettingsHash(), item.getPrismaUserHash(), item.getUsuarioHash(), "verifier-1", "e".repeat(64), Instant.EPOCH));
 
     assertThat(runs.findById(run.getId()).orElseThrow().getCatalogFingerprint()).isEqualTo("a".repeat(64));
+    assertThat(runs.findById(run.getId()).orElseThrow().getReportChecksum()).isEqualTo("e".repeat(64));
     ReconciliationItem persisted = items.findById(item.getId()).orElseThrow();
     assertThat(persisted.getAdminSettingsSnapshot()).isEqualTo("{\"createdAt\":\"2026-07-13T00:00:00Z\",\"id\":\"settings-1\",\"notificationsEnabled\":true,\"notifyNewApplications\":true,\"notifyNewContacts\":true,\"notifySecurityAlerts\":true,\"updatedAt\":\"2026-07-13T00:00:00Z\",\"userId\":\"user-1\"}");
     assertThat(persisted.getAdminSettingsHash()).isEqualTo(sha256(persisted.getAdminSettingsSnapshot()));
@@ -79,7 +80,7 @@ class ReconciliationEvidencePersistenceTest {
   @Test
   void rejectsUpdatesAndDeletesForEveryEvidenceTable() throws Exception {
     ReconciliationRun run =
-        runs.save(new ReconciliationRun("run-immutable", "f".repeat(64), Instant.parse("2026-07-13T00:00:01Z")));
+        runs.save(new ReconciliationRun("run-immutable", "f".repeat(64), "4".repeat(64), Instant.parse("2026-07-13T00:00:01Z")));
     ReconciliationItem item =
         items.save(ReconciliationItem.fromSnapshots("item-immutable", run,
             settings("settings-2", "user-2", false), user("user-2", "immutable@example.com"), usuario("usuario-2", "immutable@example.com", true)));
@@ -98,7 +99,7 @@ class ReconciliationEvidencePersistenceTest {
   @Test
   void rejectsIncompleteSnapshotsMalformedJsonAndArbitraryHashes() throws Exception {
     ReconciliationRun run =
-        runs.save(new ReconciliationRun("run-second", "5".repeat(64), Instant.parse("2026-07-13T00:00:02Z")));
+        runs.save(new ReconciliationRun("run-second", "5".repeat(64), "3".repeat(64), Instant.parse("2026-07-13T00:00:02Z")));
     assertThatThrownBy(() -> ReconciliationItem.fromSnapshots("item-incomplete", run, "{}",
             user("user-3", "second@example.com"), usuario("usuario-3", "second@example.com", false)))
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("complete");
@@ -110,7 +111,7 @@ class ReconciliationEvidencePersistenceTest {
 
   @Test
   void persistsImmutableProductResetApprovalWithCompleteEvidenceBinding() {
-    ReconciliationRun run = runs.save(new ReconciliationRun("run-reset", "6".repeat(64), Instant.EPOCH));
+    ReconciliationRun run = runs.save(new ReconciliationRun("run-reset", "6".repeat(64), "c".repeat(64), Instant.EPOCH));
     ReconciliationItem item = items.save(ReconciliationItem.fromSnapshots("item-reset", run,
         settings("settings-reset", "user-reset", false), user("user-reset", "reset@example.com"), usuario("usuario-reset", "reset@example.com", true)));
     var service = new AdminSettingsReconciliationService();
@@ -139,7 +140,7 @@ class ReconciliationEvidencePersistenceTest {
 
   @Test
   void rejectsIncompleteStatusDependentApprovalsAtThePostgresBoundary() {
-    ReconciliationRun run = runs.save(new ReconciliationRun("run-constraints", "7".repeat(64), Instant.EPOCH));
+    ReconciliationRun run = runs.save(new ReconciliationRun("run-constraints", "7".repeat(64), "8".repeat(64), Instant.EPOCH));
     ReconciliationItem item = items.save(ReconciliationItem.fromSnapshots("item-constraints", run,
         settings("settings-constraints", "user-constraints", true), user("user-constraints", "constraints@example.com"), usuario("usuario-constraints", "constraints@example.com", true)));
 
