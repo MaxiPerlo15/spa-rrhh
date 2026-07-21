@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Estimated changed lines | 3,200–4,100 total; each PR1c child ≤400 |
+| Estimated changed lines | 3,400–4,500 total; each child ≤400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
 | Delivery / chain | ask-on-risk / feature-branch-chain |
@@ -24,9 +24,12 @@ Chain strategy: feature-branch-chain
 | 1c-c | Immutable evidence foundation | PR1c-c | Base: PR1c-b; ≤400. |
 | 1c-d | Reconciliation decisions/approvals | PR1c-d | Base: PR1c-c; ≤400. |
 | 1c-e | Verified backfill/contract gate | PR1c-e | Base: PR1c-d; ≤400. |
-| 2 | Admin ownership | PR2 | Base: PR1c-e; ≤400, then later slices use immediate parents. |
+| 2a | Health ownership and Next adapter | PR2a | Base: PR1c-e; contracts; rollback health. |
+| 2b | Notifications ownership and adapters | PR2b | Base: PR2a; contracts; rollback notifications. |
+| 2c | Audit ownership and adapter | PR2c | Base: PR2b; contracts; rollback audit. |
+| 2d | Settings ownership and adapter | PR2d | Base: PR2c; contracts; rollback settings. |
 
-`feature/tracker → PR1a → PR1a-fix → PR1b → PR1c-a → PR1c-b → PR1c-c → 📍 PR1c-d → PR1c-e → PR2`. Retarget/rebase any child that shows parent work.
+`feature/tracker → PR1a → PR1a-fix → PR1b → PR1c-a → PR1c-b → PR1c-c → PR1c-d → PR1c-e → 📍 PR2a → PR2b → PR2c → PR2d`. Each child targets its immediate parent; retarget/rebase polluted diffs.
 
 ## Phase 2: Flyway and Reconciliation Chain
 
@@ -38,7 +41,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Admin Ownership
 
-- [ ] 3.1 **PR2 RED→GREEN** Contract-test notifications/audit/settings/health, 401/403/503/no-store; add Spring ownership and thin `src/app/api/admin/**`/`src/app/api/health/route.ts` adapters. Depends PR1c-e; rollback adapter/catalog. Run `npm run test:unit`, `npm run lint`, `npm run typecheck`, `cd backend && mvn test`; **≤400**.
+- [ ] 3.1 **PR2a RED→GREEN→REFACTOR** Test Spring DB health; add controller/service and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`. Depends PR1c-e; rollback health only. Run focused JUnit/Vitest, `npm run lint`, `npm run typecheck`; **≤400**.
+- [ ] 3.2 **PR2b RED→GREEN→REFACTOR** Test Spring notification ownership and both `src/app/api/admin/notifications/{route.ts,[id]/route.ts}` adapters; preserve pagination, DTOs, 201, 400/404/envelopes and 401/403/503. Depends PR2a; rollback notifications only. Run focused JUnit/Vitest plus browser contract; **≤400**.
+- [ ] 3.3 **PR2c RED→GREEN→REFACTOR** Test Spring audit query ownership and `src/app/api/admin/audit/route.ts`; preserve filters, inclusive UTC bounds, descending `createdAt`, pagination and 401/403/503/500 envelopes. Depends PR2b; rollback audit only. Run focused JUnit/Vitest plus browser contract; **≤400**.
+- [ ] 3.4 **PR2d RED→GREEN→REFACTOR** Test Spring settings GET/PATCH and `src/app/api/admin/settings/route.ts`; preserve profile/preferences/backend/`updatedAt` shape and 400/401/403/503/500 envelopes. Depends PR2c; rollback settings only. Run focused JUnit/Vitest plus browser contract; **≤400**.
 
 ## Phase 4: Remaining Contract and Decommission
 
