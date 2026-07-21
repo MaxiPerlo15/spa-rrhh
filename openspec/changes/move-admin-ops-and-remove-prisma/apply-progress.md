@@ -1,12 +1,12 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR1c-e Verified Backfill and Contract Gate
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2a Spring Health Ownership
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Work unit: PR1c-e — verified AdminSettings backfill and contract gate.
-- Boundary: `PR1c-d → PR1c-e`; legacy drops, Next/admin adapters, retention, and Prisma removal remain excluded.
-- Review budget: approximately 390 changed lines including forward V4/V5 migrations, authoritative run-checksum evidence, PostgreSQL integration coverage, compatibility assertions, and planning artifacts; within the 400-line limit.
-- Rollback: revert V4/V5 and their PostgreSQL integration coverage as one unit; immutable evidence remains intact.
+- Work unit: PR2a — Spring health ownership and Next adapter.
+- Boundary: `PR1c-e → PR2a`; notifications, audit, settings, retention, and Prisma removal remain excluded.
+- Review budget: 257 changed lines including Spring controller/service, Next adapter, contract tests, and planning artifacts; within the 400-line limit.
+- Rollback: revert the health controller/service, security matcher, adapter, and health contract tests as one unit.
 
 ## Completed Tasks
 
@@ -19,6 +19,7 @@
 - [x] 2.3 PR1c-c RED→GREEN→REFACTOR: V2 append-only run/item/approval evidence with complete canonical snapshots, source IDs, SHA-256 bindings, catalog fingerprint, and UPDATE/DELETE/TRUNCATE rejection.
 - [x] 2.4 PR1c-d RED→GREEN→REFACTOR: reconciliation approvals reject aliases, validate complete match evidence, and persist immutable checksum-bound product resets.
 - [x] 2.5 PR1c-e RED→GREEN→REFACTOR: forward V4 adds run checksum state and derives immutable compatible checksums from valid V3 approval evidence without mutating append-only runs; V5 backfills approved MATCHED/reset settings, blocks unresolved or checksum-divergent evidence, and enforces target unique/not-null/FK constraints.
+- [x] 3.1 PR2a RED→GREEN→REFACTOR: Spring owns a `SELECT 1` readiness check at `/api/v1/health`; the Next adapter delegates without Prisma fallback and preserves 200/503 `{status,database}` plus `Cache-Control: no-store`.
 
 ## TDD Cycle Evidence
 
@@ -30,6 +31,7 @@
 | 2.3 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/ReconciliationEvidencePersistenceTest.java` | PostgreSQL integration | ✅ 3/3 focused before corrective retry | ✅ Test-first retry failed at compilation because canonical factory/getters did not exist | ✅ 3/3 focused on PostgreSQL 16; 203/203 full Maven | ✅ Exact canonical bytes, independently derived SHA-256 binding, incomplete/malformed rejection, and UPDATE/DELETE/TRUNCATE paths | ✅ TEXT snapshots preserve canonical bytes; pgcrypto constraints bind every snapshot to its SHA-256 hash |
 | 2.4 | `backend/src/test/java/com/meinardi/rrhh/{application/AdminSettingsReconciliationServiceTest,infrastructure/ReconciliationEvidencePersistenceTest}.java` | Unit + PostgreSQL integration | ✅ 9/9 existing focused tests before this retry | ✅ New factory/getter assertions failed to compile before the durable binding API existed | ✅ 10/10 service+persistence, 15/15 focused PostgreSQL with Flyway, 210/210 full Maven | ✅ Missing MATCHED email and missing RESET_APPROVED product fields reject at PostgreSQL; complete MATCHED and RESET_APPROVED rows persist | ✅ V3 status-dependent check constraint and factory mappings keep each status explicit |
 | 2.5 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/ReconciliationBackfillIntegrationTest.java` | PostgreSQL integration | ✅ 8/8 focused before this correction | ✅ A real V3 fixture with valid immutable evidence failed V5 because `reconciliation_runs.report_checksum` was NULL | ✅ 10/10 focused PostgreSQL; 220/220 full Maven | ✅ Valid V3→V5 succeeds from derived approval checksum while conflicting V3 approval checksums block; previous MATCHED/reset/drift and UNIQUE `23505` cases remain | ✅ V2/V3 remain untouched; V4 inserts an append-only derived-checksum table and V5 prefers it only when the run column is NULL |
+| 3.1 | `src/lib/__tests__/healthRoute.test.ts`, `backend/src/test/java/com/meinardi/rrhh/{application/HealthServiceTest,presentation/HealthControllerTest}.java` | Unit + MockMvc | ✅ 2/2 existing health Vitest; 14/14 focused Spring security tests | ✅ Next contract tests failed against Prisma behavior; Spring tests failed to compile before the health service/controller existed | ✅ 2/2 focused Vitest; 4/4 focused Maven; 433/433 full Vitest; 224/224 full Maven | ✅ Ready/unavailable paths prove no Prisma fallback, Spring forwarding, database `SELECT 1`, and browser 200/503 no-store behavior | ➖ None needed — small controller/service and adapter are already direct |
 
 ## Verification
 
@@ -60,7 +62,14 @@
 - RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest#upgradesValidVersionThreeEvidenceWithoutMutatingTheAppendOnlyRun` — valid V3 immutable evidence failed V5 because the added run column was NULL.
 - Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest,ReconciliationEvidencePersistenceTest` — 15/15 passed; proves V3→V5 success, conflicting V3 checksums block, and existing append-only trigger behavior remains.
 - Full Maven: `cd backend && mvn test` — 220/220 passed.
+- Safety net: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2/2 passed; `cd backend && mvn test -Dtest=SecurityConfigApplicationRoutesTest` — 14/14 passed.
+- RED: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2 failures because the route still called Prisma instead of Spring.
+- RED: `cd backend && mvn test -Dtest=HealthControllerTest` — compilation failed because `HealthService` and `HealthController` did not exist.
+- Focused GREEN: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2/2 passed; `cd backend && mvn test -Dtest=HealthControllerTest,HealthServiceTest` — 4/4 passed.
+- Full: `npm run test:unit` — 433/433 passed after `DATABASE_URL=... npx prisma generate`; `npm run lint` and `npm run typecheck` — passed.
+- Full Maven: `cd backend && mvn test` — 224/224 passed.
+- `git diff --check` — passed.
 
 ## Status
 
-PR1c-e is complete. V2 and V3 remain immutable for existing databases; forward V4 adds the nullable authoritative `reconciliation_runs.report_checksum` schema and inserts a separate append-only derived checksum for V3 runs only when all bound approvals agree. V5 uses that compatible derived value only when the run column is NULL, while retaining its live-hash, reset-default, target, unique/not-null/FK, and conflicting-checksum gates. The duplicate fixture uses an existing `usuario` target and asserts PostgreSQL UNIQUE SQLSTATE `23505`. Task 3.1 and later phases remain pending. No commit or push was performed.
+PR2a is complete. Spring now owns database readiness through `SELECT 1` and exposes `/api/v1/health`; Next delegates with the configured internal header and always returns the established 200/503 no-store browser contract without Prisma fallback. Prior PR1c-e migration evidence remains unchanged. Tasks 3.2 and later phases remain pending. No commit or push was performed.

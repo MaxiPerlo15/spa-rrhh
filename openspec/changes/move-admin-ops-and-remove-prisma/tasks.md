@@ -41,7 +41,7 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Admin Ownership
 
-- [ ] 3.1 **PR2a RED→GREEN→REFACTOR** Test Spring DB health; add controller/service and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`. Depends PR1c-e; rollback health only. Run focused JUnit/Vitest, `npm run lint`, `npm run typecheck`; **≤400**.
+- [x] 3.1 **PR2a RED→GREEN→REFACTOR** Test Spring DB health; add controller/service and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`. Depends PR1c-e; rollback health only. Run focused JUnit/Vitest, `npm run lint`, `npm run typecheck`; **≤400**.
 - [ ] 3.2 **PR2b RED→GREEN→REFACTOR** Test Spring notification ownership and both `src/app/api/admin/notifications/{route.ts,[id]/route.ts}` adapters; preserve pagination, DTOs, 201, 400/404/envelopes and 401/403/503. Depends PR2a; rollback notifications only. Run focused JUnit/Vitest plus browser contract; **≤400**.
 - [ ] 3.3 **PR2c RED→GREEN→REFACTOR** Test Spring audit query ownership and `src/app/api/admin/audit/route.ts`; preserve filters, inclusive UTC bounds, descending `createdAt`, pagination and 401/403/503/500 envelopes. Depends PR2b; rollback audit only. Run focused JUnit/Vitest plus browser contract; **≤400**.
 - [ ] 3.4 **PR2d RED→GREEN→REFACTOR** Test Spring settings GET/PATCH and `src/app/api/admin/settings/route.ts`; preserve profile/preferences/backend/`updatedAt` shape and 400/401/403/503/500 envelopes. Depends PR2c; rollback settings only. Run focused JUnit/Vitest plus browser contract; **≤400**.
