@@ -6,6 +6,7 @@ import CookieNotice from "@/components/CookieNotice";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { CspNonceProvider } from "@/contexts/CspNonceContext";
 import { SentryUserContext } from "@/components/SentryUserContext";
+import { isSpringAuthEnabled } from "@/lib/server/springBackend";
 import { headers } from "next/headers";
 
 const manrope = Manrope({
@@ -75,6 +76,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const nonce = (await headers()).get('x-nonce')
+  const springAuthEnabled = isSpringAuthEnabled()
 
   return (
     <html lang="es">
@@ -82,13 +84,20 @@ export default async function RootLayout({
         className={`${manrope.variable} ${sora.variable} ${geistMono.variable} antialiased`}
       >
         <CspNonceProvider value={nonce}>
-          <AuthProvider>
-            <SentryUserContext /> 
+          {springAuthEnabled ? (
             <ToastProvider>
               {children}
               <CookieNotice />
             </ToastProvider>
-          </AuthProvider>
+          ) : (
+            <AuthProvider>
+              <SentryUserContext />
+              <ToastProvider>
+                {children}
+                <CookieNotice />
+              </ToastProvider>
+            </AuthProvider>
+          )}
         </CspNonceProvider>
       </body>
     </html>

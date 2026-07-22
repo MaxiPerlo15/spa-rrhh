@@ -23,6 +23,7 @@
     "test:e2e:chromium": "playwright test --project=chromium",
     "test:e2e:local": "playwright test --config playwright.local.config.ts",
     "test:e2e:local:chromium": "playwright test --config playwright.local.config.ts --project=chromium",
+    "test:e2e:spring-auth": "tsx scripts/run-spring-auth-e2e.ts",
     "test:perf:matrix": "node scripts/perf-matrix.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

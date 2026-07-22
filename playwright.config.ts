@@ -71,6 +71,8 @@ export default defineConfig({
     env: {
       ...process.env,
       E2E_BYPASS_RATE_LIMIT: 'true',
+      SPRING_AUTH_ENABLED: 'true',
+      NEXT_PUBLIC_SPRING_AUTH_ENABLED: 'true',
     },
   },
 });
