@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AdminAuthModeProvider } from '@/app/admin/auth-mode-provider'
 import SignInPage from '@/app/admin/signin/page'
 
 const {
@@ -26,7 +27,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('next-auth/react', () => ({
-  signIn: signInMock
+  signIn: signInMock,
+  useSession: () => ({ data: null, status: 'unauthenticated' })
 }))
 
 vi.mock('@/contexts/ToastContext', () => ({
@@ -36,13 +38,21 @@ vi.mock('@/contexts/ToastContext', () => ({
   })
 }))
 
+function renderLegacySignInPage() {
+  return render(
+    <AdminAuthModeProvider springAuthEnabled={false}>
+      <SignInPage />
+    </AdminAuthModeProvider>
+  )
+}
+
 describe('SignInPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('evita enviar el formulario cuando faltan credenciales válidas', async () => {
-    render(<SignInPage />)
+    renderLegacySignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'admin@mail.com' }
@@ -62,7 +72,7 @@ describe('SignInPage', () => {
       ok: true
     })
 
-    render(<SignInPage />)
+    renderLegacySignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: ' ADMIN@MAIL.COM ' }
@@ -90,7 +100,7 @@ describe('SignInPage', () => {
       error: 'CredentialsSignin'
     })
 
-    render(<SignInPage />)
+    renderLegacySignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'admin@mail.com' }
