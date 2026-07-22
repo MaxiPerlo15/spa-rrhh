@@ -141,6 +141,48 @@ describe('proxy — Spring session branches', () => {
     expect(result.headers.set).toHaveBeenCalledWith('Content-Security-Policy', expect.any(String))
   })
 
+  it('forwards a rotated Spring SESSIONID on the authorized response', async () => {
+    const rotatedCookie = 'SESSIONID=rotated-456; Path=/; HttpOnly; SameSite=Lax'
+    mocks.getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      user: {
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      },
+      setCookie: rotatedCookie
+    })
+
+    const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=original-123' })
+    const result = await proxy(request, {} as never) as unknown as {
+      type: string
+      headers: { set: ReturnType<typeof vi.fn> }
+    }
+
+    expect(result.type).toBe('next')
+    expect(result.headers.set).toHaveBeenCalledWith('Set-Cookie', rotatedCookie)
+  })
+
+  it('forwards Spring expiry when an anonymous session redirects to signin', async () => {
+    const expiredCookie = 'SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+    mocks.getSpringSessionMock.mockResolvedValue({
+      state: 'anonymous',
+      setCookie: expiredCookie
+    })
+
+    const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=expired' })
+    const result = await proxy(request, {} as never) as unknown as {
+      type: string
+      url: string
+      headers: { set: ReturnType<typeof vi.fn> }
+    }
+
+    expect(result.type).toBe('redirect')
+    expect(result.url).toContain('/admin/signin')
+    expect(result.headers.set).toHaveBeenCalledWith('Set-Cookie', expiredCookie)
+  })
+
   it('returns 403 when Spring identifies an authenticated non-admin', async () => {
     mocks.getSpringSessionMock.mockResolvedValue({ state: 'forbidden' })
     const request = makeRequest('/admin/dashboard', { cookie: 'SESSIONID=limited' })

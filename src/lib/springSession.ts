@@ -6,8 +6,8 @@ export type SpringSessionUser = {
 }
 
 export type SpringSession =
-  | { state: 'authorized'; user: SpringSessionUser }
-  | { state: 'anonymous' }
+  | { state: 'authorized'; user: SpringSessionUser; setCookie?: string }
+  | { state: 'anonymous'; setCookie?: string }
   | { state: 'forbidden' }
   | { state: 'unavailable' }
 
@@ -48,9 +48,10 @@ export async function getSpringSession(
       headers: { Cookie: cookieHeader },
       credentials: 'omit'
     })
+    const setCookie = response.headers?.get('set-cookie') ?? undefined
 
     if (response.status === 401) {
-      return { state: 'anonymous' }
+      return setCookie ? { state: 'anonymous', setCookie } : { state: 'anonymous' }
     }
     if (response.status === 403) {
       return { state: 'forbidden' }
@@ -66,7 +67,7 @@ export async function getSpringSession(
     if (!user.rol.permisos.includes(ADMIN_ACCESS)) {
       return { state: 'forbidden' }
     }
-    return { state: 'authorized', user }
+    return setCookie ? { state: 'authorized', user, setCookie } : { state: 'authorized', user }
   } catch {
     return { state: 'unavailable' }
   }

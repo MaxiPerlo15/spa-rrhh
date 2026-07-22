@@ -1,75 +1,40 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2a Spring Health Ownership
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2a-fix-a2/b
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Work unit: PR2a — Spring health ownership and Next adapter.
-- Boundary: `PR1c-e → PR2a`; notifications, audit, settings, retention, and Prisma removal remain excluded.
-- Review budget: 257 changed lines including Spring controller/service, Next adapter, contract tests, and planning artifacts; within the 400-line limit.
-- Rollback: revert the health controller/service, security matcher, adapter, and health contract tests as one unit.
+- Boundary: `PR2a-fix-a → PR2a-fix-a2 → PR2a-fix-b`; Spring authentication boundary, session lifecycle forwarding, and focused browser proof only.
+- Excluded: notifications, audit, settings, retention, and Prisma removal.
+- Review budget: 146 tracked changed lines before planning updates; within 400 lines.
+- Rollback: revert the root provider boundary, session-cookie forwarding, and focused Spring auth tests as one slice.
 
 ## Completed Tasks
 
-- [x] PR1a 1.1 RED: session/authorization cases (previous batch)
-- [x] PR1a 1.2a GREEN→REFACTOR: permission-authoritative session bridge (previous batch)
-- [x] PR1a-fix 1.2b RED→GREEN: configured cookie clearing and logout response propagation (previous batch)
-- [x] PR1b 1.3 RED→GREEN→REFACTOR: typed `authorized|anonymous|forbidden|unavailable` Spring BFF/proxy states.
-- [x] 2.1 PR1c-a RED→GREEN: V1 empty-PostgreSQL baseline, catalog/history/checksum assertions, and Hibernate validation proof.
-- [x] 2.2 PR1c-b RED→GREEN: approved existing-catalog fingerprint, explicit V1 baseline, fail-closed drift rejection, and production Flyway/Hibernate adoption settings.
-- [x] 2.3 PR1c-c RED→GREEN→REFACTOR: V2 append-only run/item/approval evidence with complete canonical snapshots, source IDs, SHA-256 bindings, catalog fingerprint, and UPDATE/DELETE/TRUNCATE rejection.
-- [x] 2.4 PR1c-d RED→GREEN→REFACTOR: reconciliation approvals reject aliases, validate complete match evidence, and persist immutable checksum-bound product resets.
-- [x] 2.5 PR1c-e RED→GREEN→REFACTOR: forward V4 adds run checksum state and derives immutable compatible checksums from valid V3 approval evidence without mutating append-only runs; V5 backfills approved MATCHED/reset settings, blocks unresolved or checksum-divergent evidence, and enforces target unique/not-null/FK constraints.
-- [x] 3.1 PR2a RED→GREEN→REFACTOR: Spring owns a `SELECT 1` readiness check at `/api/v1/health`; the Next adapter delegates without Prisma fallback and preserves 200/503 `{status,database}` plus `Cache-Control: no-store`.
+- [x] 2.1–2.5 reconciliation/Flyway chain (previous batches).
+- [x] 3.1 Spring health ownership (previous batch).
+- [x] 3.4 PR2a-fix-a2 RED: layout and Chromium relay contracts cover Spring-mode provider omission, `/admin`, and same-origin login.
+- [x] 3.5 PR2a-fix-a2 GREEN→REFACTOR: gate global NextAuth/Sentry providers in Spring mode and align Playwright server flags.
+- [x] 3.6 PR2a-fix-a2 verify: focused runtime browser proof, lint, and typecheck pass.
+- [x] 3.7 PR2a-fix-b RED: focused Vitest contracts fail until Spring validation `Set-Cookie` reaches the session state and proxy response.
+- [x] 3.8 PR2a-fix-b GREEN→REFACTOR: preserve the raw Spring `Set-Cookie` for authorized rotation and anonymous expiry only; harden the temporary browser cookie/logout proof.
+- [x] 3.9 PR2a-fix-b verify: focused JUnit/Vitest, Chromium proof, lint, typecheck, and whitespace check pass.
 
 ## TDD Cycle Evidence
 
 | Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
 |---|---|---|---|---|---|---|---|
-| 1.3 | `src/lib/__tests__/{springSession,proxyBranches,proxySpringSession}.test.ts` | Unit | ✅ 23/23 focused tests before corrective coverage | ✅ Original task RED was recorded in prior apply-progress; corrective tests cover already-green production behavior, so they passed immediately without production edits | ✅ 25/25 focused tests; 433/433 full suite | ✅ Authorized browser pass-through and 502 unavailable add distinct paths to the existing anonymous/403/unavailable coverage | ➖ None needed — test-only corrective retry |
-| 2.1 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/FlywayEmptyDatabaseIntegrationTest.java` | PostgreSQL integration | ✅ Prior work unit | ✅ Recorded in prior apply-progress | ✅ 2/2 focused, 203/203 full Maven | ✅ V1 catalog/history/checksum and validation | ➖ None needed |
-| 2.2 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/FlywayAdoptionIntegrationTest.java` | PostgreSQL integration | ✅ Prior work unit | ✅ Recorded in prior apply-progress | ✅ 3/3 focused, 203/203 full Maven | ✅ Adoption, drift rejection, and catalog preservation | ➖ None needed |
-| 2.3 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/ReconciliationEvidencePersistenceTest.java` | PostgreSQL integration | ✅ 3/3 focused before corrective retry | ✅ Test-first retry failed at compilation because canonical factory/getters did not exist | ✅ 3/3 focused on PostgreSQL 16; 203/203 full Maven | ✅ Exact canonical bytes, independently derived SHA-256 binding, incomplete/malformed rejection, and UPDATE/DELETE/TRUNCATE paths | ✅ TEXT snapshots preserve canonical bytes; pgcrypto constraints bind every snapshot to its SHA-256 hash |
-| 2.4 | `backend/src/test/java/com/meinardi/rrhh/{application/AdminSettingsReconciliationServiceTest,infrastructure/ReconciliationEvidencePersistenceTest}.java` | Unit + PostgreSQL integration | ✅ 9/9 existing focused tests before this retry | ✅ New factory/getter assertions failed to compile before the durable binding API existed | ✅ 10/10 service+persistence, 15/15 focused PostgreSQL with Flyway, 210/210 full Maven | ✅ Missing MATCHED email and missing RESET_APPROVED product fields reject at PostgreSQL; complete MATCHED and RESET_APPROVED rows persist | ✅ V3 status-dependent check constraint and factory mappings keep each status explicit |
-| 2.5 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/ReconciliationBackfillIntegrationTest.java` | PostgreSQL integration | ✅ 8/8 focused before this correction | ✅ A real V3 fixture with valid immutable evidence failed V5 because `reconciliation_runs.report_checksum` was NULL | ✅ 10/10 focused PostgreSQL; 220/220 full Maven | ✅ Valid V3→V5 succeeds from derived approval checksum while conflicting V3 approval checksums block; previous MATCHED/reset/drift and UNIQUE `23505` cases remain | ✅ V2/V3 remain untouched; V4 inserts an append-only derived-checksum table and V5 prefers it only when the run column is NULL |
-| 3.1 | `src/lib/__tests__/healthRoute.test.ts`, `backend/src/test/java/com/meinardi/rrhh/{application/HealthServiceTest,presentation/HealthControllerTest}.java` | Unit + MockMvc | ✅ 2/2 existing health Vitest; 14/14 focused Spring security tests | ✅ Next contract tests failed against Prisma behavior; Spring tests failed to compile before the health service/controller existed | ✅ 2/2 focused Vitest; 4/4 focused Maven; 433/433 full Vitest; 224/224 full Maven | ✅ Ready/unavailable paths prove no Prisma fallback, Spring forwarding, database `SELECT 1`, and browser 200/503 no-store behavior | ➖ None needed — small controller/service and adapter are already direct |
+| 3.4 | `src/app/__tests__/layout.test.tsx`, `tests/e2e/auth-spring-session.spec.ts` | Vitest + Chromium | ✅ Prior batch | ✅ Spring-mode omission contract failed before the layout change | ✅ Focused layout contracts passed | ✅ Spring and legacy modes | ✅ Minimal root conditional |
+| 3.5 | `src/app/__tests__/layout.test.tsx`, `tests/e2e/auth-spring-session.spec.ts` | Vitest + Chromium | ✅ Prior batch | ✅ Browser contract extended before config change | ✅ Focused tests passed | ✅ `/admin` anonymous and authenticated routes | ✅ Dedicated matching server flags |
+| 3.7–3.8 | `src/lib/__tests__/{springSession,proxyBranches,proxySpringSession}.test.ts` | Vitest unit | ✅ 14 Spring-session/proxy tests; ✅ 11 proxy-branch tests | ✅ Four new rotation/expiry assertions failed before forwarding | ✅ 29 focused tests passed | ✅ Authorized rotation and anonymous expiry preserve separate outcomes | ✅ Small typed response-cookie helper; forbidden/unavailable remain unchanged |
+| 3.9 | `tests/e2e/auth-spring-session.spec.ts` | Chromium E2E | ✅ Earlier proof exposed an immediate cookie race and missing confirmation interaction | ✅ Hardened proof failed until it awaited `/admin`, dismisses the fixture onboarding, and confirms logout | ✅ Login, cookie persistence, direct `/admin`, logout expiry, anonymous redirect | ✅ Test-only stabilization; production forwarding unchanged |
 
 ## Verification
 
-- RED: `cd backend && mvn test -Dtest=ReconciliationEvidencePersistenceTest` — corrective canonical-snapshot test failed to compile because `fromSnapshots` and hash/snapshot getters did not exist.
-- Focused: `cd backend && mvn test -Dtest=ReconciliationEvidencePersistenceTest` — 3/3 passed on PostgreSQL 16 Testcontainers, including real `TRUNCATE` rejection.
-- Compatibility: `cd backend && mvn test -Dtest=FlywayEmptyDatabaseIntegrationTest,FlywayAdoptionIntegrationTest,ReconciliationEvidencePersistenceTest` — 8/8 passed.
-- Full: `cd backend && mvn test` — 203 tests passed after the corrective retry.
-- RED: `cd backend && mvn test -Dtest=AdminSettingsReconciliationServiceTest,ReconciliationEvidencePersistenceTest` — failed before durable approval fields/factory existed.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=AdminSettingsReconciliationServiceTest,ReconciliationEvidencePersistenceTest,FlywayEmptyDatabaseIntegrationTest,FlywayAdoptionIntegrationTest` — 14/14 passed on PostgreSQL 16 Testcontainers.
-- Full: `cd backend && mvn test` — 209 tests passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationEvidencePersistenceTest` — failed to compile because `verifiedMatch`, `getUsuarioHash`, and `getPrismaUserId` did not exist.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=AdminSettingsReconciliationServiceTest,ReconciliationEvidencePersistenceTest,FlywayEmptyDatabaseIntegrationTest,FlywayAdoptionIntegrationTest` — 15/15 passed on PostgreSQL 16 Testcontainers.
-- Full Maven: `cd backend && mvn test` — 210/210 passed.
-- `git diff --check` — passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 2 failed assertions and a missing `usuarioId` column before V4 existed.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 3/3 passed on PostgreSQL 16 Testcontainers.
-- Full Maven: `cd backend && mvn test` — 213/213 passed.
-- `git diff --check` — passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — approved reset values were hardcoded and live evidence drift migrated.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 5/5 passed on PostgreSQL 16 Testcontainers.
-- Full Maven: `cd backend && mvn test` — 215/215 passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — failed because `reconciliation_runs.report_checksum` did not exist.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 7/7 passed.
-- Full Maven: `cd backend && mvn test` — 217/217 passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — simulated V3 schema failed V4 because `run.report_checksum` was absent; duplicate target fixture returned FK SQLSTATE `23503`.
-- Focused PostgreSQL: `cd backend && mvn clean test -Dtest=ReconciliationBackfillIntegrationTest` — 8/8 passed after V2 restoration, forward V4 checksum schema, V5 backfill, and referenced duplicate `23505` assertion.
-- Full Maven: `cd backend && mvn test` — 218/218 passed.
-- RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest#upgradesValidVersionThreeEvidenceWithoutMutatingTheAppendOnlyRun` — valid V3 immutable evidence failed V5 because the added run column was NULL.
-- Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest,ReconciliationEvidencePersistenceTest` — 15/15 passed; proves V3→V5 success, conflicting V3 checksums block, and existing append-only trigger behavior remains.
-- Full Maven: `cd backend && mvn test` — 220/220 passed.
-- Safety net: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2/2 passed; `cd backend && mvn test -Dtest=SecurityConfigApplicationRoutesTest` — 14/14 passed.
-- RED: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2 failures because the route still called Prisma instead of Spring.
-- RED: `cd backend && mvn test -Dtest=HealthControllerTest` — compilation failed because `HealthService` and `HealthController` did not exist.
-- Focused GREEN: `npx vitest run src/lib/__tests__/healthRoute.test.ts` — 2/2 passed; `cd backend && mvn test -Dtest=HealthControllerTest,HealthServiceTest` — 4/4 passed.
-- Full: `npm run test:unit` — 433/433 passed after `DATABASE_URL=... npx prisma generate`; `npm run lint` and `npm run typecheck` — passed.
-- Full Maven: `cd backend && mvn test` — 224/224 passed.
-- `git diff --check` — passed.
+- `npx vitest run src/lib/__tests__/springSession.test.ts src/lib/__tests__/proxyBranches.test.ts src/lib/__tests__/proxySpringSession.test.ts` — 29/29 passed.
+- `cd backend && mvn test -Dtest=SessionServiceTest` — 9/9 passed.
+- `npm run test:e2e:spring-auth` — isolated PostgreSQL + Spring + Next Chromium proof passed: login → `/admin` → confirmed logout.
+- `npm run lint`, `npm run typecheck`, and `git diff --check` — passed.
 
 ## Status
 
-PR2a is complete. Spring now owns database readiness through `SELECT 1` and exposes `/api/v1/health`; Next delegates with the configured internal header and always returns the established 200/503 no-store browser contract without Prisma fallback. Prior PR1c-e migration evidence remains unchanged. Tasks 3.2 and later phases remain pending. No commit or push was performed.
+Tasks 3.4–3.9 are complete. The next work unit is PR2b notifications, which must target this immediate parent after rebase. No notifications, audit, or settings code was changed.

@@ -1,7 +1,7 @@
 import { withAuth } from "next-auth/middleware"
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server"
 import { applyCorsHeaders, isAllowedOrigin, isPublicCorsRequest } from "@/lib/cors"
-import { getSpringSession } from "@/lib/springSession"
+import { getSpringSession, type SpringSession } from "@/lib/springSession"
 
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -66,6 +66,13 @@ function extractSessionCookie(request: NextRequest): string {
   return sessionMatch ? `SESSIONID=${sessionMatch[1]}` : ''
 }
 
+function withSpringSessionCookie(response: NextResponse, session: SpringSession) {
+  if ((session.state === 'authorized' || session.state === 'anonymous') && session.setCookie) {
+    response.headers.set('Set-Cookie', session.setCookie)
+  }
+  return response
+}
+
 const adminProxyWithNextAuth = withAuth(
   function authorizedAdminProxy(request) {
     return withNonceCspResponse(request)
@@ -85,7 +92,10 @@ async function adminProxyWithSpringSession(request: NextRequest) {
 
   const session = await getSpringSession(sessionCookie)
   if (session.state === 'anonymous') {
-    return NextResponse.redirect(new URL('/admin/signin', request.url))
+    return withSpringSessionCookie(
+      NextResponse.redirect(new URL('/admin/signin', request.url)),
+      session
+    )
   }
   if (session.state === 'forbidden') {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
@@ -94,7 +104,7 @@ async function adminProxyWithSpringSession(request: NextRequest) {
     return NextResponse.json({ error: 'spring_session_unavailable' }, { status: 503 })
   }
 
-  return withNonceCspResponse(request)
+  return withSpringSessionCookie(withNonceCspResponse(request), session)
 }
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {

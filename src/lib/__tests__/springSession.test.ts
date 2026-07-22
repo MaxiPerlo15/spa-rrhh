@@ -46,6 +46,27 @@ describe('getSpringSession', () => {
     })
   })
 
+  it('preserves Spring raw Set-Cookie when an authorized session rotates', async () => {
+    const { getSpringSession } = await import('../springSession')
+    const rotatedCookie = 'SESSIONID=rotated-456; Path=/; HttpOnly; SameSite=Lax'
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'set-cookie': rotatedCookie }),
+      json: async () => ({
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      })
+    })
+
+    await expect(getSpringSession('SESSIONID=original-123')).resolves.toMatchObject({
+      state: 'authorized',
+      setCookie: rotatedCookie
+    })
+  })
+
   it('returns an anonymous state when Spring returns 401', async () => {
     const { getSpringSession } = await import('../springSession')
 
@@ -57,6 +78,22 @@ describe('getSpringSession', () => {
     const result = await getSpringSession('SESSIONID=expired')
 
     expect(result).toEqual({ state: 'anonymous' })
+  })
+
+  it('preserves Spring raw Set-Cookie when an expired session is cleared', async () => {
+    const { getSpringSession } = await import('../springSession')
+    const expiredCookie = 'SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers({ 'set-cookie': expiredCookie })
+    })
+
+    await expect(getSpringSession('SESSIONID=expired')).resolves.toEqual({
+      state: 'anonymous',
+      setCookie: expiredCookie
+    })
   })
 
   it('returns a forbidden state when Spring returns 403', async () => {
