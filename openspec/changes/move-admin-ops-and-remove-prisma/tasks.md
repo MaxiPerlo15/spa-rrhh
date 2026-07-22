@@ -23,11 +23,13 @@ Chain strategy: feature-branch-chain
 | 2a-fix-a | Relay/auth-mode boundary | PR2a-fix-a | Base: PR2a; relay/UI rollback. |
 | 2a-fix-a2 | Parent-boundary auth-mode correction | PR2a-fix-a2 | Base: PR2a-fix-a; providers/server-env/browser relay proof; ≤400. |
 | 2a-fix-b | Session lifecycle and browser proof | PR2a-fix-b | Base: PR2a-fix-a2; lifecycle/E2E RED→GREEN→REFACTOR; rollback forwarding/tests only. |
-| 2b | Notifications ownership/adapters | PR2b | Base: PR2a-fix-b; rebase before review. |
-| 2c | Audit ownership/adapter | PR2c | Base: PR2b; contracts. |
+| 2b-a | Spring notification API, persistence, and tests | PR2b-a | Base: PR2a-fix-b; ~297 lines. |
+| 2b-b | Next notification collection adapter and tests | PR2b-b | Base: PR2b-a branch; ~379 lines. |
+| 2b-c | Next notification item adapter, Chromium E2E, evidence | PR2b-c | Base: PR2b-b branch; ~396 lines. |
+| 2c | Audit ownership/adapter | PR2c | Base: PR2b-c branch; contracts. |
 | 2d | Settings ownership/adapter | PR2d | Base: PR2c; contracts. |
 
-`feature/tracker → … → PR2a → PR2a-fix-a → 📍 PR2a-fix-a2 → PR2a-fix-b → PR2b → PR2c → PR2d`. Target the immediate parent; rebase PR2a-fix-b then PR2b.
+`feature/tracker → … → PR2a → PR2a-fix-a → 📍 PR2a-fix-a2 → PR2a-fix-b → PR2b-a → PR2b-b → PR2b-c → PR2c → PR2d`. Target the immediate parent; rebase each child before review.
 
 ## Phase 2: Flyway and Reconciliation Chain
 
@@ -44,9 +46,16 @@ Chain strategy: feature-branch-chain
 - [ ] 3.7 **PR2a-fix-b RED** Spring/JUnit and Vitest `src/proxy.ts`/`src/lib/springSession.ts` contracts: rotated/expired `SESSIONID` reaches Next. Depends PR2a-fix-a2.
 - [ ] 3.8 **PR2a-fix-b GREEN→REFACTOR** Forward rotation/stale expiry; harden `tests/e2e/auth-spring-session.spec.ts` cookie handoff and `/admin`. **≤400**.
 - [ ] 3.9 **PR2a-fix-b verify** Run focused JUnit, Vitest, Playwright, lint/typecheck; then rebase PR2b.
-- [ ] 3.10 **PR2b RED→GREEN→REFACTOR** Spring and `src/app/api/admin/notifications/{route.ts,[id]/route.ts}`: pagination/DTOs, 201, 400/404, 401/403/503. Depends PR2a-fix-b; **≤400**.
-- [ ] 3.11 **PR2c RED→GREEN→REFACTOR** Spring audit and `src/app/api/admin/audit/route.ts`: filters, UTC bounds, order, pagination, errors. Depends PR2b; **≤400**.
-- [ ] 3.12 **PR2d RED→GREEN→REFACTOR** Spring settings and `src/app/api/admin/settings/route.ts`: shape and error envelopes. Depends PR2c; **≤400**.
+- [ ] 3.10 **PR2b-a** Add Spring notification entities/repository/service/controller and JUnit tests under `backend/src/**`: pagination/DTOs, create, errors; base PR2a-fix-b; **~297**.
+- [ ] 3.11 **PR2b-b** Add `src/app/api/admin/notifications/route.ts` and Vitest contracts for GET/POST/bulk DELETE: preserve DTOs, 201, 400, 401/403/503; base PR2b-a; **~379**.
+- [ ] 3.12 **PR2b-c** Add `src/app/api/admin/notifications/[id]/route.ts` PATCH/DELETE and `tests/e2e/admin-notifications.spec.ts` Chromium coverage; record only executed/reconstructed evidence; base PR2b-b; **~396**.
+- [ ] 3.13 **PR2b-c evidence** State in task/verification evidence that original migration RED history was not retained after reconstruction; do not claim full Strict TDD for pre-existing notification changes.
+- [ ] 3.14 **PR2c RED→GREEN→REFACTOR** Spring audit and `src/app/api/admin/audit/route.ts`: filters, UTC bounds, order, pagination, errors. Depends PR2b-c; **≤400**.
+- [ ] 3.15 **PR2d RED→GREEN→REFACTOR** Spring settings and `src/app/api/admin/settings/route.ts`: shape and error envelopes. Depends PR2c; **≤400**.
+
+### Notification Evidence Constraint
+
+Original migration RED history was not retained after reconstruction. Preserve behavior with the listed tests, but do not claim full Strict TDD for pre-existing notification changes.
 
 ## Phase 4: Remaining Contract and Decommission
 
