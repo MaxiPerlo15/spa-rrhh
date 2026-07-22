@@ -36,8 +36,8 @@ Chain strategy: feature-branch-chain
 ## Phase 3: Admin Ownership
 
 - [x] 3.1 **PR2a RED→GREEN→REFACTOR** Spring health and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`.
-- [ ] 3.2 **PR2a-fix-a RED** Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts`: relay, logout cookies, redaction, and auth mode.
-- [ ] 3.3 **PR2a-fix-a GREEN→REFACTOR** Use `src/lib/server/springBackend.ts`; align `src/lib/checkEnv.ts` and admin props; forward relay cookies only; **≤400**.
+- [x] 3.2 **PR2a-fix-a RED** Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts`: relay, logout cookies, redaction, and auth mode.
+- [x] 3.3 **PR2a-fix-a GREEN→REFACTOR** Use `src/lib/server/springBackend.ts`; align `src/lib/checkEnv.ts` and admin props; forward relay cookies only; **≤400**.
 - [ ] 3.4 **PR2a-fix-a2 RED** Add `src/app/__tests__/layout.test.tsx` and `tests/e2e/auth-spring-session.spec.ts` contracts: Spring mode omits global `SessionProvider`/`SentryUserContext`, uses `/admin`, and submits only to the same-origin relay.
 - [ ] 3.5 **PR2a-fix-a2 GREEN→REFACTOR** Gate providers in `src/app/layout.tsx`; set Spring-matching server flags in `playwright.config.ts`; correct the Playwright `/admin` route and relay assertion. Preserve legacy mode; rollback layout/config/E2E only; **≤400**.
 - [ ] 3.6 **PR2a-fix-a2 verify** Run layout/Vitest and Chromium Spring relay proof, lint/typecheck; rebase PR2a-fix-b before its RED task.
