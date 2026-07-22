@@ -35,8 +35,8 @@ Chain strategy: feature-branch-chain
 ## Phase 3: Admin Ownership
 
 - [x] 3.1 **PR2a RED→GREEN→REFACTOR** Spring DB health and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`. Rollback health only.
-- [ ] 3.2 **PR2a-fix-a RED** Add Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts` and admin pages: same-origin relay, logout cookies, redaction, and legacy-vs-Spring mode.
-- [ ] 3.3 **PR2a-fix-a GREEN→REFACTOR** Implement via `src/lib/server/springBackend.ts`; make `src/lib/checkEnv.ts` and admin server/client props agree on Spring mode. Forward relay cookies only; rollback relay/UI/parity; **≤400**.
+- [x] 3.2 **PR2a-fix-a RED** Add Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts` and admin pages: same-origin relay, logout cookies, redaction, and legacy-vs-Spring mode.
+- [x] 3.3 **PR2a-fix-a GREEN→REFACTOR** Implement via `src/lib/server/springBackend.ts`; make `src/lib/checkEnv.ts` and admin server/client props agree on Spring mode. Forward relay cookies only; rollback relay/UI/parity; **≤400**.
 - [ ] 3.4 **PR2a-fix-b RED** Add Spring/JUnit validation expiry/rotation and Vitest `src/proxy.ts`/`src/lib/springSession.ts` forwarding contracts; assert rotated/expired `SESSIONID` reaches Next.
 - [ ] 3.5 **PR2a-fix-b GREEN→REFACTOR** Forward validation rotation and stale expiry; harden `tests/e2e/auth-spring-session.spec.ts` for cookie handoff and successful `/admin` navigation. Rollback forwarding/E2E only; **≤400**.
 - [ ] 3.6 **PR2a-fix-b verify** Run focused JUnit, Vitest, Playwright navigation proof, lint, and typecheck; then rebase PR2b onto PR2a-fix-b.

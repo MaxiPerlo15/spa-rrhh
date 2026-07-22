@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAdminAuth } from './auth-mode-provider'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useToast } from '@/contexts/ToastContext'
@@ -268,7 +268,7 @@ const DOMAIN_TUTORIALS_BASE: Record<TutorialKind, DomainStep[]> = {
 }
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession()
+  const { session, status, springAuthEnabled } = useAdminAuth()
   const router = useRouter()
   const { showSuccess, showError, showInfo } = useToast()
   useMobileKeyboardAssist()
@@ -1764,11 +1764,15 @@ export default function AdminDashboard() {
       closeOnBackdropClick: true,
       onConfirm: async () => {
         try {
-          const callbackUrl = `${window.location.origin}/admin/signin`
-          await signOut({
-            callbackUrl,
-            redirect: false
-          })
+          if (springAuthEnabled) {
+            await fetch('/api/auth/spring/logout', { method: 'POST' })
+          } else {
+            const callbackUrl = `${window.location.origin}/admin/signin`
+            await signOut({
+              callbackUrl,
+              redirect: false
+            })
+          }
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
           router.replace('/admin/signin')
           router.refresh()

@@ -7,8 +7,6 @@ const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
 // Set env vars BEFORE importing the component
-vi.stubEnv('NEXT_PUBLIC_SPRING_AUTH_ENABLED', 'true')
-vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://spring.example.com')
 
 const {
   pushMock,
@@ -36,20 +34,29 @@ vi.mock('@/contexts/ToastContext', () => ({
   })
 }))
 
+import { AdminAuthModeProvider } from '@/app/admin/auth-mode-provider'
 import SignInPage from '@/app/admin/signin/page'
+
+function renderSpringSignInPage() {
+  return render(
+    <AdminAuthModeProvider springAuthEnabled>
+      <SignInPage />
+    </AdminAuthModeProvider>
+  )
+}
 
 describe('SignInPage — Spring relay mode', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('POSTs to Spring /api/v1/auth/login instead of NextAuth', async () => {
+  it('POSTs to the same-origin Spring login relay instead of exposing the Spring backend', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ userId: 'u1', email: 'admin@test.com' })
     })
 
-    render(<SignInPage />)
+    renderSpringSignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'admin@test.com' }
@@ -61,7 +68,7 @@ describe('SignInPage — Spring relay mode', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://spring.example.com/api/v1/auth/login',
+        '/api/auth/spring/login',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,7 +84,7 @@ describe('SignInPage — Spring relay mode', () => {
       json: async () => ({ userId: 'u1', email: 'admin@test.com' })
     })
 
-    render(<SignInPage />)
+    renderSpringSignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'admin@test.com' }
@@ -101,7 +108,7 @@ describe('SignInPage — Spring relay mode', () => {
       json: async () => ({ error: 'Invalid credentials' })
     })
 
-    render(<SignInPage />)
+    renderSpringSignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'admin@test.com' }
@@ -123,7 +130,7 @@ describe('SignInPage — Spring relay mode', () => {
       json: async () => ({ userId: 'u1', email: 'admin@test.com' })
     })
 
-    render(<SignInPage />)
+    renderSpringSignInPage()
 
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: ' ADMIN@TEST.COM ' }
@@ -135,7 +142,7 @@ describe('SignInPage — Spring relay mode', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://spring.example.com/api/v1/auth/login',
+        '/api/auth/spring/login',
         expect.objectContaining({
           body: JSON.stringify({ email: 'admin@test.com', password: 'Password123!' })
         })

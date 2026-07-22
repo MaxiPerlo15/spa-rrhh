@@ -120,4 +120,15 @@ describe('validateRuntimeEnv', () => {
 
     expect(() => validateRuntimeEnv()).toThrow('BACKEND_URL must use http/https protocol')
   })
+
+  it('rejects a public Spring mode flag that disagrees with the server mode', () => {
+    const env = process.env as Record<string, string | undefined>
+
+    env.SPRING_AUTH_ENABLED = 'true'
+    env.BACKEND_URL = 'https://spring.example.com'
+    env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    env.NEXT_PUBLIC_SPRING_AUTH_ENABLED = 'false'
+
+    expect(() => validateRuntimeEnv()).toThrow('NEXT_PUBLIC_SPRING_AUTH_ENABLED must match SPRING_AUTH_ENABLED')
+  })
 })

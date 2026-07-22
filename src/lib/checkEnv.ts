@@ -150,6 +150,11 @@ export function validateRuntimeEnv() {
     }
   }
 
+  const publicSpringAuthEnabled = process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED
+  if (publicSpringAuthEnabled && publicSpringAuthEnabled !== process.env.SPRING_AUTH_ENABLED) {
+    errors.push('- NEXT_PUBLIC_SPRING_AUTH_ENABLED must match SPRING_AUTH_ENABLED')
+  }
+
   // Integration-specific checks
   if (!context.isProduction && process.env.RESEND_API_KEY && !process.env.FROM_EMAIL) {
     errors.push('- FROM_EMAIL (required when RESEND_API_KEY is configured)')

@@ -1,12 +1,12 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2a Spring Health Ownership
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2a-fix-a Relay and Auth-Mode Boundary
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Work unit: PR2a — Spring health ownership and Next adapter.
-- Boundary: `PR1c-e → PR2a`; notifications, audit, settings, retention, and Prisma removal remain excluded.
-- Review budget: 257 changed lines including Spring controller/service, Next adapter, contract tests, and planning artifacts; within the 400-line limit.
-- Rollback: revert the health controller/service, security matcher, adapter, and health contract tests as one unit.
+- Work unit: PR2a-fix-a — same-origin Spring login/logout relay and client auth-mode boundary.
+- Boundary: `PR2a → PR2a-fix-a`; session rotation/stale handling, browser E2E, notifications, audit, settings, retention, and Prisma removal remain excluded.
+- Review budget: relay routes, focused contracts, and the server/client boundary remain within the 400-line review budget.
+- Rollback: revert only the relay routes, signin/dashboard boundary, Spring-mode parity validation, and their contracts.
 
 ## Completed Tasks
 
@@ -20,6 +20,8 @@
 - [x] 2.4 PR1c-d RED→GREEN→REFACTOR: reconciliation approvals reject aliases, validate complete match evidence, and persist immutable checksum-bound product resets.
 - [x] 2.5 PR1c-e RED→GREEN→REFACTOR: forward V4 adds run checksum state and derives immutable compatible checksums from valid V3 approval evidence without mutating append-only runs; V5 backfills approved MATCHED/reset settings, blocks unresolved or checksum-divergent evidence, and enforces target unique/not-null/FK constraints.
 - [x] 3.1 PR2a RED→GREEN→REFACTOR: Spring owns a `SELECT 1` readiness check at `/api/v1/health`; the Next adapter delegates without Prisma fallback and preserves 200/503 `{status,database}` plus `Cache-Control: no-store`.
+- [x] 3.2 PR2a-fix-a RED: Vitest contracts cover same-origin login, credential-error redaction, login/logout `Set-Cookie` forwarding, and the Spring-versus-legacy client boundary.
+- [x] 3.3 PR2a-fix-a GREEN→REFACTOR: Next relays Spring login/logout through same-origin routes; the server-owned admin layout provides Spring mode to signin/dashboard clients and rejects public-flag disagreement.
 
 ## TDD Cycle Evidence
 
@@ -32,6 +34,8 @@
 | 2.4 | `backend/src/test/java/com/meinardi/rrhh/{application/AdminSettingsReconciliationServiceTest,infrastructure/ReconciliationEvidencePersistenceTest}.java` | Unit + PostgreSQL integration | ✅ 9/9 existing focused tests before this retry | ✅ New factory/getter assertions failed to compile before the durable binding API existed | ✅ 10/10 service+persistence, 15/15 focused PostgreSQL with Flyway, 210/210 full Maven | ✅ Missing MATCHED email and missing RESET_APPROVED product fields reject at PostgreSQL; complete MATCHED and RESET_APPROVED rows persist | ✅ V3 status-dependent check constraint and factory mappings keep each status explicit |
 | 2.5 | `backend/src/test/java/com/meinardi/rrhh/infrastructure/ReconciliationBackfillIntegrationTest.java` | PostgreSQL integration | ✅ 8/8 focused before this correction | ✅ A real V3 fixture with valid immutable evidence failed V5 because `reconciliation_runs.report_checksum` was NULL | ✅ 10/10 focused PostgreSQL; 220/220 full Maven | ✅ Valid V3→V5 succeeds from derived approval checksum while conflicting V3 approval checksums block; previous MATCHED/reset/drift and UNIQUE `23505` cases remain | ✅ V2/V3 remain untouched; V4 inserts an append-only derived-checksum table and V5 prefers it only when the run column is NULL |
 | 3.1 | `src/lib/__tests__/healthRoute.test.ts`, `backend/src/test/java/com/meinardi/rrhh/{application/HealthServiceTest,presentation/HealthControllerTest}.java` | Unit + MockMvc | ✅ 2/2 existing health Vitest; 14/14 focused Spring security tests | ✅ Next contract tests failed against Prisma behavior; Spring tests failed to compile before the health service/controller existed | ✅ 2/2 focused Vitest; 4/4 focused Maven; 433/433 full Vitest; 224/224 full Maven | ✅ Ready/unavailable paths prove no Prisma fallback, Spring forwarding, database `SELECT 1`, and browser 200/503 no-store behavior | ➖ None needed — small controller/service and adapter are already direct |
+| 3.2 | `src/lib/__tests__/{springAuthRelayRoute,signinPageSpring,adminAuthBoundary,checkEnv}.test.ts*` | Unit | ✅ 18/18 existing focused contracts | ✅ New relay imports failed; revised signin expectation and server/client parity assertion failed before implementation | ✅ 24/24 focused; 439/439 full Vitest | ✅ Successful login body/cookie, redacted invalid credentials, logout cookie clearing, Spring and legacy client branches, and mismatched public/server flags | ✅ The server layout provides Spring mode and isolates NextAuth usage to the legacy provider branch |
+| 3.3 | Same focused contracts | Unit | ✅ 18/18 existing focused contracts | ✅ Shared with task 3.2: routes and client boundary did not exist | ✅ 24/24 focused; lint and typecheck passed after generating the local Prisma client | ✅ Spring/legacy modes and login/error/logout responses exercise distinct paths | ✅ The server layout provides the private mode through context; no client code reads the backend URL |
 
 ## Verification
 
@@ -46,6 +50,12 @@
 - Focused PostgreSQL: `cd backend && mvn test -Dtest=AdminSettingsReconciliationServiceTest,ReconciliationEvidencePersistenceTest,FlywayEmptyDatabaseIntegrationTest,FlywayAdoptionIntegrationTest` — 15/15 passed on PostgreSQL 16 Testcontainers.
 - Full Maven: `cd backend && mvn test` — 210/210 passed.
 - `git diff --check` — passed.
+- Safety net: `npx vitest run src/lib/__tests__/{signinPageSpring,checkEnv,springBackend}.test.ts*` — 18/18 passed.
+- RED: `npx vitest run src/lib/__tests__/{springAuthRelayRoute,signinPageSpring,checkEnv,adminAuthBoundary}.test.ts*` — relay modules were missing, same-origin client expectation failed, and server/public Spring mode disagreement was accepted.
+- Focused GREEN: `npx vitest run src/lib/__tests__/{springAuthRelayRoute,signinPageSpring,checkEnv,springBackend,adminAuthBoundary}.test.ts*` — 24/24 passed.
+- Full Vitest: `npm run test:unit` — 439/439 passed.
+- `npm run lint` — passed.
+- `DATABASE_URL='postgresql://user:password@localhost:5432/spa_rrhh' npx prisma generate && npm run typecheck` — passed; generation needed a local `DATABASE_URL` to load `prisma.config.ts`.
 - RED: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 2 failed assertions and a missing `usuarioId` column before V4 existed.
 - Focused PostgreSQL: `cd backend && mvn test -Dtest=ReconciliationBackfillIntegrationTest` — 3/3 passed on PostgreSQL 16 Testcontainers.
 - Full Maven: `cd backend && mvn test` — 213/213 passed.
@@ -72,4 +82,4 @@
 
 ## Status
 
-PR2a is complete. Spring now owns database readiness through `SELECT 1` and exposes `/api/v1/health`; Next delegates with the configured internal header and always returns the established 200/503 no-store browser contract without Prisma fallback. Prior PR1c-e migration evidence remains unchanged. Tasks 3.2 and later phases remain pending. No commit or push was performed.
+PR2a-fix-a is complete. Spring login/logout now use same-origin Next relays that forward `Set-Cookie` without exposing the Spring backend URL; errors are redacted. The server-owned admin layout provides Spring mode through context, which isolates NextAuth to legacy mode. Session lifecycle rotation/stale fixes and browser E2E remain for PR2a-fix-b. No push was performed.

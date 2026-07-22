@@ -5,16 +5,10 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
-
-function isSpringAuthEnabled() {
-  return process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED === 'true'
-}
-
-function getSpringBackendUrl() {
-  return process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, '') || null
-}
+import { useAdminAuth } from '../auth-mode-provider'
 
 export default function SignInPage() {
+  const { springAuthEnabled } = useAdminAuth()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,9 +34,8 @@ export default function SignInPage() {
 
       setIsLoading(true)
 
-      // Spring relay mode: POST directly to Spring backend
-      if (isSpringAuthEnabled() && getSpringBackendUrl()) {
-        const response = await fetch(`${getSpringBackendUrl()}/api/v1/auth/login`, {
+      if (springAuthEnabled) {
+        const response = await fetch('/api/auth/spring/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: normalizedEmail, password: trimmedPassword })

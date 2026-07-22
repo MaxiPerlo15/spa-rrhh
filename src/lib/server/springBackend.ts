@@ -5,6 +5,10 @@ export function getBackendUrl() {
   return backendUrl || null
 }
 
+export function isSpringAuthEnabled() {
+  return process.env.SPRING_AUTH_ENABLED === 'true'
+}
+
 export function getSpringBackendHeaders(): Record<string, string> {
   const token = process.env.BACKEND_INTERNAL_API_TOKEN?.trim()
 
