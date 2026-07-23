@@ -4,10 +4,11 @@
 
 | Field | Value |
 |---|---|
-| Estimated changed lines | 3,750–4,950; each child ≤400 |
+| Estimated changed lines | 4,700–5,900; every child ≤400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Delivery / chain | ask-on-risk resolved / feature-branch-chain |
+| Delivery strategy | ask-on-risk resolved |
+| Chain strategy | feature-branch-chain |
 
 Decision needed before apply: No
 Chained PRs recommended: Yes
@@ -18,47 +19,39 @@ Chain strategy: feature-branch-chain
 
 | Unit | Goal | Likely PR | Notes |
 |---|---|---|---|
-| 1a–1c-e | Completed foundation | PR1a → PR1c-e | Immediate-parent commits. |
-| 2a | Health ownership and Next adapter | PR2a | Base: PR1c-e; contracts. |
-| 2a-fix-a | Relay/auth-mode boundary | PR2a-fix-a | Base: PR2a; relay/UI rollback. |
-| 2a-fix-a2 | Parent-boundary auth-mode correction | PR2a-fix-a2 | Base: PR2a-fix-a; providers/server-env/browser relay proof; ≤400. |
-| 2a-fix-b | Session lifecycle and browser proof | PR2a-fix-b | Base: PR2a-fix-a2; lifecycle/E2E RED→GREEN→REFACTOR; rollback forwarding/tests only. |
-| 2b-a | Spring notification API, persistence, and tests | PR2b-a | Base: PR2a-fix-b; ~297 lines. |
-| 2b-b | Next notification collection adapter and tests | PR2b-b | Base: PR2b-a branch; ~379 lines. |
-| 2b-c | Next notification item adapter, Chromium E2E, evidence | PR2b-c | Base: PR2b-b branch; ~396 lines. |
-| 2c | Audit ownership/adapter | PR2c | Base: PR2b-c branch; contracts. |
-| 2d | Settings ownership/adapter | PR2d | Base: PR2c; contracts. |
+| 1 | Spring audit persistence/API | PR2c-a | Base PR2b-c; tests and rollback included. |
+| 2 | Next audit adapter | PR2c-b | Base PR2c-a; adapter-only rollback. |
+| 3 | Audit call-site cutover | PR2c-c→e | Immediate-parent domain slices. |
+| 4 | Settings adapter | PR2d | Base PR2c-e. |
 
-`feature/tracker → … → PR2a → PR2a-fix-a → 📍 PR2a-fix-a2 → PR2a-fix-b → PR2b-a → PR2b-b → PR2b-c → PR2c → PR2d`. Target the immediate parent; rebase each child before review.
+`feature/tracker → … → PR2b-c → PR2c-a → PR2c-b → PR2c-c → PR2c-d → PR2c-e → PR2d`. Every child targets its immediate parent; retarget/rebase polluted diffs before review.
 
-## Phase 2: Flyway and Reconciliation Chain
+## Phase 1: Prior Delivery Evidence
 
-- [x] 2.1–2.5 **PR1c-a→e** Flyway baseline, adoption, evidence, approvals, and verified backfill/parity; each ≤400 with rollback.
+- [x] 1.1 PR1 foundation/Flyway and PR2a auth/health chain remain historical dependencies; do not reopen them in PR2c.
+- [x] 1.2 PR2b-a Spring notifications landed with the approved 423-line exception; PR2b-b collection landed at 400 and PR2b-c item/Chromium at 386.
+- [x] 1.3 Original notification migration RED history was not retained; only PR2b-c item's observed RED→GREEN is claimed.
 
-## Phase 3: Admin Ownership
+## Phase 2: Spring Audit Ownership (PR2c-a)
 
-- [x] 3.1 **PR2a RED→GREEN→REFACTOR** Spring health and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`.
-- [x] 3.2 **PR2a-fix-a RED** Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts`: relay, logout cookies, redaction, and auth mode.
-- [x] 3.3 **PR2a-fix-a GREEN→REFACTOR** Use `src/lib/server/springBackend.ts`; align `src/lib/checkEnv.ts` and admin props; forward relay cookies only; **≤400**.
-- [x] 3.4 **PR2a-fix-a2 RED** Add `src/app/__tests__/layout.test.tsx` and `tests/e2e/auth-spring-session.spec.ts` contracts: Spring mode omits global `SessionProvider`/`SentryUserContext`, uses `/admin`, and submits only to the same-origin relay.
-- [x] 3.5 **PR2a-fix-a2 GREEN→REFACTOR** Gate providers in `src/app/layout.tsx`; set Spring-matching server flags in `playwright.config.ts`; correct the Playwright `/admin` route and relay assertion. Preserve legacy mode; rollback layout/config/E2E only; **≤400**.
-- [x] 3.6 **PR2a-fix-a2 verify** Run layout/Vitest and Chromium Spring relay proof, lint/typecheck; rebase PR2a-fix-b before its RED task.
-- [x] 3.7 **PR2a-fix-b RED** Spring/JUnit and Vitest `src/proxy.ts`/`src/lib/springSession.ts` contracts: rotated/expired `SESSIONID` reaches Next. Depends PR2a-fix-a2.
-- [x] 3.8 **PR2a-fix-b GREEN→REFACTOR** Forward rotation/stale expiry; harden `tests/e2e/auth-spring-session.spec.ts` cookie handoff and `/admin`. **≤400**.
-- [x] 3.9 **PR2a-fix-b verify** Run focused JUnit, Vitest, Playwright, lint/typecheck; then rebase PR2b.
-- [x] 3.10 **PR2b-a** Add Spring notification entities/repository/service/controller and JUnit tests under `backend/src/**`: pagination/DTOs, create, errors; base PR2a-fix-b; **~297**.
-- [x] 3.11 **PR2b-b** Add `src/app/api/admin/notifications/route.ts` and Vitest contracts for GET/POST/bulk DELETE: preserve DTOs, 201, 400, 401/403/503; base PR2b-a; **~379**.
-- [x] 3.12 **PR2b-c** Add `src/app/api/admin/notifications/[id]/route.ts` PATCH/DELETE and `tests/e2e/admin-notifications.spec.ts` Chromium coverage; record only executed/reconstructed evidence; base PR2b-b; **~396**.
-- [x] 3.13 **PR2b-c evidence** State in task/verification evidence that original migration RED history was not retained after reconstruction; do not claim full Strict TDD for pre-existing notification changes.
-- [ ] 3.14 **PR2c RED→GREEN→REFACTOR** Spring audit and `src/app/api/admin/audit/route.ts`: filters, UTC bounds, order, pagination, errors. Depends PR2b-c; **≤400**.
-- [ ] 3.15 **PR2d RED→GREEN→REFACTOR** Spring settings and `src/app/api/admin/settings/route.ts`: shape and error envelopes. Depends PR2c; **≤400**.
+- [ ] 2.1 **RED** Add failing JUnit/MockMvc/PostgreSQL tests for `backend/src/**/audit/**`: immutable fields, UTC bounds, descending order, filters, pagination, 401/403/500.
+- [ ] 2.2 **GREEN** Add Flyway audit schema plus Spring entity/repository/service/controller under `backend/src/**`; make SUCCESS atomic and DENIED/ERROR independently durable.
+- [ ] 2.3 **REFACTOR/verify** Run focused tests; keep the slice ≤400. Rollback reverts only PR2c-a and leaves Next Prisma behavior intact.
 
-### Notification Evidence Constraint
+## Phase 3: Next Adapter and Audit Call Sites
 
-Original migration RED history was not retained after reconstruction. Preserve behavior with the listed tests, but do not claim full Strict TDD for pre-existing notification changes.
+- [ ] 3.1 **PR2c-b RED** Add failing Vitest contracts for `src/app/api/admin/audit/route.ts`: filters/envelope, UTC dates, 400/401/403/503/500, and no Prisma fallback.
+- [ ] 3.2 **PR2c-b GREEN→REFACTOR** Forward through `src/lib/server/springBackend.ts` while retaining `src/lib/apiValidation.ts` shape. Rollback adapter only; ≤400.
+- [ ] 3.3 **PR2c-c RED→GREEN→REFACTOR** Cut over `src/app/api/vacancies/**` and `src/app/api/contacts/[id]/route.ts`; prove atomic SUCCESS and durable DENIED/ERROR. Base PR2c-b; rollback these call sites; ≤400.
+- [ ] 3.4 **PR2c-d RED→GREEN→REFACTOR** Cut over `src/app/api/applications/[id]/route.ts`; prove `application.view` ERROR and mutation rollback. Base PR2c-c; ≤400.
+- [ ] 3.5 **PR2c-e RED→GREEN→REFACTOR** Cut over `src/app/api/admin/candidates/**`; prove `candidate.create` DENIED/SUCCESS rollback; remove only migrated `src/lib/adminAudit.ts` uses. Base PR2c-d; ≤400.
+- [ ] 3.6 Run focused JUnit/Vitest per slice, then audit Playwright, lint, and typecheck; record commands/results before rebasing PR2d.
 
-PR2b-c has executed evidence only: its new item-adapter tests were written first and failed against the legacy Prisma route, then passed after the Spring proxy implementation. Chromium ran against a temporary PostgreSQL 16 database, Spring Boot, and an ephemeral admin; it proved UI-issued PATCH/DELETE requests and persisted Spring state. This does not reconstruct a RED history for pre-existing collection or Spring notification code.
+## Phase 4: Follow-up
 
-## Phase 4: Remaining Contract and Decommission
+- [ ] 4.1 **PR2d** implement settings RED→GREEN→REFACTOR in `src/app/api/admin/settings/route.ts` after PR2c-e; preserve shape/errors; ≤400.
+- [ ] 4.2 Keep Prisma removal gated behind reconciliation, parity, smoke, archive, and no-reference checks.
 
-- [ ] 4.1 PR3–PR5: retention/policy, audit/export evidence, archive/verifier/CI, then Prisma removal only after checksum, parity, smoke gates; **≤400**.
+### Historical Evidence Constraint
+
+No PR2c audit code, tests, or execution evidence exists yet. Record each new RED→GREEN→REFACTOR run when executed; never backfill historical evidence.
