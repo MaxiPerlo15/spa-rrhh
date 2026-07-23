@@ -18,6 +18,7 @@ import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.NotificationService;
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
@@ -25,6 +26,7 @@ import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.presentation.ApplicationRestController;
 import com.meinardi.rrhh.presentation.NotificationController;
+import com.meinardi.rrhh.presentation.AuditController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -42,7 +44,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, NotificationController.class})
+@WebMvcTest({ApplicationRestController.class, NotificationController.class, AuditController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -73,6 +75,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private ApplicationAdminInputBoundary applicationAdminInputBoundary;
   @MockitoBean private PasswordResetService passwordResetService;
   @MockitoBean private NotificationService notificationService;
+  @MockitoBean private AuditService auditService;
   @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
@@ -182,6 +185,23 @@ class SecurityConfigApplicationRoutesTest {
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.pagination.page").value(1));
+  }
+
+  @Test
+  void auditRouteReturnsJson401WithoutASession() throws Exception {
+    mockMvc.perform(get("/api/v1/admin/audit"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+  }
+
+  @Test
+  void auditRouteReturnsJson403WithoutAdminPermission() throws Exception {
+    Usuario administrator = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
+
+    mockMvc.perform(get("/api/v1/admin/audit").session(sessionFor(administrator)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
   }
 
   @ParameterizedTest

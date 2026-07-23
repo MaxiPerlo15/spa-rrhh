@@ -71,13 +71,13 @@ class FlywayEmptyDatabaseIntegrationTest {
   }
 
   @Test
-  void recordsTheResolvedVersionFiveChecksumAndStartsWithHibernateValidation() throws Exception {
-    var versionFive = flyway.info().current();
+  void recordsTheResolvedVersionSixChecksumAndStartsWithHibernateValidation() throws Exception {
+    var versionSix = flyway.info().current();
 
-    assertThat(historyChecksum()).isEqualTo(versionFive.getAppliedChecksum());
-    assertThat(versionFive.getResolvedChecksum()).isEqualTo(versionFive.getAppliedChecksum());
-    assertThat(versionFive.isChecksumMatching()).isTrue();
-    assertThat(versionFive.getVersion().getVersion()).isEqualTo("5");
+    assertThat(historyChecksum()).isEqualTo(versionSix.getAppliedChecksum());
+    assertThat(versionSix.getResolvedChecksum()).isEqualTo(versionSix.getAppliedChecksum());
+    assertThat(versionSix.isChecksumMatching()).isTrue();
+    assertThat(versionSix.getVersion().getVersion()).isEqualTo("6");
   }
 
   private Set<String> catalogTables() throws Exception {
@@ -98,7 +98,7 @@ class FlywayEmptyDatabaseIntegrationTest {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
-                "select checksum from flyway_schema_history where version = '5' and success = true");
+                "select checksum from flyway_schema_history where version = '6' and success = true");
         ResultSet result = statement.executeQuery()) {
       assertThat(result.next()).isTrue();
       return result.getInt(1);

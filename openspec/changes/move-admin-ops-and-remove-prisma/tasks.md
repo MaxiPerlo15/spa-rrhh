@@ -34,9 +34,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Spring Audit Ownership (PR2c-a)
 
-- [ ] 2.1 **RED** Add failing JUnit/MockMvc/PostgreSQL tests for `backend/src/**/audit/**`: immutable fields, UTC bounds, descending order, filters, pagination, 401/403/500.
-- [ ] 2.2 **GREEN** Add Flyway audit schema plus Spring entity/repository/service/controller under `backend/src/**`; make SUCCESS atomic and DENIED/ERROR independently durable.
-- [ ] 2.3 **REFACTOR/verify** Run focused tests; keep the slice ≤400. Rollback reverts only PR2c-a and leaves Next Prisma behavior intact.
+- [x] 2.1 **RED** Add failing JUnit/MockMvc/PostgreSQL tests for `backend/src/**/audit/**`: immutable fields, UTC bounds, descending order, filters, pagination, 401/403/500.
+- [x] 2.2 **GREEN** Add Flyway audit schema plus Spring entity/repository/service/controller under `backend/src/**`; make SUCCESS atomic and DENIED/ERROR independently durable.
+- [x] 2.3 **REFACTOR/verify** Run focused tests; keep the slice ≤400. Rollback reverts only PR2c-a and leaves Next Prisma behavior intact.
 
 ## Phase 3: Next Adapter and Audit Call Sites
 
@@ -54,4 +54,4 @@ Chain strategy: feature-branch-chain
 
 ### Historical Evidence Constraint
 
-No PR2c audit code, tests, or execution evidence exists yet. Record each new RED→GREEN→REFACTOR run when executed; never backfill historical evidence.
+PR2c-a audit code, tests, and execution evidence are recorded above. Record each later PR2c slice's RED→GREEN→REFACTOR run when executed; never backfill historical evidence.
