@@ -1,11 +1,11 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-c call-site A
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-d application audit
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Boundary: `PR2c-b → PR2c-c call-site A`; `POST /api/vacancies` only.
-- Excluded: vacancy-detail, contacts, settings, retention, Prisma decommission, and later call sites.
-- Rollback: revert the vacancy POST proxy, `AuditedVacancyCreator`, and its focused contracts; Spring audit ownership remains intact.
+- Boundary: `PR2c-c → PR2c-d`; application detail GET/PATCH/DELETE only.
+- Excluded: vacancy-detail, contacts, candidates, settings, retention, Prisma decommission, and later call sites.
+- Rollback: revert the application route proxy, `AuditedApplicationAdmin`, and focused contracts; Spring audit ownership remains intact.
 
 ## Completed Tasks
 
@@ -27,6 +27,7 @@
 - [x] 3.1 PR2c-b RED: Vitest contracts cover audit filter/envelope forwarding, UTC dates, validation, authorization errors, Spring failures, no-store, and no Prisma fallback.
 - [x] 3.2 PR2c-b GREEN→REFACTOR: the thin Spring proxy preserves the validated query and forwards authorized `SESSIONID` rotation to both the audit request and browser response.
 - [x] 3.3a PR2c-c RED→GREEN→REFACTOR: cut over `POST /api/vacancies` to Spring-session actor forwarding and the transactional Spring `vacancy.create` audit path. The proxy relays rotated/expiry cookies on every session, validation, CSRF, and Spring-error exit; it only forwards validated first-hop IP and bounded user-agent context. Spring records SUCCESS in the mutation transaction and ERROR independently if the success audit fails.
+- [x] 3.4 PR2c-d RED→GREEN→REFACTOR: cut over application detail GET/PATCH/DELETE from NextAuth/Prisma audit calls to Spring-session forwarding and the transactional `AuditedApplicationAdmin` path. `application.view` ERROR is independently durable, while failed SUCCESS audit rolls back a status mutation and persists ERROR.
 
 ## TDD Cycle Evidence
 
@@ -41,6 +42,7 @@
 | 2.1–2.3 | `AuditControllerTest`, `AdminAuditLogRepositoryIntegrationTest`, Flyway adoption/empty tests | MockMvc + PostgreSQL 16 | ✅ 4 audit tests passed before correction | ✅ Blank filters returned 500; V6 assertions expected V5 | ✅ 12 focused tests passed | ✅ Complete filters/options, non-default page, UTC bounds/order, transaction durability, immutable metadata, V6 adoption/checksum | ✅ Small blank-filter guard; existing query records retained |
 | 3.1–3.2 | `src/lib/__tests__/adminAuditRoute.test.ts` | Vitest unit | ✅ 7/7 focused adapter contracts | ✅ Authorized rotation contract failed: the stale request cookie reached Spring and the response lacked `Set-Cookie` | ✅ 8/8 focused contracts passed after using the rotated cookie pair upstream and relaying the original `Set-Cookie` downstream | ✅ Existing non-rotation query contract plus rotation request/response assertions exercise distinct cookie paths | ✅ Minimal authorization result carrying `setCookie`; no call-site, settings, or retention changes |
 | 3.3a | `src/lib/__tests__/vacancyRoute.test.ts`, `AdminAuditLogRepositoryIntegrationTest`, `VacancyExceptionHandlerTest` | Vitest + Spring/Testcontainers | ✅ Route 4/4; Maven failed because MVC lacked the new creator mock | ✅ Cookie relay/context and proxy-rollback assertions failed before wiring | ✅ 8/8 route, 4/4 audit integration, 6/6 MVC contracts pass | ✅ Success, anonymous expiry, validation, CSRF, mapped and unexpected Spring errors cover distinct exits | ✅ Allowlisted proxy context and minimal cookie relay; no vacancy-detail, contacts, settings, retention, or Prisma-decommission changes |
+| 3.4 | `src/app/api/applications/[id]/__tests__/route.test.ts`, `AdminAuditLogRepositoryIntegrationTest` | Vitest + Spring/Testcontainers | ⚠️ Node dependencies were absent; Spring baseline 21/21 passed | ✅ Spring-session forwarding and transactional application-audit contracts failed before production changes | ✅ 27/27 focused Vitest and 6/6 PostgreSQL integration tests passed | ✅ GET/PATCH/DELETE session paths plus durable view ERROR and rolled-back update SUCCESS-audit failure | ✅ Primary audited decorator preserves the existing application boundary and route DTOs |
 
 ## Verification
 
@@ -59,6 +61,8 @@
 - `npm run test:unit` — 82 files, 473 tests passed.
 - `npm run typecheck -- --skipLibCheck` — passed.
 - `git diff --check` — passed.
+- `npm run test:unit -- "src/app/api/applications/[id]/__tests__/route.test.ts" "src/lib/server/__tests__/springApplicationGateway.test.ts"` — 27/27 passed.
+- `cd backend && mvn test -Dtest=AdminAuditLogRepositoryIntegrationTest` — 6/6 passed against Testcontainers PostgreSQL 16.
 
 ## Evidence Constraint
 
@@ -66,4 +70,4 @@ Original migration RED history was not retained after reconstruction. The PR2b-c
 
 ## Status
 
-Tasks 2.1–2.3, 3.1–3.2, and 3.3a are complete. PR2c-c remains in progress: vacancy-detail and contact call sites (3.3b) are intentionally pending. This slice excludes those routes, settings, retention, and Prisma decommission.
+Tasks 2.1–2.3, 3.1–3.2, 3.3a, and 3.4 are complete. PR2c-c remains in progress: vacancy-detail and contact call sites (3.3b) are intentionally pending. This slice excludes those routes, candidates, settings, retention, and Prisma decommission.

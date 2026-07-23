@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.AuditedApplicationAdmin;
 import com.meinardi.rrhh.application.AuditQuery;
 import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
@@ -14,6 +15,10 @@ import com.meinardi.rrhh.domain.model.AdminAuditLog;
 import com.meinardi.rrhh.domain.model.AuditOutcome;
 import com.meinardi.rrhh.domain.model.Jornada;
 import com.meinardi.rrhh.domain.model.Modalidad;
+import com.meinardi.rrhh.domain.model.Candidato;
+import com.meinardi.rrhh.domain.model.Postulacion;
+import com.meinardi.rrhh.domain.model.Vacante;
+import com.meinardi.rrhh.domain.model.Ubicacion;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +47,10 @@ class AdminAuditLogRepositoryIntegrationTest {
   @Autowired private AdminAuditLogRepository repository;
   @Autowired private AuditService service;
   @Autowired private AuditedVacancyCreator auditedVacancyCreator;
+  @Autowired private AuditedApplicationAdmin auditedApplicationManager;
   @Autowired private VacanteRepository vacanteRepository;
+  @Autowired private CandidatoRepository candidatoRepository;
+  @Autowired private PostulacionRepository postulacionRepository;
   @MockitoSpyBean private AuditService auditService;
   @Autowired private TransactionTemplate transactions;
   @BeforeEach void clearAudit() { repository.deleteAll(); }
@@ -84,6 +92,38 @@ class AdminAuditLogRepositoryIntegrationTest {
     assertThat(vacanteRepository.findAll()).isEmpty();
     assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent())
         .extracting(AdminAuditLog::getOutcome).containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
+  void keepsApplicationViewErrorsDurableAcrossAnOuterRollback() {
+    transactions.executeWithoutResult(status -> {
+      assertThatThrownBy(() -> auditedApplicationManager.getById("missing"))
+          .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+      status.setRollbackOnly();
+    });
+
+    assertThat(repository.list(new AuditQuery(null, "application.view", "application", null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
+  void rollsBackApplicationStatusWhenItsSuccessAuditFails() {
+    Vacante vacancy = Vacante.create("Reliability", "desc", "reqs", new Ubicacion("Remote", "Remote"), Jornada.FULL_TIME, Modalidad.REMOTE);
+    vacancy.activar();
+    vacancy = vacanteRepository.save(vacancy);
+    Candidato candidate = candidatoRepository.save(Candidato.create("Test User", "test@example.com", "+541234", "cv.pdf"));
+    Postulacion application = postulacionRepository.save(Postulacion.createForVacancy(vacancy, candidate, "cover"));
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService).recordSuccess(org.mockito.ArgumentMatchers.eq("application.update_status"), org.mockito.ArgumentMatchers.eq("application"), org.mockito.ArgumentMatchers.eq(application.getId()), any(), any(), any());
+
+    assertThatThrownBy(() -> auditedApplicationManager.updateStatus(application.getId(), "REVIEWING"))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(postulacionRepository.findById(application.getId()).orElseThrow().getEstadoActual().name()).isEqualTo("PENDING");
+    assertThat(repository.list(new AuditQuery(null, "application.update_status", "application", null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
   }
 
   @Test

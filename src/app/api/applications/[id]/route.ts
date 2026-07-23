@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ApplicationStatus } from '@/domain/application/ApplicationStatusMachine'
-import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   formatValidationError,
@@ -12,11 +10,32 @@ import {
 import { toApplicationAdminDto } from '@/lib/dto/application'
 import { getApplication, updateApplicationStatus, deleteApplication, SpringApplicationWriteError } from '@/lib/server/springApplicationGateway'
 import { getBackendUrl } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
 
 interface RouteParams {
   params: Promise<{
     id: string
   }>
+}
+
+type AuthorizedSession = { cookie: string; setCookie?: string }
+
+function relayCookie(response: NextResponse, setCookie?: string) {
+  if (setCookie) response.headers.set('Set-Cookie', setCookie)
+  return response
+}
+
+async function getAuthorizedSessionCookie(request: NextRequest): Promise<AuthorizedSession | NextResponse> {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') {
+    return relayCookie(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), session.setCookie)
+  }
+  if (session.state === 'forbidden') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (session.state === 'unavailable') return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
+  return { cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`, setCookie: session.setCookie }
 }
 
 // GET /api/applications/[id] — Spring-delegated detail
@@ -25,23 +44,8 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'application.view',
-        resourceType: 'application',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const sessionCookie = await getAuthorizedSessionCookie(request)
+    if (sessionCookie instanceof NextResponse) return sessionCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
@@ -61,7 +65,7 @@ export async function GET(
       )
     }
 
-    const application = await getApplication(id)
+    const application = await getApplication(id, sessionCookie.cookie)
     if (!application) {
       return NextResponse.json(
         { error: 'Postulación no encontrada' },
@@ -69,22 +73,7 @@ export async function GET(
       )
     }
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'application.view',
-      resourceType: 'application',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        backend: 'spring'
-      }
-    })
-
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       toApplicationAdminDto({
         id: application.id,
         candidateId: application.candidateId,
@@ -99,8 +88,7 @@ export async function GET(
         vacancy: application.vacancy
           ? { id: application.vacancy.id, title: application.vacancy.title, location: application.vacancy.location }
           : null
-      })
-    )
+      })), sessionCookie.setCookie)
   } catch (error) {
     logger.error('Error al obtener postulación', error)
     return NextResponse.json(
@@ -115,26 +103,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   try {
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'application.update_status',
-        resourceType: 'application',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const sessionCookie = await getAuthorizedSessionCookie(request)
+    if (sessionCookie instanceof NextResponse) return sessionCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
@@ -153,7 +124,6 @@ export async function PATCH(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
 
     const body = await request.json()
     const bodyValidation = updateApplicationStatusSchema.safeParse(body)
@@ -164,7 +134,7 @@ export async function PATCH(
 
     let updated
     try {
-      updated = await updateApplicationStatus(id, status)
+      updated = await updateApplicationStatus(id, status, sessionCookie.cookie)
     } catch (error) {
       if (error instanceof SpringApplicationWriteError) {
         if (error.status === 404) {
@@ -181,23 +151,7 @@ export async function PATCH(
       throw error
     }
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'application.update_status',
-      resourceType: 'application',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        newStatus: status,
-        backend: 'spring'
-      }
-    })
-
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       toApplicationAdminDto({
         id: updated.id,
         candidateId: updated.candidateId,
@@ -212,23 +166,8 @@ export async function PATCH(
         vacancy: updated.vacancy
           ? { id: updated.vacancy.id, title: updated.vacancy.title, location: updated.vacancy.location }
           : null
-      })
-    )
+      })), sessionCookie.setCookie)
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'application.update_status',
-      resourceType: 'application',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al actualizar postulación', error)
     return NextResponse.json(
       { error: 'Error al actualizar postulación' },
@@ -242,26 +181,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   try {
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'application.delete',
-        resourceType: 'application',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const sessionCookie = await getAuthorizedSessionCookie(request)
+    if (sessionCookie instanceof NextResponse) return sessionCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
@@ -280,10 +202,9 @@ export async function DELETE(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
 
     try {
-      await deleteApplication(id)
+      await deleteApplication(id, sessionCookie.cookie)
     } catch (error) {
       if (error instanceof SpringApplicationWriteError) {
         if (error.status === 404) {
@@ -300,37 +221,8 @@ export async function DELETE(
       throw error
     }
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'application.delete',
-      resourceType: 'application',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        backend: 'spring'
-      }
-    })
-
-    return NextResponse.json({ success: true })
+    return relayCookie(NextResponse.json({ success: true }), sessionCookie.setCookie)
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'application.delete',
-      resourceType: 'application',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al eliminar postulación', error)
     return NextResponse.json(
       { error: 'Error al eliminar postulación' },

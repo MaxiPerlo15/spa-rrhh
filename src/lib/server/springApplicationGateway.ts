@@ -26,7 +26,8 @@ export class SpringApplicationWriteError extends Error {
 }
 
 export async function getApplication(
-  id: string
+  id: string,
+  cookie?: string
 ): Promise<SpringApplicationDetailResponse | null> {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -35,7 +36,7 @@ export async function getApplication(
 
   const response = await fetch(`${backendUrl}/api/v1/applications/${id}`, {
     method: 'GET',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...(cookie ? { Cookie: cookie } : {}) }
   })
 
   if (response.status === 404) {
@@ -54,7 +55,8 @@ export async function getApplication(
 
 export async function updateApplicationStatus(
   id: string,
-  status: string
+  status: string,
+  cookie?: string
 ): Promise<SpringApplicationDetailResponse> {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -65,7 +67,8 @@ export async function updateApplicationStatus(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      ...getSpringBackendHeaders()
+      ...getSpringBackendHeaders(),
+      ...(cookie ? { Cookie: cookie } : {})
     },
     body: JSON.stringify({ status })
   })
@@ -85,7 +88,8 @@ export async function updateApplicationStatus(
 }
 
 export async function deleteApplication(
-  id: string
+  id: string,
+  cookie?: string
 ): Promise<{ success: true }> {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -94,7 +98,7 @@ export async function deleteApplication(
 
   const response = await fetch(`${backendUrl}/api/v1/applications/${id}`, {
     method: 'DELETE',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...(cookie ? { Cookie: cookie } : {}) }
   })
 
   if (!response.ok) {

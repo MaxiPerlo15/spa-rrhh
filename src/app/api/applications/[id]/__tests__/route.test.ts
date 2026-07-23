@@ -19,6 +19,10 @@ vi.mock('@/lib/adminAudit', () => ({
   auditAdminAction: vi.fn().mockResolvedValue(undefined)
 }))
 
+vi.mock('@/lib/springSession', () => ({
+  getSpringSession: vi.fn()
+}))
+
 vi.mock('@/lib/csrf', () => ({
   rejectIfUntrustedOrigin: vi.fn().mockReturnValue(null)
 }))
@@ -77,6 +81,7 @@ vi.mock('@/lib/dto/application', () => ({
 const { auth } = await import('@/lib/auth')
 const { auditAdminAction } = await import('@/lib/adminAudit')
 const { rejectIfUntrustedOrigin } = await import('@/lib/csrf')
+const { getSpringSession } = await import('@/lib/springSession')
 const { getApplication, updateApplicationStatus, deleteApplication, SpringApplicationWriteError } = await import('@/lib/server/springApplicationGateway')
 
 import { GET, PATCH, DELETE } from '@/app/api/applications/[id]/route'
@@ -102,7 +107,7 @@ function makeSpringApp(overrides: Partial<SpringApplicationDetailResponse> = {})
 function makeRequest(method: 'GET' | 'PATCH' | 'DELETE', body?: object): NextRequest {
   return new NextRequest('http://localhost:3000/api/applications/app-1', {
     method,
-    headers: { origin: 'http://localhost:3000' },
+    headers: { origin: 'http://localhost:3000', Cookie: 'SESSIONID=spring-admin-session' },
     body: body ? JSON.stringify(body) : undefined
   })
 }
@@ -111,24 +116,33 @@ describe('[id]/route — Spring-delegated handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(auth).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' } } as never)
+    vi.mocked(getSpringSession).mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: {
+        userId: 'spring-admin',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'role-admin', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
+    })
   })
 
   describe('GET', () => {
-    it('returns 401 when session is missing', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null)
+    it('returns 401 when the Spring session is missing', async () => {
+      vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous', setCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly' })
       const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(401)
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'DENIED' })
-      )
+      expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+      expect(getApplication).not.toHaveBeenCalled()
     })
 
-    it('returns 401 when session is not ADMIN', async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { role: 'USER' } } as never)
+    it('returns 403 when the Spring session lacks admin access', async () => {
+      vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'forbidden' })
       const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
 
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(403)
     })
 
     it('returns 200 with application data on success', async () => {
@@ -138,10 +152,10 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(200)
-      expect(getApplication).toHaveBeenCalledWith('app-1')
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'SUCCESS', resourceType: 'application', resourceId: 'app-1' })
-      )
+      expect(getSpringSession).toHaveBeenCalledWith('SESSIONID=spring-admin-session')
+      expect(getApplication).toHaveBeenCalledWith('app-1', 'SESSIONID=rotated-session')
+      expect(auditAdminAction).not.toHaveBeenCalled()
+      expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
       const body = await response.json()
       expect(body.id).toBe('app-1')
     })
@@ -175,14 +189,12 @@ describe('[id]/route — Spring-delegated handlers', () => {
   })
 
   describe('PATCH', () => {
-    it('returns 401 when session is missing', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null)
+    it('returns 401 when the Spring session is missing', async () => {
+      vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous' })
       const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(401)
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'DENIED', action: 'application.update_status' })
-      )
+      expect(updateApplicationStatus).not.toHaveBeenCalled()
     })
 
     it('returns 200 with updated application on valid transition', async () => {
@@ -192,10 +204,8 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(200)
-      expect(updateApplicationStatus).toHaveBeenCalledWith('app-1', 'REVIEWING')
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'SUCCESS', action: 'application.update_status' })
-      )
+      expect(updateApplicationStatus).toHaveBeenCalledWith('app-1', 'REVIEWING', 'SESSIONID=rotated-session')
+      expect(auditAdminAction).not.toHaveBeenCalled()
       const body = await response.json()
       expect(body.status).toBe('REVIEWING')
     })
@@ -241,14 +251,12 @@ describe('[id]/route — Spring-delegated handlers', () => {
   })
 
   describe('DELETE', () => {
-    it('returns 401 when session is missing', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null)
+    it('returns 401 when the Spring session is missing', async () => {
+      vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous' })
       const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(401)
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'DENIED', action: 'application.delete' })
-      )
+      expect(deleteApplication).not.toHaveBeenCalled()
     })
 
     it('returns 200 with { success: true } on success', async () => {
@@ -257,10 +265,8 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(200)
-      expect(deleteApplication).toHaveBeenCalledWith('app-1')
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'SUCCESS', action: 'application.delete', resourceId: 'app-1' })
-      )
+      expect(deleteApplication).toHaveBeenCalledWith('app-1', 'SESSIONID=rotated-session')
+      expect(auditAdminAction).not.toHaveBeenCalled()
       const body = await response.json()
       expect(body.success).toBe(true)
     })
@@ -281,9 +287,7 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
 
       expect(response.status).toBe(500)
-      expect(auditAdminAction).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'ERROR', action: 'application.delete' })
-      )
+      expect(auditAdminAction).not.toHaveBeenCalled()
     })
 
     it('returns 403 when origin is untrusted', async () => {
