@@ -83,6 +83,13 @@ async function seedAdmin(port: number) {
       'INSERT INTO usuario (id, email, enabled, nombre_usuario, password, rol_id) VALUES ($1, $2, TRUE, $3, $4, $5)',
       [userId, adminEmail, 'Spring E2E Admin', passwordHash, roleId],
     )
+    await client.query(
+      'INSERT INTO "AdminNotification" ("id", "title", "message", "level", "isRead", "createdAt", "updatedAt") VALUES ($1, $2, $3, CAST($4 AS "NotificationLevel"), FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ($5, $6, $7, CAST($4 AS "NotificationLevel"), FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+      [
+        'spring-notification-read', 'Spring notification to read', 'This item proves PATCH through Next.', 'INFO',
+        'spring-notification-delete', 'Spring notification to delete', 'This item proves DELETE through Next.',
+      ],
+    )
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
@@ -191,7 +198,7 @@ async function main() {
   await command(
     'npx',
     [
-      'playwright', 'test', 'tests/e2e/auth-spring-session.spec.ts',
+       'playwright', 'test', 'tests/e2e/auth-spring-session.spec.ts', 'tests/e2e/admin-notifications.spec.ts',
       '--config', 'playwright.local.config.ts', '--project=chromium',
     ],
     {
