@@ -17,12 +17,14 @@ import com.meinardi.rrhh.application.CreateVacancyInputBoundary;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
+import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.presentation.ApplicationRestController;
+import com.meinardi.rrhh.presentation.NotificationController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -40,7 +42,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest(ApplicationRestController.class)
+@WebMvcTest({ApplicationRestController.class, NotificationController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -70,6 +72,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private ApplicationListInputBoundary applicationListInputBoundary;
   @MockitoBean private ApplicationAdminInputBoundary applicationAdminInputBoundary;
   @MockitoBean private PasswordResetService passwordResetService;
+  @MockitoBean private NotificationService notificationService;
   @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
@@ -167,6 +170,18 @@ class SecurityConfigApplicationRoutesTest {
         .andExpect(status().isForbidden())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(content().string("{\"error\":\"forbidden\"}"));
+  }
+
+  @Test
+  void permissionAuthorizedAdminReachesNotificationsThroughSecurityFilter() throws Exception {
+    Usuario administrator = administrator();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
+    org.mockito.Mockito.when(notificationService.list(org.mockito.ArgumentMatchers.eq("all"), org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+        .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+    mockMvc.perform(get("/api/v1/admin/notifications").session(sessionFor(administrator)))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.pagination.page").value(1));
   }
 
   @ParameterizedTest
