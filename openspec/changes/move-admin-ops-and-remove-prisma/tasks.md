@@ -47,7 +47,7 @@ Chain strategy: feature-branch-chain
 - [x] 3.8 **PR2a-fix-b GREEN→REFACTOR** Forward rotation/stale expiry; harden `tests/e2e/auth-spring-session.spec.ts` cookie handoff and `/admin`. **≤400**.
 - [x] 3.9 **PR2a-fix-b verify** Run focused JUnit, Vitest, Playwright, lint/typecheck; then rebase PR2b.
 - [x] 3.10 **PR2b-a** Add Spring notification entities/repository/service/controller and JUnit tests under `backend/src/**`: pagination/DTOs, create, errors; base PR2a-fix-b; **~297**.
-- [ ] 3.11 **PR2b-b** Add `src/app/api/admin/notifications/route.ts` and Vitest contracts for GET/POST/bulk DELETE: preserve DTOs, 201, 400, 401/403/503; base PR2b-a; **~379**.
+- [x] 3.11 **PR2b-b** Add `src/app/api/admin/notifications/route.ts` and Vitest contracts for GET/POST/bulk DELETE: preserve DTOs, 201, 400, 401/403/503; base PR2b-a; **~379**.
 - [ ] 3.12 **PR2b-c** Add `src/app/api/admin/notifications/[id]/route.ts` PATCH/DELETE and `tests/e2e/admin-notifications.spec.ts` Chromium coverage; record only executed/reconstructed evidence; base PR2b-b; **~396**.
 - [ ] 3.13 **PR2b-c evidence** State in task/verification evidence that original migration RED history was not retained after reconstruction; do not claim full Strict TDD for pre-existing notification changes.
 - [ ] 3.14 **PR2c RED→GREEN→REFACTOR** Spring audit and `src/app/api/admin/audit/route.ts`: filters, UTC bounds, order, pagination, errors. Depends PR2b-c; **≤400**.
