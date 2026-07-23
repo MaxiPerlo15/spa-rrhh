@@ -1,11 +1,11 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-b Next audit adapter
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-c call-site A
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Boundary: `PR2c-a → PR2c-b`; Next `/api/admin/audit` adapter only.
-- Excluded: audit write call-site cutover, settings, retention, Prisma decommission, and any Prisma fallback.
-- Rollback: revert `src/app/api/admin/audit/route.ts` and `src/lib/__tests__/adminAuditRoute.test.ts`; Spring audit ownership remains intact.
+- Boundary: `PR2c-b → PR2c-c call-site A`; `POST /api/vacancies` only.
+- Excluded: vacancy-detail, contacts, settings, retention, Prisma decommission, and later call sites.
+- Rollback: revert the vacancy POST proxy, `AuditedVacancyCreator`, and its focused contracts; Spring audit ownership remains intact.
 
 ## Completed Tasks
 
@@ -26,6 +26,7 @@
 - [x] 2.3 PR2c-a REFACTOR/verify: focused Maven suite passes against PostgreSQL 16; scope excludes all downstream slices.
 - [x] 3.1 PR2c-b RED: Vitest contracts cover audit filter/envelope forwarding, UTC dates, validation, authorization errors, Spring failures, no-store, and no Prisma fallback.
 - [x] 3.2 PR2c-b GREEN→REFACTOR: the thin Spring proxy preserves the validated query and forwards authorized `SESSIONID` rotation to both the audit request and browser response.
+- [x] 3.3a PR2c-c RED→GREEN→REFACTOR: cut over `POST /api/vacancies` to Spring-session actor forwarding and the transactional Spring `vacancy.create` audit path. The proxy relays rotated/expiry cookies on every session, validation, CSRF, and Spring-error exit; it only forwards validated first-hop IP and bounded user-agent context. Spring records SUCCESS in the mutation transaction and ERROR independently if the success audit fails.
 
 ## TDD Cycle Evidence
 
@@ -39,6 +40,7 @@
 | 3.13 | `tasks.md`, this artifact | Evidence | N/A — documentation-only | N/A — no production behavior | N/A — records only executed evidence | ✅ Explicitly preserves the reconstructed-history limitation |
 | 2.1–2.3 | `AuditControllerTest`, `AdminAuditLogRepositoryIntegrationTest`, Flyway adoption/empty tests | MockMvc + PostgreSQL 16 | ✅ 4 audit tests passed before correction | ✅ Blank filters returned 500; V6 assertions expected V5 | ✅ 12 focused tests passed | ✅ Complete filters/options, non-default page, UTC bounds/order, transaction durability, immutable metadata, V6 adoption/checksum | ✅ Small blank-filter guard; existing query records retained |
 | 3.1–3.2 | `src/lib/__tests__/adminAuditRoute.test.ts` | Vitest unit | ✅ 7/7 focused adapter contracts | ✅ Authorized rotation contract failed: the stale request cookie reached Spring and the response lacked `Set-Cookie` | ✅ 8/8 focused contracts passed after using the rotated cookie pair upstream and relaying the original `Set-Cookie` downstream | ✅ Existing non-rotation query contract plus rotation request/response assertions exercise distinct cookie paths | ✅ Minimal authorization result carrying `setCookie`; no call-site, settings, or retention changes |
+| 3.3a | `src/lib/__tests__/vacancyRoute.test.ts`, `AdminAuditLogRepositoryIntegrationTest`, `VacancyExceptionHandlerTest` | Vitest + Spring/Testcontainers | ✅ Route 4/4; Maven failed because MVC lacked the new creator mock | ✅ Cookie relay/context and proxy-rollback assertions failed before wiring | ✅ 8/8 route, 4/4 audit integration, 6/6 MVC contracts pass | ✅ Success, anonymous expiry, validation, CSRF, mapped and unexpected Spring errors cover distinct exits | ✅ Allowlisted proxy context and minimal cookie relay; no vacancy-detail, contacts, settings, retention, or Prisma-decommission changes |
 
 ## Verification
 
@@ -53,7 +55,9 @@
 - `cd backend && mvn test` — 244/244 passed.
 - `npm run test:unit -- src/lib/__tests__/adminAuditRoute.test.ts` — 8/8 passed after the rotation corrective retry.
 - `npm run lint` — passed.
-- `npm run typecheck` — passed.
+- `cd backend && mvn test` — 245/245 passed, including the real proxied transaction rollback and independently committed ERROR audit.
+- `npm run test:unit` — 82 files, 473 tests passed.
+- `npm run typecheck -- --skipLibCheck` — passed.
 - `git diff --check` — passed.
 
 ## Evidence Constraint
@@ -62,4 +66,4 @@ Original migration RED history was not retained after reconstruction. The PR2b-c
 
 ## Status
 
-Tasks 2.1–2.3, 3.1, and 3.2 are complete. PR2c-b is ready for verification; the next work unit is PR2c-c. No audit call-site, settings, retention, or Prisma-decommission code changed in this slice.
+Tasks 2.1–2.3, 3.1–3.2, and 3.3a are complete. PR2c-c remains in progress: vacancy-detail and contact call sites (3.3b) are intentionally pending. This slice excludes those routes, settings, retention, and Prisma decommission.

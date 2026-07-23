@@ -11,9 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
+import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
-import com.meinardi.rrhh.application.CreateVacancyInputBoundary;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class VacancyExceptionHandlerTest {
   @Autowired private MockMvc mockMvc;
 
-  @MockitoBean private CreateVacancyInputBoundary createVacancyInputBoundary;
+  @MockitoBean private AuditedVacancyCreator auditedVacancyCreator;
   @MockitoBean private GetVacancyInputBoundary getVacancyInputBoundary;
   @MockitoBean private UpdateVacancyInputBoundary updateVacancyInputBoundary;
   @MockitoBean private ActivateVacancyInputBoundary activateVacancyInputBoundary;
@@ -77,7 +77,7 @@ class VacancyExceptionHandlerTest {
         }
         """;
 
-    when(createVacancyInputBoundary.registerVacancy(any(CreateVacancyCommand.class)))
+    when(auditedVacancyCreator.create(any(CreateVacancyCommand.class), any(), any()))
         .thenThrow(new IllegalArgumentException("titulo is required"));
 
     mockMvc

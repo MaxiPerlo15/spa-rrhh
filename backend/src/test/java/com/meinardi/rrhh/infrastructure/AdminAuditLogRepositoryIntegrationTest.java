@@ -2,11 +2,18 @@ package com.meinardi.rrhh.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 
+import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.AuditQuery;
 import com.meinardi.rrhh.application.AuditService;
+import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.domain.model.AdminAuditLog;
 import com.meinardi.rrhh.domain.model.AuditOutcome;
+import com.meinardi.rrhh.domain.model.Jornada;
+import com.meinardi.rrhh.domain.model.Modalidad;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +26,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.aop.support.AopUtils;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate", "spring.datasource.driver-class-name=org.postgresql.Driver", "rrhh.security.internal-api-token=test-token"})
 @AutoConfigureMockMvc(addFilters = false)
@@ -32,6 +41,9 @@ class AdminAuditLogRepositoryIntegrationTest {
   }
   @Autowired private AdminAuditLogRepository repository;
   @Autowired private AuditService service;
+  @Autowired private AuditedVacancyCreator auditedVacancyCreator;
+  @Autowired private VacanteRepository vacanteRepository;
+  @MockitoSpyBean private AuditService auditService;
   @Autowired private TransactionTemplate transactions;
   @BeforeEach void clearAudit() { repository.deleteAll(); }
 
@@ -57,6 +69,21 @@ class AdminAuditLogRepositoryIntegrationTest {
     assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent()).isEmpty();
     transactions.executeWithoutResult(status -> { service.recordDenied("contact.delete", "contact", "denied", null, null, Map.of()); service.recordError("application.view", "application", "error", null, null, Map.of()); status.setRollbackOnly(); });
     assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent()).extracting(AdminAuditLog::getOutcome).containsExactlyInAnyOrder(AuditOutcome.DENIED, AuditOutcome.ERROR);
+  }
+
+  @Test
+  void springProxyRollsBackTheVacancyAndCommitsItsErrorAuditIndependently() {
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService).recordSuccess(anyString(), anyString(), anyString(), any(), any(), any());
+
+    assertThat(AopUtils.isAopProxy(auditedVacancyCreator)).isTrue();
+    assertThatThrownBy(() -> auditedVacancyCreator.create(
+        new CreateVacancyCommand("Reliability Engineer", "Keep services running", null, "Remote", "Remote", Jornada.FULL_TIME, Modalidad.REMOTE),
+        "203.0.113.10", "browser-agent")).isInstanceOf(IllegalStateException.class);
+
+    assertThat(vacanteRepository.findAll()).isEmpty();
+    assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getOutcome).containsExactly(AuditOutcome.ERROR);
   }
 
   @Test

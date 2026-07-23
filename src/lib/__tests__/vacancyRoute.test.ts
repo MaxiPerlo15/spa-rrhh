@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const authMock = vi.fn()
 const vacancyCreateMock = vi.fn()
 const auditAdminActionMock = vi.fn()
+const getSpringSessionMock = vi.fn()
 const ORIGINAL_ENV = process.env
 
 vi.mock('@/lib/auth', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/adminAudit', () => ({
   auditAdminAction: auditAdminActionMock
+}))
+
+vi.mock('@/lib/springSession', () => ({
+  getSpringSession: getSpringSessionMock
 }))
 
 vi.mock('@/lib/server/publicVacancies', () => ({
@@ -44,11 +49,10 @@ describe('/api/vacancies', () => {
   it('preserves Spring validation status and message when creation is rejected', async () => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
-    authMock.mockResolvedValue({
-      user: {
-        id: 'usr_admin',
-        role: 'ADMIN'
-      }
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: {}
     })
     const fetchMock = vi.fn(() => Promise.resolve({
       ok: false,
@@ -60,6 +64,7 @@ describe('/api/vacancies', () => {
     const { POST } = await import('@/app/api/vacancies/route')
     const request = new NextRequest('http://localhost:3000/api/vacancies', {
       method: 'POST',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({
         title: 'Backend Engineer',
         description: 'Build APIs',
@@ -73,6 +78,7 @@ describe('/api/vacancies', () => {
 
     expect(response.status).toBe(400)
     expect(payload.error).toBe('modalidad is invalid')
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
     expect(vacancyCreateMock).not.toHaveBeenCalled()
   })
 
@@ -113,5 +119,102 @@ describe('/api/vacancies', () => {
 
     expect(response.status).toBe(503)
     expect(payload.error).toBe('Vacancy backend not configured')
+  })
+
+  it('delegates an authorized creation to Spring with its session actor and no Prisma audit write', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly; SameSite=Lax',
+      user: {
+        userId: 'spring-admin',
+        email: 'admin@example.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'role-admin', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
+    })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'vacancy-1',
+        titulo: 'Backend Engineer',
+        descripcion: 'Build APIs',
+        requisitos: null,
+        ubicacionNombre: 'Remote',
+        ubicacionDescripcion: 'Remote',
+        jornada: 'FULL_TIME',
+        modalidad: 'REMOTE',
+        estadoActual: 'CREATED',
+        fechaCreacion: '2026-07-22T00:00:00.000Z',
+        fechaPublicacion: null
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { POST } = await import('@/app/api/vacancies/route')
+    const response = await POST(new NextRequest('http://localhost:3000/api/vacancies', {
+      method: 'POST',
+      headers: {
+        Cookie: 'SESSIONID=spring-admin-session',
+        'X-Forwarded-For': '203.0.113.10, 10.0.0.1',
+        'User-Agent': 'browser-agent'
+      },
+      body: JSON.stringify({
+        title: 'Backend Engineer',
+        description: 'Build APIs',
+        location: 'Remote',
+        workday: 'FULL_TIME',
+        modality: 'REMOTE'
+      })
+    }))
+
+    expect(response.status).toBe(201)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=spring-admin-session')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://spring.example.com/api/v1/vacancies',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Backend-Api-Key': 'shared-secret',
+          Cookie: 'SESSIONID=rotated-session',
+          'X-Forwarded-For': '203.0.113.10',
+          'User-Agent': 'browser-agent'
+        }
+      })
+    )
+    expect(auditAdminActionMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['anonymous session expiry', { headers: { Cookie: 'SESSIONID=expired' } }, { state: 'anonymous', setCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly' }, undefined, 401],
+    ['validation rejection', { headers: { Cookie: 'SESSIONID=active' } }, { state: 'authorized', setCookie: 'SESSIONID=rotated; Path=/; HttpOnly', user: {} }, { description: 'Missing title' }, 400],
+    ['CSRF rejection', { headers: { Origin: 'https://evil.example', Cookie: 'SESSIONID=active' } }, { state: 'authorized', setCookie: 'SESSIONID=rotated; Path=/; HttpOnly', user: {} }, undefined, 403]
+  ])('relays Spring cookies through %s', async (_caseName, init, session, body, expectedStatus) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    getSpringSessionMock.mockResolvedValue(session)
+    const { POST } = await import('@/app/api/vacancies/route')
+    const response = await POST(new NextRequest('http://localhost:3000/api/vacancies', {
+      method: 'POST',
+      ...init,
+      body: body ? JSON.stringify(body) : undefined
+    }))
+
+    expect(response.status).toBe(expectedStatus)
+    expect(response.headers.get('set-cookie')).toBe(session.setCookie)
+  })
+
+  it('relays a rotated cookie when Spring returns an unexpected error', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: 'SESSIONID=rotated; Path=/; HttpOnly', user: {} })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: () => Promise.resolve('failure') }))
+    const { POST } = await import('@/app/api/vacancies/route')
+    const response = await POST(new NextRequest('http://localhost:3000/api/vacancies', {
+      method: 'POST', headers: { Cookie: 'SESSIONID=active' }, body: JSON.stringify({ title: 'Role', description: 'Description', location: 'Remote', workday: 'FULL_TIME', modality: 'REMOTE' })
+    }))
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 })

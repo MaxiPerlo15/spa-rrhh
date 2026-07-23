@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   createVacancySchema,
@@ -22,8 +21,9 @@ import {
   rejectUnsupportedSpringVacancyFields,
   SpringVacancyWriteError
 } from '@/lib/server/springVacancyGateway'
+import { getSpringSession } from '@/lib/springSession'
 
-async function createVacancyInSpring(data: ReturnType<typeof buildCreatePayload>) {
+async function createVacancyInSpring(data: ReturnType<typeof buildCreatePayload>, cookie: string, request: NextRequest) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy creation')
@@ -33,7 +33,9 @@ async function createVacancyInSpring(data: ReturnType<typeof buildCreatePayload>
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getSpringBackendHeaders()
+      ...getSpringBackendHeaders(),
+      Cookie: cookie,
+      ...requestContextHeaders(request)
     },
     body: JSON.stringify(data)
   })
@@ -50,6 +52,24 @@ async function createVacancyInSpring(data: ReturnType<typeof buildCreatePayload>
   }
 
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
+}
+
+function requestContextHeaders(request: NextRequest): Record<string, string> {
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  const userAgent = request.headers.get('user-agent')?.trim()
+  return {
+    ...(forwardedFor && /^[0-9a-f:.]+$/i.test(forwardedFor) ? { 'X-Forwarded-For': forwardedFor } : {}),
+    ...(userAgent && userAgent.length <= 512 && !/[\r\n]/.test(userAgent) ? { 'User-Agent': userAgent } : {})
+  }
+}
+
+function json(body: unknown, status: number, setCookie?: string) {
+  return NextResponse.json(body, { status, headers: setCookie ? { 'Set-Cookie': setCookie } : undefined })
+}
+
+function relayCookie(response: Response, setCookie?: string) {
+  if (setCookie) response.headers.set('Set-Cookie', setCookie)
+  return response
 }
 
 async function listVacanciesInSpring(all: boolean) {
@@ -115,49 +135,33 @@ export async function GET(request: NextRequest) {
 
 // POST /api/vacancies - Crear nueva vacante (admin)
 export async function POST(request: NextRequest) {
-  let session = null as Awaited<ReturnType<typeof auth>>
+  let setCookie: string | undefined
   try {
-    // Verificar autenticación
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.create',
-        resourceType: 'vacancy',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+    if (!getBackendUrl()) {
+      return json({ error: 'Vacancy backend not configured' }, 503)
     }
+
+    const sessionId = request.cookies.get('SESSIONID')?.value
+    if (!sessionId) return json({ error: 'No autorizado' }, 401)
+    const session = await getSpringSession(`SESSIONID=${sessionId}`)
+    if (session.state === 'anonymous') return json({ error: 'No autorizado' }, 401, session.setCookie)
+    if (session.state === 'forbidden') return json({ error: 'No autorizado' }, 403)
+    if (session.state === 'unavailable') return json({ error: 'Spring backend unavailable' }, 503)
+    setCookie = session.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
-    if (originRejection) {
-      return originRejection
-    }
-
-    if (!getBackendUrl()) {
-      return NextResponse.json(
-        { error: 'Vacancy backend not configured' },
-        { status: 503 }
-      )
-    }
+    if (originRejection) return relayCookie(originRejection, setCookie)
 
     const body = await request.json()
     const bodyValidation = createVacancySchema.safeParse(body)
     if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+      return json(formatValidationError(bodyValidation.error), 400, setCookie)
     }
     const { title, description, location, workday, modality, salary, requirements, benefits } = bodyValidation.data
 
     const unsupportedFields = getUnsupportedSpringVacancyFields({ salary, benefits })
     if (unsupportedFields.length > 0) {
-      return rejectUnsupportedSpringVacancyFields(unsupportedFields)
+      return relayCookie(rejectUnsupportedSpringVacancyFields(unsupportedFields), setCookie)
     }
 
     const springVacancy = await createVacancyInSpring(buildCreatePayload({
@@ -167,52 +171,16 @@ export async function POST(request: NextRequest) {
       workday,
       modality,
       requirements
-    }))
-
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'vacancy.create',
-      resourceType: 'vacancy',
-      resourceId: springVacancy.id,
-      outcome: 'SUCCESS',
-      metadata: {
-        title: springVacancy.title,
-        status: springVacancy.status,
-        backend: 'spring'
-      }
-    })
+    }), setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`, request)
     revalidatePublicVacanciesCache()
 
-    return NextResponse.json(springVacancy, { status: 201 })
+    return json(springVacancy, 201, setCookie)
   } catch (error) {
     if (error instanceof SpringVacancyWriteError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
-      )
+      return json({ error: error.message }, error.status, setCookie)
     }
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'vacancy.create',
-      resourceType: 'vacancy',
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al crear vacante', error)
-    return NextResponse.json(
-      { error: 'Error al crear vacante' },
-      { status: 500 }
-    )
+    return json({ error: 'Error al crear vacante' }, 500, setCookie)
   }
 }

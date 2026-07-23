@@ -43,6 +43,8 @@ Chain strategy: feature-branch-chain
 - [x] 3.1 **PR2c-b RED** Add failing Vitest contracts for `src/app/api/admin/audit/route.ts`: filters/envelope, UTC dates, 400/401/403/503/500, and no Prisma fallback.
 - [x] 3.2 **PR2c-b GREEN→REFACTOR** Forward through `src/lib/server/springBackend.ts` while retaining `src/lib/apiValidation.ts` shape. Rollback adapter only; ≤400.
 - [ ] 3.3 **PR2c-c RED→GREEN→REFACTOR** Cut over `src/app/api/vacancies/**` and `src/app/api/contacts/[id]/route.ts`; prove atomic SUCCESS and durable DENIED/ERROR. Base PR2c-b; rollback these call sites; ≤400.
+  - [x] 3.3a **PR2c-c call-site A** Cut over `POST /api/vacancies`: Spring-session actor forwarding and transactional `vacancy.create` SUCCESS/ERROR audit. Rollback reverts only the POST call site and `AuditedVacancyCreator`.
+  - [ ] 3.3b Complete the remaining vacancy-detail and contact call sites, including their DENIED paths.
 - [ ] 3.4 **PR2c-d RED→GREEN→REFACTOR** Cut over `src/app/api/applications/[id]/route.ts`; prove `application.view` ERROR and mutation rollback. Base PR2c-c; ≤400.
 - [ ] 3.5 **PR2c-e RED→GREEN→REFACTOR** Cut over `src/app/api/admin/candidates/**`; prove `candidate.create` DENIED/SUCCESS rollback; remove only migrated `src/lib/adminAudit.ts` uses. Base PR2c-d; ≤400.
 - [ ] 3.6 Run focused JUnit/Vitest per slice, then audit Playwright, lint, and typecheck; record commands/results before rebasing PR2d.

@@ -2,7 +2,7 @@ package com.meinardi.rrhh.presentation;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
-import com.meinardi.rrhh.application.CreateVacancyInputBoundary;
+import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
@@ -10,6 +10,7 @@ import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.UpdateVacancyCommand;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import com.meinardi.rrhh.domain.model.Vacante;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/vacancies")
 public class VacancyRestController {
-  private final CreateVacancyInputBoundary createVacancyInputBoundary;
+  private final AuditedVacancyCreator auditedVacancyCreator;
   private final GetVacancyInputBoundary getVacancyInputBoundary;
   private final UpdateVacancyInputBoundary updateVacancyInputBoundary;
   private final ActivateVacancyInputBoundary activateVacancyInputBoundary;
@@ -35,14 +37,14 @@ public class VacancyRestController {
   private final ListVacanciesInputBoundary listVacanciesInputBoundary;
 
   public VacancyRestController(
-      CreateVacancyInputBoundary createVacancyInputBoundary,
+      AuditedVacancyCreator auditedVacancyCreator,
       GetVacancyInputBoundary getVacancyInputBoundary,
       UpdateVacancyInputBoundary updateVacancyInputBoundary,
       ActivateVacancyInputBoundary activateVacancyInputBoundary,
       DeactivateVacancyInputBoundary deactivateVacancyInputBoundary,
       CloseVacancyInputBoundary closeVacancyInputBoundary,
       ListVacanciesInputBoundary listVacanciesInputBoundary) {
-    this.createVacancyInputBoundary = createVacancyInputBoundary;
+    this.auditedVacancyCreator = auditedVacancyCreator;
     this.getVacancyInputBoundary = getVacancyInputBoundary;
     this.updateVacancyInputBoundary = updateVacancyInputBoundary;
     this.activateVacancyInputBoundary = activateVacancyInputBoundary;
@@ -63,8 +65,13 @@ public class VacancyRestController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public VacancyResponse create(@Valid @RequestBody CreateVacancyCommand command) {
-    Vacante created = createVacancyInputBoundary.registerVacancy(command);
+  public VacancyResponse create(
+      @Valid @RequestBody CreateVacancyCommand command,
+      @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+      @RequestHeader(value = "User-Agent", required = false) String userAgent,
+      HttpServletRequest request) {
+    Vacante created = auditedVacancyCreator.create(
+        command, forwardedFor == null ? request.getRemoteAddr() : forwardedFor, userAgent);
     return VacancyResponse.from(created);
   }
 
