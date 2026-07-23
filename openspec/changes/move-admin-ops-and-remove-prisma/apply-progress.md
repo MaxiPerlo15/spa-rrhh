@@ -1,11 +1,11 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-a Spring audit
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2c-b Next audit adapter
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Boundary: `PR2b-c → PR2c-a`; Spring audit persistence and `/api/v1/admin/audit` API only.
-- Excluded: the Next audit adapter and call-site cutover, settings, retention, and Prisma decommission.
-- Rollback: revert the audit model/repository/service/controller, audit index, and JUnit contracts as one slice; Next Prisma behavior remains unchanged.
+- Boundary: `PR2c-a → PR2c-b`; Next `/api/admin/audit` adapter only.
+- Excluded: audit write call-site cutover, settings, retention, Prisma decommission, and any Prisma fallback.
+- Rollback: revert `src/app/api/admin/audit/route.ts` and `src/lib/__tests__/adminAuditRoute.test.ts`; Spring audit ownership remains intact.
 
 ## Completed Tasks
 
@@ -24,6 +24,8 @@
 - [x] 2.1 PR2c-a RED: JUnit/MockMvc/Testcontainers contracts for audit pagination, UTC bounds, filters, 401/403, and 500.
 - [x] 2.2 PR2c-a GREEN: Spring audit model, repository, transactional write API, controller, and Flyway filter index.
 - [x] 2.3 PR2c-a REFACTOR/verify: focused Maven suite passes against PostgreSQL 16; scope excludes all downstream slices.
+- [x] 3.1 PR2c-b RED: Vitest contracts cover audit filter/envelope forwarding, UTC dates, validation, authorization errors, Spring failures, no-store, and no Prisma fallback.
+- [x] 3.2 PR2c-b GREEN→REFACTOR: the thin Spring proxy preserves the validated query and forwards authorized `SESSIONID` rotation to both the audit request and browser response.
 
 ## TDD Cycle Evidence
 
@@ -36,6 +38,7 @@
 | 3.12 | `src/lib/__tests__/adminNotificationByIdRoute.test.ts`, `tests/e2e/admin-notifications.spec.ts` | Vitest + Chromium | ✅ Legacy item-route test: 1/1 passed before replacement | ✅ Six Spring-proxy contracts were written first and failed while the legacy Prisma route loaded | ✅ 6/6 focused item contracts passed after the minimal proxy; PATCH and DELETE exercise distinct paths | ✅ Chromium used temporary PostgreSQL 16, Spring, and an ephemeral admin; persisted read state and deletion through browser-issued Next requests |
 | 3.13 | `tasks.md`, this artifact | Evidence | N/A — documentation-only | N/A — no production behavior | N/A — records only executed evidence | ✅ Explicitly preserves the reconstructed-history limitation |
 | 2.1–2.3 | `AuditControllerTest`, `AdminAuditLogRepositoryIntegrationTest`, Flyway adoption/empty tests | MockMvc + PostgreSQL 16 | ✅ 4 audit tests passed before correction | ✅ Blank filters returned 500; V6 assertions expected V5 | ✅ 12 focused tests passed | ✅ Complete filters/options, non-default page, UTC bounds/order, transaction durability, immutable metadata, V6 adoption/checksum | ✅ Small blank-filter guard; existing query records retained |
+| 3.1–3.2 | `src/lib/__tests__/adminAuditRoute.test.ts` | Vitest unit | ✅ 7/7 focused adapter contracts | ✅ Authorized rotation contract failed: the stale request cookie reached Spring and the response lacked `Set-Cookie` | ✅ 8/8 focused contracts passed after using the rotated cookie pair upstream and relaying the original `Set-Cookie` downstream | ✅ Existing non-rotation query contract plus rotation request/response assertions exercise distinct cookie paths | ✅ Minimal authorization result carrying `setCookie`; no call-site, settings, or retention changes |
 
 ## Verification
 
@@ -48,6 +51,10 @@
 - `npm run test:e2e:spring-auth` — temporary PostgreSQL 16 + Spring + Next Chromium proof passed (including item PATCH read-state persistence and DELETE removal).
 - `cd backend && mvn test -Dtest=AuditControllerTest,AdminAuditLogRepositoryIntegrationTest,FlywayAdoptionIntegrationTest,FlywayEmptyDatabaseIntegrationTest` — 12/12 passed; Testcontainers PostgreSQL 16 applied Flyway V1–V6.
 - `cd backend && mvn test` — 244/244 passed.
+- `npm run test:unit -- src/lib/__tests__/adminAuditRoute.test.ts` — 8/8 passed after the rotation corrective retry.
+- `npm run lint` — passed.
+- `npm run typecheck` — passed.
+- `git diff --check` — passed.
 
 ## Evidence Constraint
 
@@ -55,4 +62,4 @@ Original migration RED history was not retained after reconstruction. The PR2b-c
 
 ## Status
 
-Tasks 2.1–2.3 are complete. PR2c-a is ready for verification; the next work unit is PR2c-b, which alone replaces the Next audit adapter. No Next audit adapter/call-site, settings, retention, or Prisma-decommission code changed in this slice.
+Tasks 2.1–2.3, 3.1, and 3.2 are complete. PR2c-b is ready for verification; the next work unit is PR2c-c. No audit call-site, settings, retention, or Prisma-decommission code changed in this slice.

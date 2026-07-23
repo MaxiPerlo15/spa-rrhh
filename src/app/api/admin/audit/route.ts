@@ -1,117 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { adminAuditListQuerySchema, formatValidationError } from '@/lib/apiValidation'
-import { canUseSchemaDriftFallback } from '@/lib/prismaError'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' }
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+  const authorization = await authorize(request)
+  if (authorization instanceof Response) return authorization
 
-    const queryValidation = adminAuditListQuerySchema.safeParse({
-      actorEmail: request.nextUrl.searchParams.get('actorEmail') ?? undefined,
-      action: request.nextUrl.searchParams.get('action') ?? undefined,
-      resourceType: request.nextUrl.searchParams.get('resourceType') ?? undefined,
-      dateFrom: request.nextUrl.searchParams.get('dateFrom') ?? undefined,
-      dateTo: request.nextUrl.searchParams.get('dateTo') ?? undefined,
-      page: request.nextUrl.searchParams.get('page') ?? undefined,
-      limit: request.nextUrl.searchParams.get('limit') ?? undefined
+  const validation = adminAuditListQuerySchema.safeParse({
+    actorEmail: request.nextUrl.searchParams.get('actorEmail') ?? undefined,
+    action: request.nextUrl.searchParams.get('action') ?? undefined,
+    resourceType: request.nextUrl.searchParams.get('resourceType') ?? undefined,
+    dateFrom: request.nextUrl.searchParams.get('dateFrom') ?? undefined,
+    dateTo: request.nextUrl.searchParams.get('dateTo') ?? undefined,
+    page: request.nextUrl.searchParams.get('page') ?? undefined,
+    limit: request.nextUrl.searchParams.get('limit') ?? undefined
+  })
+  if (!validation.success) return json(formatValidationError(validation.error), 400)
+
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(validation.data)) {
+    if (value !== undefined) query.set(key, String(value))
+  }
+
+  return proxy(request, `/api/v1/admin/audit?${query}`, authorization.setCookie)
+}
+
+async function proxy(request: NextRequest, path: string, setCookie?: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) return json({ error: 'Spring backend not configured' }, 503)
+
+  try {
+    const cookie = setCookie?.split(';', 1)[0] ?? request.headers.get('cookie')
+    const response = await fetch(`${backendUrl}${path}`, {
+      cache: 'no-store',
+      headers: {
+        ...getSpringBackendHeaders(),
+        ...(cookie ? { Cookie: cookie } : {})
+      }
     })
 
-    if (!queryValidation.success) {
-      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
-    }
-
-    const { actorEmail, action, resourceType, dateFrom, dateTo, page, limit } = queryValidation.data
-    const normalizedDateFrom = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : null
-    const normalizedDateTo = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : null
-
-    const where: Prisma.AdminAuditLogWhereInput = {
-      ...(actorEmail ? { actorEmail } : {}),
-      ...(action ? { action } : {}),
-      ...(resourceType ? { resourceType } : {}),
-      ...((normalizedDateFrom || normalizedDateTo)
-        ? {
-            createdAt: {
-              ...(normalizedDateFrom ? { gte: normalizedDateFrom } : {}),
-              ...(normalizedDateTo ? { lte: normalizedDateTo } : {})
-            }
-          }
-        : {})
-    }
-
-    try {
-      const [items, total, actions, resourceTypes, actorEmails] = await prisma.$transaction([
-        prisma.adminAuditLog.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit
-        }),
-        prisma.adminAuditLog.count({ where }),
-        prisma.adminAuditLog.findMany({
-          distinct: ['action'],
-          select: { action: true },
-          orderBy: { action: 'asc' }
-        }),
-        prisma.adminAuditLog.findMany({
-          distinct: ['resourceType'],
-          select: { resourceType: true },
-          orderBy: { resourceType: 'asc' }
-        }),
-        prisma.adminAuditLog.findMany({
-          where: { actorEmail: { not: null } },
-          distinct: ['actorEmail'],
-          select: { actorEmail: true },
-          orderBy: { actorEmail: 'asc' }
-        })
-      ])
-
-      return NextResponse.json({
-        items: items.map((item) => ({
-          ...item,
-          createdAt: item.createdAt.toISOString()
-        })),
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.max(1, Math.ceil(total / limit))
-        },
-        filters: {
-          actions: actions.map((item) => item.action),
-          resourceTypes: resourceTypes.map((item) => item.resourceType),
-          actorEmails: actorEmails.map((item) => item.actorEmail).filter((value): value is string => Boolean(value))
-        }
-      })
-    } catch (error) {
-      if (!canUseSchemaDriftFallback(error)) throw error
-      logger.warn('Fallback temporal de auditoría admin por schema drift', {
-        route: 'GET /api/admin/audit'
-      })
-
-      return NextResponse.json({
-        items: [],
-        pagination: {
-          page,
-          limit,
-          total: 0,
-          totalPages: 1
-        },
-        filters: {
-          actions: [],
-          resourceTypes: [],
-          actorEmails: []
-        }
-      })
-    }
+    return new NextResponse(await response.text(), {
+      status: response.status,
+      headers: {
+        ...NO_STORE_HEADERS,
+        'Content-Type': response.headers.get('Content-Type') ?? 'application/json',
+        ...(setCookie ? { 'Set-Cookie': setCookie } : {})
+      }
+    })
   } catch (error) {
-    logger.error('Error al obtener timeline de auditoría admin', error)
-    return NextResponse.json({ error: 'Error al obtener auditoría' }, { status: 500 })
+    logger.error('Spring backend unavailable for admin audit', error)
+    return json({ error: 'Spring backend unavailable' }, 503)
   }
+}
+
+function json(body: unknown, status: number, setCookie?: string) {
+  return NextResponse.json(body, {
+    status,
+    headers: { ...NO_STORE_HEADERS, ...(setCookie ? { 'Set-Cookie': setCookie } : {}) }
+  })
+}
+
+async function authorize(request: NextRequest) {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return json({ error: 'No autorizado' }, 401)
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') return json({ error: 'No autorizado' }, 401, session.setCookie)
+  if (session.state === 'forbidden') return json({ error: 'No autorizado' }, 403)
+  if (session.state === 'unavailable') return json({ error: 'Spring backend unavailable' }, 503)
+  return { setCookie: session.setCookie }
 }
