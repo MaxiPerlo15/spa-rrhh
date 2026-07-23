@@ -15,6 +15,7 @@ export default defineConfig({
         ],
 
         testTimeout: 10000,
+        allowOnly: !process.env.CI,
 
         coverage: {
             enabled: false,

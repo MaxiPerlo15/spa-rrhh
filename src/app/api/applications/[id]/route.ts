@@ -43,34 +43,37 @@ export async function GET(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let authorizedSetCookie: string | undefined
+
   try {
     const sessionCookie = await getAuthorizedSessionCookie(request)
     if (sessionCookie instanceof NextResponse) return sessionCookie
+    authorizedSetCookie = sessionCookie.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
+      return relayCookie(originRejection, authorizedSetCookie)
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
-      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(parsedParams.error), { status: 400 }), authorizedSetCookie)
     }
     const { id } = parsedParams.data
 
     if (!getBackendUrl()) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
 
     const application = await getApplication(id, sessionCookie.cookie)
     if (!application) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'Postulación no encontrada' },
         { status: 404 }
-      )
+      ), authorizedSetCookie)
     }
 
     return relayCookie(NextResponse.json(
@@ -88,13 +91,13 @@ export async function GET(
         vacancy: application.vacancy
           ? { id: application.vacancy.id, title: application.vacancy.title, location: application.vacancy.location }
           : null
-      })), sessionCookie.setCookie)
+      })), authorizedSetCookie)
   } catch (error) {
     logger.error('Error al obtener postulación', error)
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       { error: 'Error al obtener postulación' },
       { status: 500 }
-    )
+    ), authorizedSetCookie)
   }
 }
 
@@ -103,32 +106,35 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let authorizedSetCookie: string | undefined
+
   try {
     const sessionCookie = await getAuthorizedSessionCookie(request)
     if (sessionCookie instanceof NextResponse) return sessionCookie
+    authorizedSetCookie = sessionCookie.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
+      return relayCookie(originRejection, authorizedSetCookie)
     }
 
     if (!getBackendUrl()) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
-      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(parsedParams.error), { status: 400 }), authorizedSetCookie)
     }
     const { id } = parsedParams.data
 
     const body = await request.json()
     const bodyValidation = updateApplicationStatusSchema.safeParse(body)
     if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 }), authorizedSetCookie)
     }
     const { status } = bodyValidation.data
 
@@ -138,15 +144,15 @@ export async function PATCH(
     } catch (error) {
       if (error instanceof SpringApplicationWriteError) {
         if (error.status === 404) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: 'Postulación no encontrada' },
             { status: 404 }
-          )
+          ), authorizedSetCookie)
         }
-        return NextResponse.json(
+        return relayCookie(NextResponse.json(
           { error: error.message },
           { status: error.status }
-        )
+        ), authorizedSetCookie)
       }
       throw error
     }
@@ -166,13 +172,13 @@ export async function PATCH(
         vacancy: updated.vacancy
           ? { id: updated.vacancy.id, title: updated.vacancy.title, location: updated.vacancy.location }
           : null
-      })), sessionCookie.setCookie)
+      })), authorizedSetCookie)
   } catch (error) {
     logger.error('Error al actualizar postulación', error)
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       { error: 'Error al actualizar postulación' },
       { status: 500 }
-    )
+    ), authorizedSetCookie)
   }
 }
 
@@ -181,25 +187,28 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let authorizedSetCookie: string | undefined
+
   try {
     const sessionCookie = await getAuthorizedSessionCookie(request)
     if (sessionCookie instanceof NextResponse) return sessionCookie
+    authorizedSetCookie = sessionCookie.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
+      return relayCookie(originRejection, authorizedSetCookie)
     }
 
     if (!getBackendUrl()) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
-      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(parsedParams.error), { status: 400 }), authorizedSetCookie)
     }
     const { id } = parsedParams.data
 
@@ -208,25 +217,25 @@ export async function DELETE(
     } catch (error) {
       if (error instanceof SpringApplicationWriteError) {
         if (error.status === 404) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: 'Postulación no encontrada' },
             { status: 404 }
-          )
+          ), authorizedSetCookie)
         }
-        return NextResponse.json(
+        return relayCookie(NextResponse.json(
           { error: error.message },
           { status: error.status }
-        )
+        ), authorizedSetCookie)
       }
       throw error
     }
 
-    return relayCookie(NextResponse.json({ success: true }), sessionCookie.setCookie)
+    return relayCookie(NextResponse.json({ success: true }), authorizedSetCookie)
   } catch (error) {
     logger.error('Error al eliminar postulación', error)
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       { error: 'Error al eliminar postulación' },
       { status: 500 }
-    )
+    ), authorizedSetCookie)
   }
 }

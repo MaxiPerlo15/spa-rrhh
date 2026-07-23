@@ -1,23 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    application: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn()
-    }
-  }
-}))
-
-vi.mock('@/lib/auth', () => ({
-  auth: vi.fn()
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: vi.fn().mockResolvedValue(undefined)
-}))
 
 vi.mock('@/lib/springSession', () => ({
   getSpringSession: vi.fn()
@@ -31,21 +13,8 @@ vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() }
 }))
 
-vi.mock('@/lib/server/applicationVacancyMetadata', () => ({
-  getApplicationVacancyMetadata: vi.fn().mockResolvedValue(null)
-}))
-
-vi.mock('@/lib/candidateRecord', () => ({
-  resolveApplicationCandidate: vi.fn((data: unknown) => data)
-}))
-
-vi.mock('@/domain/application/ApplicationStatusMachine', () => ({
-  ApplicationStatusMachine: { assertTransition: vi.fn() }
-}))
-
 vi.mock('@/lib/server/springBackend', () => ({
-  getBackendUrl: vi.fn(() => 'http://localhost:8080'),
-  getSpringBackendHeaders: vi.fn(() => ({ 'X-Backend-Api-Key': 'test-token' }))
+  getBackendUrl: vi.fn(() => 'http://localhost:8080')
 }))
 
 vi.mock('@/lib/server/springApplicationGateway', () => ({
@@ -62,30 +31,23 @@ vi.mock('@/lib/server/springApplicationGateway', () => ({
   }
 }))
 
-vi.mock('@/lib/apiValidation', () => ({
-  routeIdSchema: { safeParse: (data: { id: string }) => ({ success: true, data }) },
-  formatValidationError: (error: unknown) => ({ error: String(error) }),
-  updateApplicationStatusSchema: {
-    safeParse: (data: unknown) => {
-      const body = data as { status?: string }
-      if (!body?.status) return { success: false, error: 'status is required' }
-      return { success: true, data: { status: body.status } }
-    }
-  }
-}))
-
 vi.mock('@/lib/dto/application', () => ({
   toApplicationAdminDto: (data: unknown) => data
 }))
 
-const { auth } = await import('@/lib/auth')
-const { auditAdminAction } = await import('@/lib/adminAudit')
 const { rejectIfUntrustedOrigin } = await import('@/lib/csrf')
 const { getSpringSession } = await import('@/lib/springSession')
+const { getBackendUrl } = await import('@/lib/server/springBackend')
 const { getApplication, updateApplicationStatus, deleteApplication, SpringApplicationWriteError } = await import('@/lib/server/springApplicationGateway')
 
 import { GET, PATCH, DELETE } from '@/app/api/applications/[id]/route'
 import type { SpringApplicationDetailResponse } from '@/lib/server/springApplicationGateway'
+
+const applicationId = '8d5b6e0d-8262-4e80-8aaa-0a0e0a0e0a0e'
+
+function expectRotatedCookie(response: NextResponse) {
+  expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+}
 
 function makeSpringApp(overrides: Partial<SpringApplicationDetailResponse> = {}): SpringApplicationDetailResponse {
   return {
@@ -112,10 +74,21 @@ function makeRequest(method: 'GET' | 'PATCH' | 'DELETE', body?: object): NextReq
   })
 }
 
+function makeMalformedPatchRequest(): NextRequest {
+  return new NextRequest('http://localhost:3000/api/applications/app-1', {
+    method: 'PATCH',
+    headers: {
+      origin: 'http://localhost:3000',
+      Cookie: 'SESSIONID=spring-admin-session',
+      'Content-Type': 'application/json'
+    },
+    body: '{'
+  })
+}
+
 describe('[id]/route — Spring-delegated handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' } } as never)
     vi.mocked(getSpringSession).mockResolvedValue({
       state: 'authorized',
       setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
@@ -131,7 +104,7 @@ describe('[id]/route — Spring-delegated handlers', () => {
   describe('GET', () => {
     it('returns 401 when the Spring session is missing', async () => {
       vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous', setCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly' })
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(401)
       expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
@@ -140,7 +113,7 @@ describe('[id]/route — Spring-delegated handlers', () => {
 
     it('returns 403 when the Spring session lacks admin access', async () => {
       vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'forbidden' })
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(403)
     })
@@ -149,13 +122,12 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const springData = makeSpringApp()
       vi.mocked(getApplication).mockResolvedValueOnce(springData)
 
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(200)
       expect(getSpringSession).toHaveBeenCalledWith('SESSIONID=spring-admin-session')
-      expect(getApplication).toHaveBeenCalledWith('app-1', 'SESSIONID=rotated-session')
-      expect(auditAdminAction).not.toHaveBeenCalled()
-      expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+      expect(getApplication).toHaveBeenCalledWith(applicationId, 'SESSIONID=rotated-session')
+      expectRotatedCookie(response)
       const body = await response.json()
       expect(body.id).toBe('app-1')
     })
@@ -163,17 +135,19 @@ describe('[id]/route — Spring-delegated handlers', () => {
     it('returns 404 when application not found', async () => {
       vi.mocked(getApplication).mockResolvedValueOnce(null)
 
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'missing' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(404)
+      expectRotatedCookie(response)
     })
 
     it('returns 500 on Spring gateway error', async () => {
       vi.mocked(getApplication).mockRejectedValueOnce(new Error('Spring backend rejected'))
 
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(500)
+      expectRotatedCookie(response)
     })
 
     it('returns 403 when origin is untrusted', async () => {
@@ -181,9 +155,28 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new NextResponse(null, { status: 403 })
       )
 
-      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(403)
+      expectRotatedCookie(response)
+      expect(getApplication).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the route id is malformed', async () => {
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: 'invalid-id' }) })
+
+      expect(response.status).toBe(400)
+      expectRotatedCookie(response)
+      expect(getApplication).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the backend is unconfigured', async () => {
+      vi.mocked(getBackendUrl).mockReturnValueOnce(null)
+
+      const response = await GET(makeRequest('GET'), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(response.status).toBe(503)
+      expectRotatedCookie(response)
       expect(getApplication).not.toHaveBeenCalled()
     })
   })
@@ -191,7 +184,7 @@ describe('[id]/route — Spring-delegated handlers', () => {
   describe('PATCH', () => {
     it('returns 401 when the Spring session is missing', async () => {
       vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous' })
-      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(401)
       expect(updateApplicationStatus).not.toHaveBeenCalled()
@@ -201,11 +194,11 @@ describe('[id]/route — Spring-delegated handlers', () => {
       const updated = makeSpringApp({ status: 'REVIEWING' })
       vi.mocked(updateApplicationStatus).mockResolvedValueOnce(updated)
 
-      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(200)
-      expect(updateApplicationStatus).toHaveBeenCalledWith('app-1', 'REVIEWING', 'SESSIONID=rotated-session')
-      expect(auditAdminAction).not.toHaveBeenCalled()
+      expect(updateApplicationStatus).toHaveBeenCalledWith(applicationId, 'REVIEWING', 'SESSIONID=rotated-session')
+      expectRotatedCookie(response)
       const body = await response.json()
       expect(body.status).toBe('REVIEWING')
     })
@@ -215,9 +208,10 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new SpringApplicationWriteError(400, 'Transición inválida')
       )
 
-      const response = await PATCH(makeRequest('PATCH', { status: 'ACCEPTED' }), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await PATCH(makeRequest('PATCH', { status: 'ACCEPTED' }), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(400)
+      expectRotatedCookie(response)
       const body = await response.json()
       expect(body.error).toContain('Transición inválida')
     })
@@ -227,9 +221,10 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new SpringApplicationWriteError(409, 'ya se encuentra en estado')
       )
 
-      const response = await PATCH(makeRequest('PATCH', { status: 'PENDING' }), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await PATCH(makeRequest('PATCH', { status: 'PENDING' }), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(409)
+      expectRotatedCookie(response)
     })
 
     it('returns 404 when application missing (Spring 404)', async () => {
@@ -237,23 +232,64 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new SpringApplicationWriteError(404, 'Postulación no encontrada')
       )
 
-      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'missing' }) })
+      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(404)
+      expectRotatedCookie(response)
     })
 
     it('returns 400 on invalid body', async () => {
-      const response = await PATCH(makeRequest('PATCH', {}), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await PATCH(makeRequest('PATCH', {}), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(400)
+      expectRotatedCookie(response)
       expect(updateApplicationStatus).not.toHaveBeenCalled()
+    })
+
+    it('returns 500 and relays the rotated cookie when authorized PATCH JSON is malformed', async () => {
+      const response = await PATCH(makeMalformedPatchRequest(), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(response.status).toBe(500)
+      expectRotatedCookie(response)
+      expect(updateApplicationStatus).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the route id is malformed', async () => {
+      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: 'invalid-id' }) })
+
+      expect(response.status).toBe(400)
+      expectRotatedCookie(response)
+      expect(updateApplicationStatus).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the backend is unconfigured', async () => {
+      vi.mocked(getBackendUrl).mockReturnValueOnce(null)
+
+      const response = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(response.status).toBe(503)
+      expectRotatedCookie(response)
+      expect(updateApplicationStatus).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie on CSRF and unexpected errors', async () => {
+      vi.mocked(rejectIfUntrustedOrigin).mockReturnValueOnce(new NextResponse(null, { status: 403 }))
+      const csrfResponse = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
+
+      vi.mocked(updateApplicationStatus).mockRejectedValueOnce(new Error('Spring backend rejected'))
+      const errorResponse = await PATCH(makeRequest('PATCH', { status: 'REVIEWING' }), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(csrfResponse.status).toBe(403)
+      expectRotatedCookie(csrfResponse)
+      expect(errorResponse.status).toBe(500)
+      expectRotatedCookie(errorResponse)
     })
   })
 
   describe('DELETE', () => {
     it('returns 401 when the Spring session is missing', async () => {
       vi.mocked(getSpringSession).mockResolvedValueOnce({ state: 'anonymous' })
-      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(401)
       expect(deleteApplication).not.toHaveBeenCalled()
@@ -262,11 +298,11 @@ describe('[id]/route — Spring-delegated handlers', () => {
     it('returns 200 with { success: true } on success', async () => {
       vi.mocked(deleteApplication).mockResolvedValueOnce({ success: true })
 
-      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(200)
-      expect(deleteApplication).toHaveBeenCalledWith('app-1', 'SESSIONID=rotated-session')
-      expect(auditAdminAction).not.toHaveBeenCalled()
+      expect(deleteApplication).toHaveBeenCalledWith(applicationId, 'SESSIONID=rotated-session')
+      expectRotatedCookie(response)
       const body = await response.json()
       expect(body.success).toBe(true)
     })
@@ -276,18 +312,30 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new SpringApplicationWriteError(404, 'Postulación no encontrada')
       )
 
-      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'missing' }) })
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(404)
+      expectRotatedCookie(response)
+    })
+
+    it('relays the rotated cookie on a Spring write error', async () => {
+      vi.mocked(deleteApplication).mockRejectedValueOnce(
+        new SpringApplicationWriteError(409, 'Postulación no se puede eliminar')
+      )
+
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(response.status).toBe(409)
+      expectRotatedCookie(response)
     })
 
     it('returns 500 on Spring gateway error', async () => {
       vi.mocked(deleteApplication).mockRejectedValueOnce(new Error('Spring backend rejected'))
 
-      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(500)
-      expect(auditAdminAction).not.toHaveBeenCalled()
+      expectRotatedCookie(response)
     })
 
     it('returns 403 when origin is untrusted', async () => {
@@ -295,9 +343,28 @@ describe('[id]/route — Spring-delegated handlers', () => {
         new NextResponse(null, { status: 403 })
       )
 
-      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'app-1' }) })
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
 
       expect(response.status).toBe(403)
+      expectRotatedCookie(response)
+      expect(deleteApplication).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the route id is malformed', async () => {
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: 'invalid-id' }) })
+
+      expect(response.status).toBe(400)
+      expectRotatedCookie(response)
+      expect(deleteApplication).not.toHaveBeenCalled()
+    })
+
+    it('relays the rotated cookie when the backend is unconfigured', async () => {
+      vi.mocked(getBackendUrl).mockReturnValueOnce(null)
+
+      const response = await DELETE(makeRequest('DELETE'), { params: Promise.resolve({ id: applicationId }) })
+
+      expect(response.status).toBe(503)
+      expectRotatedCookie(response)
       expect(deleteApplication).not.toHaveBeenCalled()
     })
   })
