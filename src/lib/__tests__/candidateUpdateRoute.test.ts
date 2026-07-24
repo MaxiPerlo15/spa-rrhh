@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
+const auditAdminActionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
+}))
+
+vi.mock('@/lib/adminAudit', () => ({
+  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -77,6 +82,15 @@ describe('/api/admin/candidates/[id] PATCH', () => {
 
     expect(response.status).toBe(401)
     expect(fetchSpy).not.toHaveBeenCalled()
+    expect(auditAdminActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request,
+        action: 'candidate.update',
+        resourceType: 'candidate',
+        resourceId: VALID_UUID,
+        outcome: 'DENIED'
+      })
+    )
   })
 
   it('retorna 409 cuando Spring retorna CANDIDATE_IDENTITY_CONFLICT', async () => {

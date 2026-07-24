@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
+const auditAdminActionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
+}))
+
+vi.mock('@/lib/adminAudit', () => ({
+  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -81,6 +86,39 @@ describe('/api/admin/candidates POST', () => {
 
     expect(response.status).toBe(401)
     expect(fetchSpy).not.toHaveBeenCalled()
+    expect(auditAdminActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request,
+        action: 'candidate.create',
+        resourceType: 'candidate',
+        outcome: 'DENIED'
+      })
+    )
+  })
+
+  it('audita el actor cuando su rol no puede crear candidatos', async () => {
+    authMock.mockResolvedValue({
+      user: { id: 'user-1', role: 'USER', email: 'user@test.com' }
+    })
+    const { POST } = await import('@/app/api/admin/candidates/route')
+    const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(401)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(auditAdminActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: { id: 'user-1', email: 'user@test.com' },
+        action: 'candidate.create',
+        resourceType: 'candidate',
+        outcome: 'DENIED'
+      })
+    )
   })
 
   it('retorna 409 cuando Spring retorna DUPLICATE_CANDIDATE', async () => {

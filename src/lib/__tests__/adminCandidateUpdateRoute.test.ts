@@ -3,9 +3,14 @@ import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
 const rejectIfUntrustedOriginMock = vi.fn()
+const auditAdminActionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
+}))
+
+vi.mock('@/lib/adminAudit', () => ({
+  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({

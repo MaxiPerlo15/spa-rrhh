@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { auditAdminAction } from '@/lib/adminAudit'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { createAdminCandidateSchema, formatValidationError } from '@/lib/apiValidation'
@@ -9,6 +10,16 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'candidate.create',
+        resourceType: 'candidate',
+        outcome: 'DENIED'
+      })
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

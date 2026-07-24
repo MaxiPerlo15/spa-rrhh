@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { auditAdminAction } from '@/lib/adminAudit'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateAdminCandidateSchema } from '@/lib/apiValidation'
@@ -18,6 +19,18 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
+      const { id } = await params
+      await auditAdminAction({
+        request,
+        actor: {
+          id: session?.user?.id,
+          email: session?.user?.email
+        },
+        action: 'candidate.update',
+        resourceType: 'candidate',
+        resourceId: id,
+        outcome: 'DENIED'
+      })
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

@@ -2,6 +2,7 @@ package com.meinardi.rrhh.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.domain.model.*;
 import com.meinardi.rrhh.infrastructure.CandidatoRepository;
 import com.meinardi.rrhh.infrastructure.PostulacionRepository;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -37,6 +39,8 @@ class ApplicationRestControllerIntegrationTest {
   @Autowired private PostulacionRepository postulacionRepository;
   @Autowired private CandidatoRepository candidatoRepository;
   @Autowired private VacanteRepository vacanteRepository;
+
+  @MockitoBean private AuditService auditService;
 
   private String savedAppId;
 
