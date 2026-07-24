@@ -182,6 +182,62 @@ class AdminAuditLogRepositoryIntegrationTest {
   }
 
   @Test
+  void recordsCandidateUpdateSuccessTransactionally() {
+    Candidato candidate =
+        candidatoRepository.save(Candidato.create("Original Candidate", "original@example.com", "+541111", "cv.pdf"));
+
+    var result =
+        auditedCandidateAdmin.updateIdentity(
+            candidate.getId(), "Updated Candidate", "updated@example.com", "+542222", null, null);
+
+    assertThat(result.candidateId()).isEqualTo(candidate.getId());
+    assertThat(candidatoRepository.findById(candidate.getId()).orElseThrow())
+        .extracting(Candidato::getNombre, Candidato::getEmail, Candidato::getTelefono)
+        .containsExactly("Updated Candidate", "updated@example.com", "+542222");
+    assertThat(
+            repository
+                .list(
+                    new AuditQuery(null, "candidate.update", "candidate", null, null),
+                    PageRequest.of(0, 20))
+                .getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.SUCCESS);
+  }
+
+  @Test
+  void rollsBackCandidateUpdateWhenSuccessAuditFails() {
+    Candidato candidate =
+        candidatoRepository.save(Candidato.create("Original Candidate", "original@example.com", "+541111", "cv.pdf"));
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService)
+        .recordSuccess(
+            org.mockito.ArgumentMatchers.eq("candidate.update"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            org.mockito.ArgumentMatchers.eq(candidate.getId()),
+            any(),
+            any(),
+            any());
+
+    assertThatThrownBy(
+            () ->
+                auditedCandidateAdmin.updateIdentity(
+                    candidate.getId(), "Updated Candidate", "rollback-updated@example.com", "+543333", null, null))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(candidatoRepository.findById(candidate.getId()).orElseThrow())
+        .extracting(Candidato::getNombre, Candidato::getEmail, Candidato::getTelefono)
+        .containsExactly("Original Candidate", "original@example.com", "+541111");
+    assertThat(
+            repository
+                .list(
+                    new AuditQuery(null, "candidate.update", "candidate", null, null),
+                    PageRequest.of(0, 20))
+                .getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
   void keepsAuditFieldsImmutableAfterCreation() {
     Map<String, Object> mutable = new java.util.HashMap<>(Map.of("source", "test")); AdminAuditLog entry = entry("immutable", "admin@example.com", "vacancy.update", "vacancy", "2026-07-22T00:00:00Z", mutable);
     mutable.put("source", "changed");

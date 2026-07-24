@@ -117,6 +117,25 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any());
   }
 
+  @Test
+  void candidateUpdateDenialIsRecordedInSpring() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/candidates/candidate-123")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
+        .andExpect(status().isForbidden());
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("candidate.update"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            org.mockito.ArgumentMatchers.eq("candidate-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
+  }
+
   // --- PATCH /api/v1/applications/{id}/status ---
 
   @Test
