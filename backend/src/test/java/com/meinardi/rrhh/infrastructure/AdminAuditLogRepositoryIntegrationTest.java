@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.AuditedApplicationAdmin;
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.AuditQuery;
@@ -20,6 +21,7 @@ import com.meinardi.rrhh.domain.model.Modalidad;
 import com.meinardi.rrhh.domain.model.Candidato;
 import com.meinardi.rrhh.domain.model.Postulacion;
 import com.meinardi.rrhh.domain.model.Vacante;
+import com.meinardi.rrhh.domain.model.Contacto;
 import com.meinardi.rrhh.domain.model.Ubicacion;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -49,11 +51,13 @@ class AdminAuditLogRepositoryIntegrationTest {
   @Autowired private AdminAuditLogRepository repository;
   @Autowired private AuditService service;
   @Autowired private AuditedVacancyCreator auditedVacancyCreator;
+  @Autowired private AuditedAdminMutation auditedMutation;
   @Autowired private AuditedApplicationAdmin auditedApplicationManager;
   @Autowired private AuditedCandidateAdmin auditedCandidateAdmin;
   @Autowired private VacanteRepository vacanteRepository;
   @Autowired private CandidatoRepository candidatoRepository;
   @Autowired private PostulacionRepository postulacionRepository;
+  @Autowired private ContactoRepository contactoRepository;
   @MockitoSpyBean private AuditService auditService;
   @Autowired private TransactionTemplate transactions;
   @BeforeEach void clearAudit() { repository.deleteAll(); }
@@ -127,6 +131,28 @@ class AdminAuditLogRepositoryIntegrationTest {
     assertThat(repository.list(new AuditQuery(null, "application.update_status", "application", null, null), PageRequest.of(0, 20)).getContent())
         .extracting(AdminAuditLog::getOutcome)
         .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
+  void rollsBackVacancyAndContactMutationsWhenTheirSuccessAuditsFail() {
+    Vacante vacancy = vacanteRepository.save(Vacante.create("Original vacancy", "desc", "reqs", new Ubicacion("Remote", "Remote"), Jornada.FULL_TIME, Modalidad.REMOTE));
+    Contacto contact = contactoRepository.save(Contacto.create("Contact", "contact@example.com", "+541111", "Subject", "Message", "contact-key"));
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService).recordSuccess(org.mockito.ArgumentMatchers.startsWith("vacancy."), org.mockito.ArgumentMatchers.eq("vacancy"), org.mockito.ArgumentMatchers.any(), any(), any(), any());
+    assertThatThrownBy(() -> auditedMutation.execute("vacancy.update", "vacancy", vacancy.getId(), null, null, Map.of(), () -> {
+      vacancy.updateDetails("Updated vacancy", vacancy.getDescripcion(), vacancy.getRequisitos(), vacancy.getUbicacion(), vacancy.getJornada(), vacancy.getModalidad());
+      return vacanteRepository.save(vacancy);
+    }))
+        .isInstanceOf(IllegalStateException.class);
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService).recordSuccess(org.mockito.ArgumentMatchers.eq("contact.update_status"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq(contact.getId()), any(), any(), any());
+    assertThatThrownBy(() -> auditedMutation.execute("contact.update_status", "contact", contact.getId(), null, null, Map.of("newStatus", "RESPONDED"), () -> new com.meinardi.rrhh.application.ContactoService(contactoRepository).updateStatus(contact.getId(), "RESPONDED")))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(vacanteRepository.findById(vacancy.getId()).orElseThrow().getTitulo()).isEqualTo("Original vacancy");
+    assertThat(contactoRepository.findById(contact.getId()).orElseThrow().getEstadoActual()).isEqualTo(com.meinardi.rrhh.domain.model.ContactStatus.PENDING);
+    assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getOutcome).containsExactlyInAnyOrder(AuditOutcome.ERROR, AuditOutcome.ERROR);
   }
 
   @Test
