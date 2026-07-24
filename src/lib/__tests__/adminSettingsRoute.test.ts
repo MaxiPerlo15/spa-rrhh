@@ -5,7 +5,7 @@ vi.mock('@/lib/springSession', () => ({ getSpringSession: session }))
 vi.mock('@/lib/server/springBackend', () => ({ getBackendUrl: backend, getSpringBackendHeaders: headers }))
 vi.mock('@/lib/prisma', () => { throw new Error('The settings adapter must not load Prisma') })
 const payload = { profile: { id: 'admin-1', email: 'admin@example.com', name: 'Admin', role: 'ADMIN' }, preferences: { notificationsEnabled: true, notifyNewApplications: true, notifyNewContacts: false, notifySecurityAlerts: true }, backend: { springVacanciesEnabled: true }, updatedAt: '2026-07-24T12:00:00Z' }
-const request = (method = 'GET', body?: unknown) => new NextRequest('https://spa-rrhh.test/api/admin/settings', { method, headers: { Cookie: 'SESSIONID=admin-session', ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+const request = (method = 'GET', body?: unknown, extraHeaders: HeadersInit = {}) => new NextRequest('https://spa-rrhh.test/api/admin/settings', { method, headers: { Cookie: 'SESSIONID=admin-session', ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders }, ...(body ? { body: JSON.stringify(body) } : {}) })
 
 describe('/api/admin/settings Spring adapter', () => {
   beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); backend.mockReturnValue('https://spring.example.com'); headers.mockReturnValue({ 'X-Backend-Api-Key': 'test-token' }); session.mockResolvedValue({ state: 'authorized' }) })
@@ -31,5 +31,30 @@ describe('/api/admin/settings Spring adapter', () => {
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
     const response = await (await import('@/app/api/admin/settings/route')).PATCH(request('PATCH', {}))
     expect(response.status).toBe(400); await expect(response.json()).resolves.toEqual({ error: 'Datos inválidos', details: [{ field: '', message: 'Debes enviar al menos un campo para actualizar' }] }); expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it('rejects a missing browser session before proxying', async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+    const response = await (await import('@/app/api/admin/settings/route')).GET(new NextRequest('https://spa-rrhh.test/api/admin/settings'))
+    expect(response.status).toBe(401); expect(response.headers.get('Cache-Control')).toBe('no-store'); await expect(response.json()).resolves.toEqual({ error: 'No autorizado' }); expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it('rejects an untrusted PATCH origin while preserving a rotated session cookie', async () => {
+    const setCookie = 'SESSIONID=rotated-session; Path=/; HttpOnly'; session.mockResolvedValue({ state: 'authorized', setCookie }); const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+    const response = await (await import('@/app/api/admin/settings/route')).PATCH(request('PATCH', { name: 'Admin' }, { Origin: 'https://evil.example.com' }))
+    expect(response.status).toBe(403); expect(response.headers.get('Cache-Control')).toBe('no-store'); expect(response.headers.get('Set-Cookie')).toBe(setCookie); await expect(response.json()).resolves.toEqual({ error: 'Origen no permitido' }); expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it('returns a no-store 503 when the Spring backend is not configured', async () => {
+    backend.mockReturnValue(null); const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+    const response = await (await import('@/app/api/admin/settings/route')).GET(request())
+    expect(response.status).toBe(503); expect(response.headers.get('Cache-Control')).toBe('no-store'); await expect(response.json()).resolves.toEqual({ error: 'Spring backend not configured' }); expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it.each([[404, { error: 'Usuario no encontrado' }], [500, { error: 'Internal server error' }]])('relays Spring %s responses without caching', async (status, payload) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })))
+    const response = await (await import('@/app/api/admin/settings/route')).GET(request())
+    expect(response.status).toBe(status); expect(response.headers.get('Cache-Control')).toBe('no-store'); await expect(response.json()).resolves.toEqual(payload)
+  })
+  it('returns a no-store 503 when the Spring request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')))
+    const response = await (await import('@/app/api/admin/settings/route')).GET(request())
+    expect(response.status).toBe(503); expect(response.headers.get('Cache-Control')).toBe('no-store'); await expect(response.json()).resolves.toEqual({ error: 'Spring backend unavailable' })
   })
 })
