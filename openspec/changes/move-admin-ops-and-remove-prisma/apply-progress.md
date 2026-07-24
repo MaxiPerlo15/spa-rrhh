@@ -28,6 +28,7 @@
 - [x] 3.2 PR2c-b GREEN→REFACTOR: the thin Spring proxy preserves the validated query and forwards authorized `SESSIONID` rotation to both the audit request and browser response.
 - [x] 3.3a PR2c-c RED→GREEN→REFACTOR: cut over `POST /api/vacancies` to Spring-session actor forwarding and the transactional Spring `vacancy.create` audit path. The proxy relays rotated/expiry cookies on every session, validation, CSRF, and Spring-error exit; it only forwards validated first-hop IP and bounded user-agent context. Spring records SUCCESS in the mutation transaction and ERROR independently if the success audit fails.
 - [x] 3.4 PR2c-d RED→GREEN→REFACTOR: cut over application detail GET/PATCH/DELETE from NextAuth/Prisma audit calls to Spring-session forwarding and the transactional `AuditedApplicationAdmin` path. `application.view` ERROR is independently durable, while failed SUCCESS audit rolls back a status mutation and persists ERROR.
+- [x] 4.1 PR2d RED→GREEN→REFACTOR: Spring now owns settings GET/PUT through the reconciled `usuario`/`AdminSettings` mapping; the Next PATCH adapter validates locally, preserves the browser response/error/cookie/no-store contracts, and forwards to Spring PUT without a Prisma fallback.
 
 ## TDD Cycle Evidence
 
@@ -43,6 +44,7 @@
 | 3.1–3.2 | `src/lib/__tests__/adminAuditRoute.test.ts` | Vitest unit | ✅ 7/7 focused adapter contracts | ✅ Authorized rotation contract failed: the stale request cookie reached Spring and the response lacked `Set-Cookie` | ✅ 8/8 focused contracts passed after using the rotated cookie pair upstream and relaying the original `Set-Cookie` downstream | ✅ Existing non-rotation query contract plus rotation request/response assertions exercise distinct cookie paths | ✅ Minimal authorization result carrying `setCookie`; no call-site, settings, or retention changes |
 | 3.3a | `src/lib/__tests__/vacancyRoute.test.ts`, `AdminAuditLogRepositoryIntegrationTest`, `VacancyExceptionHandlerTest` | Vitest + Spring/Testcontainers | ✅ Route 4/4; Maven failed because MVC lacked the new creator mock | ✅ Cookie relay/context and proxy-rollback assertions failed before wiring | ✅ 8/8 route, 4/4 audit integration, 6/6 MVC contracts pass | ✅ Success, anonymous expiry, validation, CSRF, mapped and unexpected Spring errors cover distinct exits | ✅ Allowlisted proxy context and minimal cookie relay; no vacancy-detail, contacts, settings, retention, or Prisma-decommission changes |
 | 3.4 | `src/app/api/applications/[id]/__tests__/route.test.ts`, `AdminAuditLogRepositoryIntegrationTest` | Vitest + Spring/Testcontainers | ⚠️ Node dependencies were absent; Spring baseline 21/21 passed | ✅ Spring-session forwarding and transactional application-audit contracts failed before production changes | ✅ 27/27 focused Vitest and 6/6 PostgreSQL integration tests passed | ✅ GET/PATCH/DELETE session paths plus durable view ERROR and rolled-back update SUCCESS-audit failure | ✅ Primary audited decorator preserves the existing application boundary and route DTOs |
+| 4.1 | `adminSettingsRoute.test.ts`, `AdminSettingsServiceIntegrationTest` | Vitest + PostgreSQL 16 | N/A — no prior focused settings adapter test; Spring compilation RED confirmed the absent service | ✅ Adapter test was written before replacement; backend test failed to compile before the service existed | ✅ 6/6 Vitest and 1/1 focused Spring PostgreSQL test passed | ✅ GET/PATCH-to-PUT, session outcomes, validation, response shape, and persisted preference/name update | ✅ Kept the Next browser PATCH contract while Spring exposes PUT; no Prisma fallback |
 
 ## Verification
 
@@ -63,6 +65,8 @@
 - `git diff --check` — passed.
 - `npm run test:unit -- "src/app/api/applications/[id]/__tests__/route.test.ts" "src/lib/server/__tests__/springApplicationGateway.test.ts"` — 27/27 passed.
 - `cd backend && mvn test -Dtest=AdminAuditLogRepositoryIntegrationTest` — 6/6 passed against Testcontainers PostgreSQL 16.
+- `npm run test:unit -- "src/lib/__tests__/adminSettingsRoute.test.ts"` — 6/6 passed.
+- `cd backend && mvn test -Dtest=AdminSettingsServiceIntegrationTest` — 1/1 passed against PostgreSQL 16.
 
 ## Evidence Constraint
 
@@ -70,4 +74,4 @@ Original migration RED history was not retained after reconstruction. The PR2b-c
 
 ## Status
 
-Tasks 2.1–2.3, 3.1–3.2, 3.3a, and 3.4 are complete. PR2c-c remains in progress: vacancy-detail and contact call sites (3.3b) are intentionally pending. This slice excludes those routes, candidates, settings, retention, and Prisma decommission.
+Tasks 2.1–2.3, 3.1–3.2, 3.3a, 3.4, and 4.1 are complete. PR2c-c remains in progress: vacancy-detail and contact call sites (3.3b) are intentionally pending. This slice excludes those routes, candidates, retention, and Prisma decommission.

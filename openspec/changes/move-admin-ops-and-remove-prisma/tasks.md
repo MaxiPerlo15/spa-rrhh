@@ -51,7 +51,7 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: Follow-up
 
-- [ ] 4.1 **PR2d** implement settings RED→GREEN→REFACTOR in `src/app/api/admin/settings/route.ts` after PR2c-e; preserve shape/errors; ≤400.
+- [x] 4.1 **PR2d** implement settings RED→GREEN→REFACTOR in `src/app/api/admin/settings/route.ts` after PR2c-e; preserve shape/errors; ≤400.
 - [ ] 4.2 Keep Prisma removal gated behind reconciliation, parity, smoke, archive, and no-reference checks.
 
 ### Historical Evidence Constraint

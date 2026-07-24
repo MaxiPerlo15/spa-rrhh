@@ -1,181 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { formatValidationError, updateAdminSettingsSchema } from '@/lib/apiValidation'
-import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
-import { canUseSchemaDriftFallback } from '@/lib/prismaError'
-import { getBackendUrl } from '@/lib/server/springBackend'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
 
-function toAdminSettingsResponse(input: {
-  user: { id: string; email: string; name: string | null; role: string }
-  settings: {
-    notificationsEnabled: boolean
-    notifyNewApplications: boolean
-    notifyNewContacts: boolean
-    notifySecurityAlerts: boolean
-    updatedAt: Date
-  }
-}) {
-  return {
-    profile: {
-      id: input.user.id,
-      email: input.user.email,
-      name: input.user.name ?? '',
-      role: input.user.role
-    },
-    preferences: {
-      notificationsEnabled: input.settings.notificationsEnabled,
-      notifyNewApplications: input.settings.notifyNewApplications,
-      notifyNewContacts: input.settings.notifyNewContacts,
-      notifySecurityAlerts: input.settings.notifySecurityAlerts
-    },
-    backend: {
-      springVacanciesEnabled: Boolean(getBackendUrl())
-    },
-    updatedAt: input.settings.updatedAt.toISOString()
-  }
-}
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' }
 
-export async function GET() {
-  try {
-    const session = await auth()
-    if (!session?.user?.id || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, email: true, name: true, role: true }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-    }
-
-    let settings: {
-      notificationsEnabled: boolean
-      notifyNewApplications: boolean
-      notifyNewContacts: boolean
-      notifySecurityAlerts: boolean
-      updatedAt: Date
-    }
-    try {
-      settings = await prisma.adminSettings.upsert({
-        where: { userId: user.id },
-        update: {},
-        create: { userId: user.id },
-        select: {
-          notificationsEnabled: true,
-          notifyNewApplications: true,
-          notifyNewContacts: true,
-          notifySecurityAlerts: true,
-          updatedAt: true
-        }
-      })
-    } catch (error) {
-      if (!canUseSchemaDriftFallback(error)) throw error
-      logger.warn('Fallback temporal de AdminSettings por schema drift', {
-        route: 'GET /api/admin/settings'
-      })
-      settings = {
-        notificationsEnabled: true,
-        notifyNewApplications: true,
-        notifyNewContacts: true,
-        notifySecurityAlerts: true,
-        updatedAt: new Date()
-      }
-    }
-
-    return NextResponse.json(toAdminSettingsResponse({ user, settings }))
-  } catch (error) {
-    logger.error('Error al obtener configuración admin', error)
-    return NextResponse.json({ error: 'Error al obtener configuración' }, { status: 500 })
-  }
+export async function GET(request: NextRequest) {
+  const authorization = await authorize(request)
+  if (authorization instanceof Response) return authorization
+  return proxy(request, '/api/v1/admin/settings', undefined, authorization.setCookie)
 }
 
 export async function PATCH(request: NextRequest) {
+  const authorization = await authorize(request)
+  if (authorization instanceof Response) return authorization
+  const originRejection = rejectIfUntrustedOrigin(request)
+  if (originRejection) return withNoStore(originRejection, authorization.setCookie)
   try {
-    const session = await auth()
-    if (!session?.user?.id || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const validation = updateAdminSettingsSchema.safeParse(await request.json())
+    if (!validation.success) return json(formatValidationError(validation.error), 400, authorization.setCookie)
+    return proxy(request, '/api/v1/admin/settings', { method: 'PUT', body: JSON.stringify(validation.data) }, authorization.setCookie)
+  } catch { return json({ error: 'Malformed request body' }, 400, authorization.setCookie) }
+}
 
-    const originRejection = rejectIfUntrustedOrigin(request)
-    if (originRejection) {
-      return originRejection
-    }
+async function proxy(request: NextRequest, path: string, init?: RequestInit, setCookie?: string) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) return json({ error: 'Spring backend not configured' }, 503, setCookie)
+  try {
+    const cookie = setCookie?.split(';', 1)[0] ?? request.headers.get('cookie')
+    const response = await fetch(`${backendUrl}${path}`, { ...init, cache: 'no-store', headers: { ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...getSpringBackendHeaders(), ...(cookie ? { Cookie: cookie } : {}) } })
+    return new NextResponse(await response.text(), { status: response.status, headers: { ...NO_STORE_HEADERS, 'Content-Type': response.headers.get('Content-Type') ?? 'application/json', ...(setCookie ? { 'Set-Cookie': setCookie } : {}) } })
+  } catch { return json({ error: 'Spring backend unavailable' }, 503, setCookie) }
+}
 
-    const body = await request.json()
-    const bodyValidation = updateAdminSettingsSchema.safeParse(body)
-    if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
-    }
-
-    const { name, notificationsEnabled, notifyNewApplications, notifyNewContacts, notifySecurityAlerts } =
-      bodyValidation.data
-
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.update({
-        where: { id: session.user!.id },
-        data: {
-          ...(name !== undefined ? { name } : {})
-        },
-        select: { id: true, email: true, name: true, role: true }
-      })
-
-      let settings: {
-        notificationsEnabled: boolean
-        notifyNewApplications: boolean
-        notifyNewContacts: boolean
-        notifySecurityAlerts: boolean
-        updatedAt: Date
-      }
-      try {
-        settings = await tx.adminSettings.upsert({
-          where: { userId: user.id },
-          update: {
-            ...(notificationsEnabled !== undefined ? { notificationsEnabled } : {}),
-            ...(notifyNewApplications !== undefined ? { notifyNewApplications } : {}),
-            ...(notifyNewContacts !== undefined ? { notifyNewContacts } : {}),
-            ...(notifySecurityAlerts !== undefined ? { notifySecurityAlerts } : {})
-          },
-          create: {
-            userId: user.id,
-            notificationsEnabled: notificationsEnabled ?? true,
-            notifyNewApplications: notifyNewApplications ?? true,
-            notifyNewContacts: notifyNewContacts ?? true,
-            notifySecurityAlerts: notifySecurityAlerts ?? true
-          },
-          select: {
-            notificationsEnabled: true,
-            notifyNewApplications: true,
-            notifyNewContacts: true,
-            notifySecurityAlerts: true,
-            updatedAt: true
-          }
-        })
-      } catch (error) {
-        if (!canUseSchemaDriftFallback(error)) throw error
-        logger.warn('Fallback temporal de AdminSettings por schema drift', {
-          route: 'PATCH /api/admin/settings',
-          userId: user.id
-        })
-        settings = {
-          notificationsEnabled: notificationsEnabled ?? true,
-          notifyNewApplications: notifyNewApplications ?? true,
-          notifyNewContacts: notifyNewContacts ?? true,
-          notifySecurityAlerts: notifySecurityAlerts ?? true,
-          updatedAt: new Date()
-        }
-      }
-
-      return { user, settings }
-    })
-
-    return NextResponse.json(toAdminSettingsResponse(result))
-  } catch (error) {
-    logger.error('Error al actualizar configuración admin', error)
-    return NextResponse.json({ error: 'Error al actualizar configuración' }, { status: 500 })
-  }
+function json(body: unknown, status: number, setCookie?: string) { return NextResponse.json(body, { status, headers: { ...NO_STORE_HEADERS, ...(setCookie ? { 'Set-Cookie': setCookie } : {}) } }) }
+function withNoStore(response: Response, setCookie?: string) { response.headers.set('Cache-Control', 'no-store'); if (setCookie) response.headers.set('Set-Cookie', setCookie); return response }
+async function authorize(request: NextRequest) {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return json({ error: 'No autorizado' }, 401)
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') return json({ error: 'No autorizado' }, 401, session.setCookie)
+  if (session.state === 'forbidden') return json({ error: 'No autorizado' }, 403)
+  if (session.state === 'unavailable') return json({ error: 'Spring backend unavailable' }, 503)
+  return { setCookie: session.setCookie }
 }
