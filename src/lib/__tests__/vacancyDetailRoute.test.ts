@@ -459,4 +459,44 @@ describe('/api/vacancies/[id]', () => {
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
     expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
   })
+
+  it.each([
+    { method: 'PATCH', body: { title: 'Updated Engineer' } },
+    { method: 'PUT', body: { title: 'Updated Engineer' } },
+    { method: 'DELETE' }
+  ] as const)('returns 500 and relays authorization and mutation cookies for an upstream $method failure', async ({ method, body }) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } })
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: { userId: 'spring-admin', email: 'admin@example.com' }
+    })
+    const mutationCookie = 'XSRF-TOKEN=mutation-token; Path=/; SameSite=Lax'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers: {
+        get: (name: string) => name === 'set-cookie' ? mutationCookie : null,
+        getSetCookie: () => [mutationCookie]
+      },
+      text: () => Promise.resolve('service unavailable')
+    }))
+
+    const { PATCH, PUT, DELETE } = await import('@/app/api/vacancies/[id]/route')
+    const handler = { PATCH, PUT, DELETE }[method]
+    const response = await handler(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method,
+      headers: { Cookie: 'SESSIONID=original-session' },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response).toBeDefined()
+    if (!response) throw new Error('Expected a vacancy route response')
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({ error: method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante' })
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
+  })
 })

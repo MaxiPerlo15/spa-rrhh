@@ -26,6 +26,13 @@ class SpringVacancyNotFoundError extends Error {
   }
 }
 
+class SpringVacancyMutationError extends Error {
+  constructor(readonly headers: Headers, readonly cause: unknown) {
+    super('Spring vacancy mutation failed')
+    this.name = 'SpringVacancyMutationError'
+  }
+}
+
 async function rejectFailedSpringVacancyStatusMutation(
   response: Response,
   id: string,
@@ -46,7 +53,7 @@ async function rejectFailedSpringVacancyStatusMutation(
   }
 }
 
-async function closeVacancyInSpring(id: string) {
+async function closeVacancyInSpring(id: string, cookie?: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -54,15 +61,22 @@ async function closeVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/close`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: {
+      ...getSpringBackendHeaders(),
+      ...(cookie ? { Cookie: cookie } : {})
+    }
   })
 
-  await rejectFailedSpringVacancyStatusMutation(
-    response,
-    id,
-    'close',
-    'No se pudo cerrar la vacante por una regla de negocio'
-  )
+  try {
+    await rejectFailedSpringVacancyStatusMutation(
+      response,
+      id,
+      'close',
+      'No se pudo cerrar la vacante por una regla de negocio'
+    )
+  } catch (error) {
+    throw new SpringVacancyMutationError(response.headers, error)
+  }
 
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
 }
@@ -155,12 +169,16 @@ async function updateVacancyInSpring(
   })
 
   if (!response.ok) {
-    await rejectFailedSpringVacancyStatusMutation(
-      response,
-      id,
-      'update',
-      'No se pudo actualizar la vacante por una regla de negocio'
-    )
+    try {
+      await rejectFailedSpringVacancyStatusMutation(
+        response,
+        id,
+        'update',
+        'No se pudo actualizar la vacante por una regla de negocio'
+      )
+    } catch (error) {
+      throw new SpringVacancyMutationError(response.headers, error)
+    }
   }
 
   return {
@@ -234,6 +252,8 @@ export async function GET(
 async function updateVacancy(request: NextRequest, params: Promise<{ id: string }>) {
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
+  let authorizedSetCookie: string | undefined
+  let mutationHeaders: Headers | undefined
   try {
     // Verificar autenticación
     session = await auth()
@@ -362,9 +382,9 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     if (hasBusinessFieldChange) {
       const springSession = await authorizeSpringMutation(request)
       if (springSession instanceof NextResponse) return springSession
+      authorizedSetCookie = springSession.setCookie
 
       let springVacancy = null
-      let mutationHeaders: Headers | undefined
       try {
         const mutation = await updateVacancyInSpring(id, buildUpdatePayload({
           title: bodyValidation.data.title,
@@ -377,19 +397,21 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
         springVacancy = mutation.vacancy
         mutationHeaders = mutation.headers
       } catch (error) {
-        if (error instanceof SpringVacancyNotFoundError) {
+        const cause = error instanceof SpringVacancyMutationError ? error.cause : error
+        mutationHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+        if (cause instanceof SpringVacancyNotFoundError) {
           return NextResponse.json(
             { error: 'Vacante no encontrada' },
             { status: 404 }
           )
         }
-        if (error instanceof SpringVacancyWriteError) {
+        if (cause instanceof SpringVacancyWriteError) {
           return NextResponse.json(
-            { error: error.message },
-            { status: error.status }
+            { error: cause.message },
+            { status: cause.status }
           )
         }
-        throw error
+        throw cause
       }
 
       if (springVacancy) {
@@ -434,10 +456,15 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       }
     })
     logger.error('Error al actualizar vacante', error)
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Error al actualizar vacante' },
       { status: 500 }
     )
+    if (mutationHeaders) {
+      relaySpringCookies(response, authorizedSetCookie)
+      relaySpringCookies(response, mutationHeaders)
+    }
+    return response
   }
 }
 
@@ -464,6 +491,8 @@ export async function DELETE(
 ) {
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
+  let authorizedSetCookie: string | undefined
+  let mutationHeaders: Headers | undefined
   try {
     // Verificar autenticación
     session = await auth()
@@ -505,21 +534,28 @@ export async function DELETE(
 
     let closedVacancy = null
     try {
-      closedVacancy = await closeVacancyInSpring(id)
+      const springSession = request.cookies.get('SESSIONID')
+        ? await authorizeSpringMutation(request)
+        : undefined
+      if (springSession instanceof NextResponse) return springSession
+      authorizedSetCookie = springSession?.setCookie
+      closedVacancy = await closeVacancyInSpring(id, springSession?.cookie)
     } catch (error) {
-      if (error instanceof SpringVacancyNotFoundError) {
+      const cause = error instanceof SpringVacancyMutationError ? error.cause : error
+      mutationHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+      if (cause instanceof SpringVacancyNotFoundError) {
         return NextResponse.json(
           { error: 'Vacante no encontrada' },
           { status: 404 }
         )
       }
-      if (error instanceof SpringVacancyWriteError) {
+      if (cause instanceof SpringVacancyWriteError) {
         return NextResponse.json(
-          { error: error.message },
-          { status: error.status }
+          { error: cause.message },
+          { status: cause.status }
         )
       }
-      throw error
+      throw cause
     }
 
     if (closedVacancy) {
@@ -559,9 +595,14 @@ export async function DELETE(
       }
     })
     logger.error('Error al cerrar vacante', error)
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Error al cerrar vacante' },
       { status: 500 }
     )
+    if (mutationHeaders) {
+      relaySpringCookies(response, authorizedSetCookie)
+      relaySpringCookies(response, mutationHeaders)
+    }
+    return response
   }
 }
