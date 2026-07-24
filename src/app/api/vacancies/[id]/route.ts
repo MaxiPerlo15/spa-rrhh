@@ -7,6 +7,8 @@ import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib
 import { normalizeLocation } from '@/lib/utils'
 import { revalidatePublicVacanciesCache } from '@/lib/server/publicVacancies'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
+import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 import {
   type SpringVacancyResponse,
   mapSpringToDto,
@@ -132,7 +134,9 @@ async function deactivateVacancyInSpring(id: string) {
 
 async function updateVacancyInSpring(
   id: string,
-  data: ReturnType<typeof buildUpdatePayload>
+  data: ReturnType<typeof buildUpdatePayload>,
+  request: NextRequest,
+  cookie: string
 ) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -143,7 +147,9 @@ async function updateVacancyInSpring(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      ...getSpringBackendHeaders()
+      ...getSpringBackendHeaders(),
+      ...getAllowedBffRequestHeaders(request),
+      Cookie: cookie
     },
     body: JSON.stringify(data)
   })
@@ -157,13 +163,31 @@ async function updateVacancyInSpring(
     )
   }
 
-  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+  return {
+    vacancy: mapSpringToDto(await response.json() as SpringVacancyResponse),
+    headers: response.headers
+  }
 }
 
 interface RouteParams {
   params: Promise<{
     id: string
   }>
+}
+
+async function authorizeSpringMutation(request: NextRequest) {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (session.state === 'forbidden') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (session.state === 'unavailable') return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
+
+  return {
+    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`,
+    setCookie: session.setCookie
+  }
 }
 
 // GET /api/vacancies/[id] - Obtener una vacante específica
@@ -336,16 +360,22 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     }
 
     if (hasBusinessFieldChange) {
+      const springSession = await authorizeSpringMutation(request)
+      if (springSession instanceof NextResponse) return springSession
+
       let springVacancy = null
+      let mutationHeaders: Headers | undefined
       try {
-        springVacancy = await updateVacancyInSpring(id, buildUpdatePayload({
+        const mutation = await updateVacancyInSpring(id, buildUpdatePayload({
           title: bodyValidation.data.title,
           description: bodyValidation.data.description,
           location: originalLocation,
           workday: bodyValidation.data.workday,
           modality: bodyValidation.data.modality,
           requirements: bodyValidation.data.requirements
-        }))
+        }), request, springSession.cookie)
+        springVacancy = mutation.vacancy
+        mutationHeaders = mutation.headers
       } catch (error) {
         if (error instanceof SpringVacancyNotFoundError) {
           return NextResponse.json(
@@ -381,7 +411,9 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
         })
         revalidatePublicVacanciesCache()
 
-        return NextResponse.json(springVacancy)
+        const response = NextResponse.json(springVacancy)
+        relaySpringCookies(response, springSession.setCookie)
+        return relaySpringCookies(response, mutationHeaders)
       }
     }
 
