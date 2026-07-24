@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateAdminCandidateSchema } from '@/lib/apiValidation'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
@@ -16,22 +15,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
-
   try {
-    session = await auth()
+    const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'candidate.update',
-        resourceType: 'candidate',
-        outcome: 'DENIED'
-      })
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -46,8 +32,6 @@ export async function PATCH(
     }
 
     const { id } = parsedParams.data
-    resourceId = id
-
     const body = await request.json()
     const bodyValidation = updateAdminCandidateSchema.safeParse(body)
     if (!bodyValidation.success) {
@@ -97,40 +81,8 @@ export async function PATCH(
 
     const responseBody = await springResponse.json()
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'candidate.update',
-      resourceType: 'candidate',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        candidateName,
-        email,
-        phone,
-        updatedApplications: responseBody.applications?.length ?? 0
-      }
-    })
-
     return NextResponse.json(responseBody)
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'candidate.update',
-      resourceType: 'candidate',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al actualizar candidato', error)
     return NextResponse.json(
       { error: 'Error al actualizar candidato' },

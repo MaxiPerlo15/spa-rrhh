@@ -2,15 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 const rejectIfUntrustedOriginMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -46,7 +41,6 @@ describe('/api/admin/candidates POST', () => {
 
   it('rechaza acceso sin autenticación de admin', async () => {
     authMock.mockResolvedValue(null)
-
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
@@ -65,7 +59,6 @@ describe('/api/admin/candidates POST', () => {
     authMock.mockResolvedValue({
       user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -97,7 +90,6 @@ describe('/api/admin/candidates POST', () => {
     authMock.mockResolvedValue({
       user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -134,13 +126,6 @@ describe('/api/admin/candidates POST', () => {
           phone: '+54 9 11 1234-5678',
           notes: 'Referida por cliente.'
         })
-      })
-    )
-    expect(auditAdminActionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'candidate.create',
-        outcome: 'SUCCESS',
-        resourceId: 'cand_manual_1'
       })
     )
   })

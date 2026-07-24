@@ -8,8 +8,10 @@ import static org.mockito.Mockito.doThrow;
 
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.AuditedApplicationAdmin;
+import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.AuditQuery;
 import com.meinardi.rrhh.application.AuditService;
+import com.meinardi.rrhh.application.ApplicationManager;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.domain.model.AdminAuditLog;
 import com.meinardi.rrhh.domain.model.AuditOutcome;
@@ -48,6 +50,7 @@ class AdminAuditLogRepositoryIntegrationTest {
   @Autowired private AuditService service;
   @Autowired private AuditedVacancyCreator auditedVacancyCreator;
   @Autowired private AuditedApplicationAdmin auditedApplicationManager;
+  @Autowired private AuditedCandidateAdmin auditedCandidateAdmin;
   @Autowired private VacanteRepository vacanteRepository;
   @Autowired private CandidatoRepository candidatoRepository;
   @Autowired private PostulacionRepository postulacionRepository;
@@ -75,7 +78,7 @@ class AdminAuditLogRepositoryIntegrationTest {
   void keepsSuccessAtomicAndDeniedAndErrorDurableAcrossOuterRollback() {
     transactions.executeWithoutResult(status -> { service.recordSuccess("vacancy.update", "vacancy", "success", null, null, Map.of()); status.setRollbackOnly(); });
     assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent()).isEmpty();
-    transactions.executeWithoutResult(status -> { service.recordDenied("contact.delete", "contact", "denied", null, null, Map.of()); service.recordError("application.view", "application", "error", null, null, Map.of()); status.setRollbackOnly(); });
+    transactions.executeWithoutResult(status -> { service.recordDenied("candidate.create", "candidate", "denied", null, null, Map.of()); service.recordError("application.view", "application", "error", null, null, Map.of()); status.setRollbackOnly(); });
     assertThat(repository.list(new AuditQuery(null, null, null, null, null), PageRequest.of(0, 20)).getContent()).extracting(AdminAuditLog::getOutcome).containsExactlyInAnyOrder(AuditOutcome.DENIED, AuditOutcome.ERROR);
   }
 
@@ -122,6 +125,58 @@ class AdminAuditLogRepositoryIntegrationTest {
 
     assertThat(postulacionRepository.findById(application.getId()).orElseThrow().getEstadoActual().name()).isEqualTo("PENDING");
     assertThat(repository.list(new AuditQuery(null, "application.update_status", "application", null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
+  void recordsCandidateCreateSuccessTransactionally() {
+    var result =
+        auditedCandidateAdmin.manualCreate(
+            "Candidate Audit", "candidate-audit@example.com", "+541234567", "notes", null, null);
+
+    assertThat(result.candidateId()).isNotBlank();
+    assertThat(
+            repository
+                .list(
+                    new AuditQuery(null, "candidate.create", "candidate", null, null),
+                    PageRequest.of(0, 20))
+                .getContent())
+        .extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.SUCCESS);
+  }
+
+  @Test
+  void rollsBackCandidateCreateWhenSuccessAuditFails() {
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService)
+        .recordSuccess(
+            org.mockito.ArgumentMatchers.eq("candidate.create"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            any(),
+            any(),
+            any(),
+            any());
+
+    assertThatThrownBy(
+            () ->
+                auditedCandidateAdmin.manualCreate(
+                    "Rollback Candidate", "rollback-candidate@example.com", "+549876543", "notes", null, null))
+        .isInstanceOf(IllegalStateException.class);
+
+    transactions.executeWithoutResult(
+        status ->
+            assertThat(
+                    candidatoRepository.findByPersonKey(
+                        ApplicationManager.buildPersonKey(
+                            "rollback-candidate@example.com", "+549876543")))
+                .isEmpty());
+    assertThat(
+            repository
+                .list(
+                    new AuditQuery(null, "candidate.create", "candidate", null, null),
+                    PageRequest.of(0, 20))
+                .getContent())
         .extracting(AdminAuditLog::getOutcome)
         .containsExactly(AuditOutcome.ERROR);
   }

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.CandidateAdminService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,11 +24,11 @@ class CandidateRestControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockitoBean private CandidateAdminService candidateAdminService;
+  @MockitoBean private AuditedCandidateAdmin candidateAdmin;
 
   @Test
   void create_returns201WithCandidateIdAndApplicationId() throws Exception {
-    when(candidateAdminService.manualCreate("Maria", "maria@test.com", "+54 11 9999-0000", "Notes"))
+    when(candidateAdmin.manualCreate("Maria", "maria@test.com", "+54 11 9999-0000", "Notes", "127.0.0.1", null))
         .thenReturn(new CandidateAdminService.CreateResult("cand-1", "app-1"));
 
     mockMvc
@@ -43,7 +44,7 @@ class CandidateRestControllerTest {
 
   @Test
   void create_returns409OnDuplicateCandidate() throws Exception {
-    when(candidateAdminService.manualCreate(any(), any(), any(), any()))
+    when(candidateAdmin.manualCreate(any(), any(), any(), any(), any(), any()))
         .thenThrow(new IllegalArgumentException("DUPLICATE_CANDIDATE"));
 
     mockMvc
@@ -58,7 +59,7 @@ class CandidateRestControllerTest {
 
   @Test
   void update_returns200WithCandidateId() throws Exception {
-    when(candidateAdminService.updateIdentity("cand-1", "Maria G.", "new@test.com", "+54 11 1111-2222"))
+    when(candidateAdmin.updateIdentity("cand-1", "Maria G.", "new@test.com", "+54 11 1111-2222", "127.0.0.1", null))
         .thenReturn(new CandidateAdminService.UpdateResult("cand-1"));
 
     mockMvc
@@ -73,7 +74,7 @@ class CandidateRestControllerTest {
 
   @Test
   void update_returns409OnIdentityConflict() throws Exception {
-    when(candidateAdminService.updateIdentity(any(), any(), any(), any()))
+    when(candidateAdmin.updateIdentity(any(), any(), any(), any(), any(), any()))
         .thenThrow(new IllegalArgumentException("CANDIDATE_IDENTITY_CONFLICT"));
 
     mockMvc
@@ -88,7 +89,7 @@ class CandidateRestControllerTest {
 
   @Test
   void update_returns404WhenCandidateNotFound() throws Exception {
-    when(candidateAdminService.updateIdentity(any(), any(), any(), any()))
+    when(candidateAdmin.updateIdentity(any(), any(), any(), any(), any(), any()))
         .thenThrow(new IllegalArgumentException("Candidate not found"));
 
     mockMvc

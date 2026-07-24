@@ -2,7 +2,11 @@ package com.meinardi.rrhh.infrastructure;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.SessionService;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,6 +21,7 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 @Configuration
 public class SecurityConfig {
   private static final String INTERNAL_API_TOKEN_HEADER = "X-Backend-Api-Key";
+  private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
   @Bean
   public PasswordEncoder passwordEncoder() {
@@ -37,8 +42,9 @@ public class SecurityConfig {
           boolean allowUnauthenticatedVacancyAccess,
        @Value("${rrhh.security.allow-unauthenticated-mutations:false}")
             boolean allowUnauthenticatedMutations,
-        @Value("${rrhh.security.internal-api-token:}") String internalApiToken,
-        SessionAuthenticationFilter sessionAuthenticationFilter)
+         @Value("${rrhh.security.internal-api-token:}") String internalApiToken,
+         SessionAuthenticationFilter sessionAuthenticationFilter,
+         AuditService auditService)
       throws Exception {
     if (requiresInternalApiToken(allowUnauthenticatedVacancyAccess, allowUnauthenticatedMutations)
         && (internalApiToken == null || internalApiToken.isBlank())) {
@@ -53,14 +59,18 @@ public class SecurityConfig {
                 exceptions
                     .authenticationEntryPoint(
                         (request, response, exception) -> {
+                          recordCandidateDenied(request, auditService);
                           if (request.getRequestURI().startsWith("/api/v1/admin/")) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
                           }
                         })
-                    .accessDeniedHandler(
-                        (request, response, exception) -> writeJsonError(response, 403, "forbidden")))
+                     .accessDeniedHandler(
+                         (request, response, exception) -> {
+                           recordCandidateDenied(request, auditService);
+                           writeJsonError(response, 403, "forbidden");
+                         }))
         .sessionManagement(
             session ->
                 session.sessionCreationPolicy(
@@ -210,6 +220,34 @@ public class SecurityConfig {
     return configuredToken != null
         && !configuredToken.isBlank()
         && configuredToken.equals(providedToken);
+  }
+
+  private void recordCandidateDenied(
+      jakarta.servlet.http.HttpServletRequest request, AuditService auditService) {
+    String path = request.getRequestURI();
+    String action;
+    String resourceId;
+    if ("POST".equals(request.getMethod()) && "/api/v1/candidates".equals(path)) {
+      action = "candidate.create";
+      resourceId = null;
+    } else if ("PATCH".equals(request.getMethod()) && path.startsWith("/api/v1/candidates/")) {
+      action = "candidate.update";
+      resourceId = path.substring("/api/v1/candidates/".length());
+    } else {
+      return;
+    }
+    try {
+      String forwardedFor = request.getHeader("X-Forwarded-For");
+      auditService.recordDenied(
+          action,
+          "candidate",
+          resourceId,
+          forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim(),
+          request.getHeader("User-Agent"),
+          Map.of("reason", "forbidden"));
+    } catch (RuntimeException auditFailure) {
+      log.error("Unable to persist {} DENIED audit event", action, auditFailure);
+    }
   }
 
   private boolean requiresInternalApiToken(

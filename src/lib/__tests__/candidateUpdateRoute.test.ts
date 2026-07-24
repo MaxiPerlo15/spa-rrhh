@@ -2,14 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -41,7 +36,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     authMock.mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -68,18 +62,10 @@ describe('/api/admin/candidates/[id] PATCH', () => {
       `http://localhost:8080/api/v1/candidates/${VALID_UUID}`,
       expect.objectContaining({ method: 'PATCH' })
     )
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'candidate.update',
-        outcome: 'SUCCESS',
-        resourceId: VALID_UUID
-      })
-    )
   })
 
   it('retorna 401 cuando no hay sesión admin', async () => {
     authMock.mockResolvedValue(null)
-
     const { PATCH } = await import('@/app/api/admin/candidates/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/admin/candidates/${VALID_UUID}`, {
       method: 'PATCH',
@@ -91,16 +77,12 @@ describe('/api/admin/candidates/[id] PATCH', () => {
 
     expect(response.status).toBe(401)
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({ outcome: 'DENIED' })
-    )
   })
 
   it('retorna 409 cuando Spring retorna CANDIDATE_IDENTITY_CONFLICT', async () => {
     authMock.mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: 'Conflicto', code: 'CANDIDATE_IDENTITY_CONFLICT' }),

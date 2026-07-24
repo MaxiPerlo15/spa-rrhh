@@ -2,14 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -40,7 +35,6 @@ describe('/api/admin/candidates POST', () => {
     authMock.mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -72,18 +66,10 @@ describe('/api/admin/candidates POST', () => {
       'http://localhost:8080/api/v1/candidates',
       expect.objectContaining({ method: 'POST' })
     )
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'candidate.create',
-        outcome: 'SUCCESS',
-        resourceId: 'cand-123'
-      })
-    )
   })
 
   it('retorna 401 cuando no hay sesión admin', async () => {
     authMock.mockResolvedValue(null)
-
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
@@ -101,7 +87,6 @@ describe('/api/admin/candidates POST', () => {
     authMock.mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: 'Duplicado', code: 'DUPLICATE_CANDIDATE' }),

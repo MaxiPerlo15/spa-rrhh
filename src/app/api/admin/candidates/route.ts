@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { createAdminCandidateSchema, formatValidationError } from '@/lib/apiValidation'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
 
 export async function POST(request: NextRequest) {
-  let session = null as Awaited<ReturnType<typeof auth>>
   try {
-    session = await auth()
+    const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -68,38 +66,8 @@ export async function POST(request: NextRequest) {
 
     const responseBody = await springResponse.json()
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'candidate.create',
-      resourceType: 'candidate',
-      resourceId: responseBody.candidateId,
-      outcome: 'SUCCESS',
-      metadata: {
-        candidateName,
-        email,
-        source: 'admin-manual'
-      }
-    })
-
     return NextResponse.json(responseBody, { status: springResponse.status })
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'candidate.create',
-      resourceType: 'candidate',
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al registrar candidato manual', error)
     return NextResponse.json(
       { error: 'Error al registrar candidato manual' },

@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.meinardi.rrhh.application.ApplicationAdminInputBoundary;
 import com.meinardi.rrhh.application.ApplicationIntakeInputBoundary;
 import com.meinardi.rrhh.application.ApplicationListInputBoundary;
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.SubmitApplicationCommand;
 import com.meinardi.rrhh.domain.model.Candidato;
 import com.meinardi.rrhh.domain.model.Jornada;
@@ -54,6 +55,7 @@ class ApplicationRestControllerTest {
   @MockitoBean private ApplicationIntakeInputBoundary applicationIntakeInputBoundary;
   @MockitoBean private ApplicationListInputBoundary applicationListInputBoundary;
   @MockitoBean private ApplicationAdminInputBoundary applicationAdminInputBoundary;
+  @MockitoBean private AuditService auditService;
 
   // --- POST /api/v1/applications ---
 

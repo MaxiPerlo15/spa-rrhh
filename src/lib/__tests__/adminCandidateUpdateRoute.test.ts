@@ -2,15 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 const rejectIfUntrustedOriginMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -47,7 +42,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
 
   it('rechaza acceso sin autenticación de admin', async () => {
     authMock.mockResolvedValue(null)
-
     const { PATCH } = await import('@/app/api/admin/candidates/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/admin/candidates/${VALID_UUID}`, {
       method: 'PATCH',
@@ -66,7 +60,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     authMock.mockResolvedValue({
       user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -98,7 +91,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     authMock.mockResolvedValue({
       user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
     })
-
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -128,13 +120,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       `http://localhost:8080/api/v1/candidates/${VALID_UUID}`,
       expect.objectContaining({ method: 'PATCH' })
-    )
-    expect(auditAdminActionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'candidate.update',
-        outcome: 'SUCCESS',
-        resourceId: VALID_UUID
-      })
     )
   })
 })

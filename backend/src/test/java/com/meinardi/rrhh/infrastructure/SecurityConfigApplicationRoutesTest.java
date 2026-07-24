@@ -19,6 +19,7 @@ import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.AuditService;
+import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
@@ -27,6 +28,7 @@ import com.meinardi.rrhh.domain.model.Usuario;
 import com.meinardi.rrhh.presentation.ApplicationRestController;
 import com.meinardi.rrhh.presentation.NotificationController;
 import com.meinardi.rrhh.presentation.AuditController;
+import com.meinardi.rrhh.presentation.CandidateRestController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,7 +46,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, NotificationController.class, AuditController.class})
+@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, NotificationController.class, AuditController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -76,6 +78,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private PasswordResetService passwordResetService;
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private AuditService auditService;
+  @MockitoBean private AuditedCandidateAdmin auditedCandidateAdmin;
   @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
@@ -93,6 +96,25 @@ class SecurityConfigApplicationRoutesTest {
         .perform(
             get("/api/v1/applications/some-id").header("X-Backend-Api-Key", INVALID_TOKEN))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void candidateCreateDenialIsRecordedInSpring() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/candidates")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
+        .andExpect(status().isForbidden());
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("candidate.create"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
   }
 
   // --- PATCH /api/v1/applications/{id}/status ---
