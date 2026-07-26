@@ -33,10 +33,18 @@ class SpringVacancyMutationError extends Error {
   }
 }
 
+class SpringVacancyMutationFailureError extends Error {
+  readonly category = 'spring_mutation_failure'
+
+  constructor(readonly status: number) {
+    super('Spring vacancy mutation failed')
+    this.name = 'SpringVacancyMutationFailureError'
+  }
+}
+
 async function rejectFailedSpringVacancyStatusMutation(
   response: Response,
   id: string,
-  action: string,
   businessRuleFallback: string
 ) {
   if (response.status === 404) {
@@ -44,13 +52,21 @@ async function rejectFailedSpringVacancyStatusMutation(
   }
 
   if (!response.ok) {
-    const errorBody = await response.text()
     if (response.status === 400 || response.status === 409) {
+      const errorBody = await response.text()
       const message = parseSpringError(errorBody) || businessRuleFallback
       throw new SpringVacancyWriteError(response.status, message)
     }
-    throw new Error(`Spring backend rejected vacancy ${action} (${response.status}): ${errorBody}`)
+    throw new SpringVacancyMutationFailureError(response.status)
   }
+}
+
+function springMutationFailureMetadata(error: unknown) {
+  if (error instanceof SpringVacancyMutationFailureError) {
+    return { category: error.category, status: error.status }
+  }
+
+  return undefined
 }
 
 function preservedSpringMutationErrorResponse(
@@ -88,7 +104,6 @@ async function closeVacancyInSpring(id: string, request: NextRequest, cookie: st
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
-      'close',
       'No se pudo cerrar la vacante por una regla de negocio'
     )
   } catch (error) {
@@ -143,7 +158,6 @@ async function activateVacancyInSpring(id: string, request: NextRequest, cookie:
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
-      'activation',
       'No se pudo activar la vacante por una regla de negocio'
     )
   } catch (error) {
@@ -175,7 +189,6 @@ async function deactivateVacancyInSpring(id: string, request: NextRequest, cooki
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
-      'deactivation',
       'No se pudo desactivar la vacante por una regla de negocio'
     )
   } catch (error) {
@@ -212,11 +225,10 @@ async function updateVacancyInSpring(
 
   if (!response.ok) {
     try {
-      await rejectFailedSpringVacancyStatusMutation(
-        response,
-        id,
-        'update',
-        'No se pudo actualizar la vacante por una regla de negocio'
+        await rejectFailedSpringVacancyStatusMutation(
+          response,
+          id,
+          'No se pudo actualizar la vacante por una regla de negocio'
       )
     } catch (error) {
       throw new SpringVacancyMutationError(response.headers, error)
@@ -488,6 +500,7 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
 
     throw new Error('Spring backend did not complete the vacancy update')
   } catch (error) {
+    const failureMetadata = springMutationFailureMetadata(error)
     await auditAdminAction({
       request,
       actor: {
@@ -499,10 +512,10 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       resourceId,
       outcome: 'ERROR',
       metadata: {
-        error: error instanceof Error ? error.message : String(error)
+        ...(failureMetadata ?? { error: error instanceof Error ? error.message : String(error) })
       }
     })
-    logger.error('Error al actualizar vacante', error)
+    logger.error('Error al actualizar vacante', error, failureMetadata)
     const response = NextResponse.json(
       { error: 'Error al actualizar vacante' },
       { status: 500 }
@@ -620,6 +633,7 @@ export async function DELETE(
       return relaySpringCookies(response, mutationHeaders)
     }
   } catch (error) {
+    const failureMetadata = springMutationFailureMetadata(error)
     await auditAdminAction({
       request,
       actor: {
@@ -631,10 +645,10 @@ export async function DELETE(
       resourceId,
       outcome: 'ERROR',
       metadata: {
-        error: error instanceof Error ? error.message : String(error)
+        ...(failureMetadata ?? { error: error instanceof Error ? error.message : String(error) })
       }
     })
-    logger.error('Error al cerrar vacante', error)
+    logger.error('Error al cerrar vacante', error, failureMetadata)
     const response = NextResponse.json(
       { error: 'Error al cerrar vacante' },
       { status: 500 }

@@ -7,6 +7,7 @@ const findUniqueMock = vi.fn()
 const updateMock = vi.fn()
 const auditAdminActionMock = vi.fn()
 const getSpringSessionMock = vi.fn()
+const loggerErrorMock = vi.fn()
 const ORIGINAL_ENV = process.env
 
 vi.mock('@/lib/auth', () => ({
@@ -29,6 +30,12 @@ vi.mock('@/lib/adminAudit', () => ({
 
 vi.mock('@/lib/springSession', () => ({
   getSpringSession: getSpringSessionMock
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    error: loggerErrorMock
+  }
 }))
 
 vi.mock('@/lib/server/publicVacancies', () => ({
@@ -599,6 +606,7 @@ describe('/api/vacancies/[id]', () => {
   it.each([
     { method: 'PATCH', body: { title: 'Updated Engineer' } },
     { method: 'PUT', body: { title: 'Updated Engineer' } },
+    { method: 'PATCH', body: { status: 'ACTIVE' } },
     { method: 'DELETE' }
   ] as const)('returns 500 and relays authorization and mutation cookies for an upstream $method failure', async ({ method, body }) => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
@@ -610,6 +618,7 @@ describe('/api/vacancies/[id]', () => {
       user: { userId: 'spring-admin', email: 'admin@example.com' }
     })
     const mutationCookie = 'XSRF-TOKEN=mutation-token; Path=/; SameSite=Lax'
+    const upstreamBody = 'upstream diagnostic: database password=spring-secret'
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 503,
@@ -617,7 +626,7 @@ describe('/api/vacancies/[id]', () => {
         get: (name: string) => name === 'set-cookie' ? mutationCookie : null,
         getSetCookie: () => [mutationCookie]
       },
-      text: () => Promise.resolve('service unavailable')
+      text: () => Promise.resolve(upstreamBody)
     }))
 
     const { PATCH, PUT, DELETE } = await import('@/app/api/vacancies/[id]/route')
@@ -634,5 +643,20 @@ describe('/api/vacancies/[id]', () => {
     await expect(response.json()).resolves.toEqual({ error: method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante' })
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
     expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
+    expect(auditAdminActionMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      outcome: 'ERROR',
+      metadata: { category: 'spring_mutation_failure', status: 503 }
+    }))
+    expect(loggerErrorMock).toHaveBeenLastCalledWith(
+      method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante',
+      expect.objectContaining({
+        message: 'Spring vacancy mutation failed',
+        category: 'spring_mutation_failure',
+        status: 503
+      }),
+      { category: 'spring_mutation_failure', status: 503 }
+    )
+    expect(JSON.stringify(auditAdminActionMock.mock.calls)).not.toContain(upstreamBody)
+    expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain(upstreamBody)
   })
 })
