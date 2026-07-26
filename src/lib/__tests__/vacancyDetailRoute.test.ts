@@ -436,7 +436,7 @@ describe('/api/vacancies/[id]', () => {
     expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
   })
 
-  it('forwards only safe context and the rotated Spring session for PUT, then appends both response cookies', async () => {
+  it('forwards only safe context and the rotated Spring session for PUT, then relays both response cookies in order', async () => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } })
@@ -493,8 +493,7 @@ describe('/api/vacancies/[id]', () => {
       })
     )
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization')
-    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
-    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
+    expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([rotatedSessionCookie, mutationCookie])
   })
 
   it.each([
