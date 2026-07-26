@@ -260,19 +260,34 @@ describe('/api/contacts/[id] PATCH', () => {
     expect(getSetCookies(response)).toEqual(['SESSIONID=rotated-session; Path=/; HttpOnly'])
   })
 
-  it('relays the Spring session cookie when DELETE is denied anonymously', async () => {
+  it.each(['PATCH', 'DELETE'] as const)('relays the Spring session cookie when %s is denied anonymously', async method => {
     authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
     getSpringSessionMock.mockResolvedValue({
       state: 'anonymous', setCookie: 'SESSIONID=expired; Max-Age=0; Path=/'
     })
+    const { PATCH, DELETE } = await import('@/app/api/contacts/[id]/route')
+    const response = await (method === 'PATCH' ? PATCH : DELETE)(new NextRequest(
+      'http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+        method, headers: { Cookie: 'SESSIONID=original-session' },
+        ...(method === 'PATCH' ? { body: JSON.stringify({ status: 'RESPONDED' }) } : {})
+      }
+    ), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(401)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(getSetCookies(response)).toEqual(['SESSIONID=expired; Max-Age=0; Path=/'])
+  })
+
+  it('relays the authorization cookie when DELETE transport fails', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    fetchSpy.mockRejectedValueOnce(new Error('Spring unavailable'))
     const { DELETE } = await import('@/app/api/contacts/[id]/route')
     const response = await DELETE(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
       method: 'DELETE', headers: { Cookie: 'SESSIONID=original-session' }
     }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
 
-    expect(response.status).toBe(401)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    expect(getSetCookies(response)).toEqual(['SESSIONID=expired; Max-Age=0; Path=/'])
+    expect(response.status).toBe(503)
+    expect(getSetCookies(response)).toEqual(['SESSIONID=rotated-session; Path=/; HttpOnly'])
   })
 
   it('relays ordered cookies when DELETE receives a Spring text failure', async () => {
