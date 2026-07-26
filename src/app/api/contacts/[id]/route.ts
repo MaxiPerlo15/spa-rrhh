@@ -9,6 +9,7 @@ import {
 } from '@/lib/apiValidation'
 import { toContactAdminDto } from '@/lib/dto/contact'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { relaySpringCookies } from '@/lib/server/adminBffBoundary'
 import { getSpringSession } from '@/lib/springSession'
 interface RouteParams {
   params: Promise<{
@@ -16,13 +17,27 @@ interface RouteParams {
   }>
 }
 
-async function authorizeSpringContactMutation(request: NextRequest) {
+type AuthorizedSpringContactMutation = { cookie: string; setCookie?: string }
+
+function relayMutationCookies(
+  response: NextResponse,
+  authorizedSetCookie?: string,
+  mutationHeaders?: Headers
+): NextResponse {
+  relaySpringCookies(response, authorizedSetCookie)
+  relaySpringCookies(response, mutationHeaders)
+  return response
+}
+
+async function authorizeSpringContactMutation(
+  request: NextRequest
+): Promise<AuthorizedSpringContactMutation | NextResponse> {
   const sessionId = request.cookies.get('SESSIONID')?.value
   if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const session = await getSpringSession(`SESSIONID=${sessionId}`)
   if (session.state === 'anonymous') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    return relayMutationCookies(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), session.setCookie)
   }
   if (session.state === 'forbidden') {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
@@ -32,7 +47,8 @@ async function authorizeSpringContactMutation(request: NextRequest) {
   }
 
   return {
-    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`
+    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`,
+    setCookie: session.setCookie
   }
 }
 
@@ -117,6 +133,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let authorizedSetCookie: string | undefined
+  let mutationHeaders: Headers | undefined
+
   try {
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
@@ -153,6 +172,7 @@ export async function PATCH(
 
     const springSession = await authorizeSpringContactMutation(request)
     if (springSession instanceof NextResponse) return springSession
+    authorizedSetCookie = springSession.setCookie
 
     let springResponse: Response
     try {
@@ -167,28 +187,30 @@ export async function PATCH(
       })
     } catch (error) {
       logger.error('Spring backend unreachable for contact status update', error)
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend unavailable' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
+    mutationHeaders = springResponse.headers
 
     if (!springResponse.ok) {
+      const errorBody = await springResponse.text()
       try {
-        const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relayMutationCookies(NextResponse.json(JSON.parse(errorBody), {
+          status: springResponse.status
+        }), authorizedSetCookie, mutationHeaders)
       } catch {
-        const errorBody = await springResponse.text()
-        return NextResponse.json(
+        return relayMutationCookies(NextResponse.json(
           { error: errorBody || 'Error al actualizar contacto' },
           { status: springResponse.status }
-        )
+        ), authorizedSetCookie, mutationHeaders)
       }
     }
 
     const contact = await springResponse.json()
 
-    return NextResponse.json(
+    return relayMutationCookies(NextResponse.json(
       toContactAdminDto({
         id: contact.id,
         name: contact.name,
@@ -199,13 +221,13 @@ export async function PATCH(
         status: contact.status,
         createdAt: contact.createdAt
       })
-    )
+    ), authorizedSetCookie, mutationHeaders)
   } catch (error) {
     logger.error('Error al actualizar contacto', error)
-    return NextResponse.json(
+    return relayMutationCookies(NextResponse.json(
       { error: 'Error al actualizar contacto' },
       { status: 500 }
-    )
+    ), authorizedSetCookie, mutationHeaders)
   }
 }
 
@@ -214,6 +236,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
+  let authorizedSetCookie: string | undefined
+  let mutationHeaders: Headers | undefined
+
   try {
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
@@ -243,6 +268,7 @@ export async function DELETE(
 
     const springSession = await authorizeSpringContactMutation(request)
     if (springSession instanceof NextResponse) return springSession
+    authorizedSetCookie = springSession.setCookie
 
     let springResponse: Response
     try {
@@ -255,31 +281,37 @@ export async function DELETE(
       })
     } catch (error) {
       logger.error('Spring backend unreachable for contact delete', error)
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend unavailable' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
+    mutationHeaders = springResponse.headers
 
     if (!springResponse.ok) {
+      const errorBody = await springResponse.text()
       try {
-        const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relayMutationCookies(NextResponse.json(JSON.parse(errorBody), {
+          status: springResponse.status
+        }), authorizedSetCookie, mutationHeaders)
       } catch {
-        const errorBody = await springResponse.text()
-        return NextResponse.json(
+        return relayMutationCookies(NextResponse.json(
           { error: errorBody || 'Error al eliminar contacto' },
           { status: springResponse.status }
-        )
+        ), authorizedSetCookie, mutationHeaders)
       }
     }
 
-    return NextResponse.json({ message: 'Contacto eliminado' })
+    return relayMutationCookies(
+      NextResponse.json({ message: 'Contacto eliminado' }),
+      authorizedSetCookie,
+      mutationHeaders
+    )
   } catch (error) {
     logger.error('Error al eliminar contacto', error)
-    return NextResponse.json(
+    return relayMutationCookies(NextResponse.json(
       { error: 'Error al eliminar contacto' },
       { status: 500 }
-    )
+    ), authorizedSetCookie, mutationHeaders)
   }
 }

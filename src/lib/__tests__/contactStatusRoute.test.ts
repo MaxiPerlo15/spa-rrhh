@@ -22,6 +22,9 @@ vi.mock('@/lib/server/springBackend', () => ({
 }))
 
 const fetchSpy = vi.spyOn(globalThis, 'fetch')
+const getSetCookies = (response: Response) => (
+  response.headers as Headers & { getSetCookie: () => string[] }
+).getSetCookie()
 
 describe('/api/contacts/[id] GET', () => {
   beforeEach(() => {
@@ -96,7 +99,7 @@ describe('/api/contacts/[id] PATCH', () => {
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: 'Transición inválida de contacto', code: 'INVALID_CONTACT_TRANSITION' }),
-        { status: 400 }
+        { status: 400, headers: { 'Set-Cookie': 'XSRF-TOKEN=failed-patch; Path=/' } }
       )
     )
 
@@ -128,6 +131,10 @@ describe('/api/contacts/[id] PATCH', () => {
       })
     )
     expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session')
+    expect(getSetCookies(response)).toEqual([
+      'SESSIONID=rotated-session; Path=/; HttpOnly',
+      'XSRF-TOKEN=failed-patch; Path=/'
+    ])
   })
 
   it('retorna 401 cuando no hay sesión de admin', async () => {
@@ -214,5 +221,94 @@ describe('/api/contacts/[id] PATCH', () => {
       : { Cookie: 'SESSIONID=rotated-session' })
     expect(springHeaders).not.toHaveProperty('X-Forwarded-For')
     expect(springHeaders).not.toHaveProperty('User-Agent')
+  })
+
+  it('relays ordered cookies on successful contact mutations', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    fetchSpy
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 'cmdbcontactstatus0000000001', name: 'Carlos', email: 'carlos@example.com', phone: null,
+        subject: 'Recruitment', message: 'Message', status: 'RESPONDED', createdAt: '2026-03-01T08:00:00.000Z'
+      }), { status: 200, headers: { 'Set-Cookie': 'XSRF-TOKEN=patched; Path=/' } }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 200, headers: { 'Set-Cookie': 'XSRF-TOKEN=deleted; Path=/' }
+      }))
+    const { PATCH, DELETE } = await import('@/app/api/contacts/[id]/route')
+    const params = { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) }
+    const patch = await PATCH(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'PATCH', headers: { Cookie: 'SESSIONID=original-session' }, body: JSON.stringify({ status: 'RESPONDED' })
+    }), params)
+    const deletion = await DELETE(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'DELETE', headers: { Cookie: 'SESSIONID=original-session' }
+    }), params)
+
+    expect(getSetCookies(patch)).toEqual(['SESSIONID=rotated-session; Path=/; HttpOnly', 'XSRF-TOKEN=patched; Path=/'])
+    expect(getSetCookies(deletion)).toEqual(['SESSIONID=rotated-session; Path=/; HttpOnly', 'XSRF-TOKEN=deleted; Path=/'])
+  })
+
+  it('relays authorization cookies when PATCH transport fails', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    fetchSpy.mockRejectedValueOnce(new Error('Spring unavailable'))
+    const { PATCH } = await import('@/app/api/contacts/[id]/route')
+    const response = await PATCH(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=original-session' },
+      body: JSON.stringify({ status: 'RESPONDED' })
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(503)
+    expect(getSetCookies(response)).toEqual(['SESSIONID=rotated-session; Path=/; HttpOnly'])
+  })
+
+  it('relays the Spring session cookie when DELETE is denied anonymously', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    getSpringSessionMock.mockResolvedValue({
+      state: 'anonymous', setCookie: 'SESSIONID=expired; Max-Age=0; Path=/'
+    })
+    const { DELETE } = await import('@/app/api/contacts/[id]/route')
+    const response = await DELETE(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'DELETE', headers: { Cookie: 'SESSIONID=original-session' }
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(401)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(getSetCookies(response)).toEqual(['SESSIONID=expired; Max-Age=0; Path=/'])
+  })
+
+  it('relays ordered cookies when DELETE receives a Spring text failure', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    fetchSpy.mockResolvedValueOnce(new Response('Contact locked', {
+      status: 409, headers: { 'Set-Cookie': 'XSRF-TOKEN=failed-delete; Path=/' }
+    }))
+    const { DELETE } = await import('@/app/api/contacts/[id]/route')
+    const response = await DELETE(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'DELETE', headers: { Cookie: 'SESSIONID=original-session' }
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({ error: 'Contact locked' })
+    expect(getSetCookies(response)).toEqual([
+      'SESSIONID=rotated-session; Path=/; HttpOnly',
+      'XSRF-TOKEN=failed-delete; Path=/'
+    ])
+  })
+
+  it('relays ordered cookies when PATCH cannot parse a Spring success body', async () => {
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    fetchSpy.mockResolvedValueOnce(new Response('not json', {
+      status: 200, headers: { 'Set-Cookie': 'XSRF-TOKEN=parse-error; Path=/' }
+    }))
+    const { PATCH } = await import('@/app/api/contacts/[id]/route')
+    const response = await PATCH(new NextRequest('http://localhost/api/contacts/cmdbcontactstatus0000000001', {
+      method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=original-session' },
+      body: JSON.stringify({ status: 'RESPONDED' })
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(500)
+    expect(getSetCookies(response)).toEqual([
+      'SESSIONID=rotated-session; Path=/; HttpOnly',
+      'XSRF-TOKEN=parse-error; Path=/'
+    ])
   })
 })
