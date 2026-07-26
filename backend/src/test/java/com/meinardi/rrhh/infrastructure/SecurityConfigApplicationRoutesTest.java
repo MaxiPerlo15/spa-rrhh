@@ -19,7 +19,9 @@ import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.AuditService;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
+import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
@@ -29,6 +31,7 @@ import com.meinardi.rrhh.presentation.ApplicationRestController;
 import com.meinardi.rrhh.presentation.NotificationController;
 import com.meinardi.rrhh.presentation.AuditController;
 import com.meinardi.rrhh.presentation.CandidateRestController;
+import com.meinardi.rrhh.presentation.ContactoRestController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -46,7 +49,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, NotificationController.class, AuditController.class})
+@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -78,7 +81,9 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private PasswordResetService passwordResetService;
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private AuditService auditService;
+  @MockitoBean private AuditedAdminMutation auditedAdminMutation;
   @MockitoBean private AuditedCandidateAdmin auditedCandidateAdmin;
+  @MockitoBean private ContactoService contactoService;
   @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
@@ -134,6 +139,52 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PATCH", "DELETE"})
+  void anonymousContactMutationReturnsJson401AndRecordsDeniedInSpring(String method) throws Exception {
+    mockMvc
+        .perform(contactMutation(method))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"),
+            org.mockito.ArgumentMatchers.eq("contact"),
+            org.mockito.ArgumentMatchers.eq("contact-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PATCH", "DELETE"})
+  void contactMutationWithAdminDelegatesThroughAuditedMutation(String method) throws Exception {
+    Usuario administrator = administrator();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
+    org.mockito.Mockito.doAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get())
+        .when(auditedAdminMutation).execute(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
+    if ("PATCH".equals(method)) org.mockito.Mockito.when(contactoService.updateStatus("contact-123", "RESPONDED")).thenReturn(org.mockito.Mockito.mock(com.meinardi.rrhh.domain.model.Contacto.class));
+
+    mockMvc.perform(contactMutation(method).session(sessionFor(administrator))).andExpect(status().isOk());
+
+    org.mockito.Mockito.verify(auditedAdminMutation).execute(
+        org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq("contact-123"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
+    if ("PATCH".equals(method)) org.mockito.Mockito.verify(contactoService).updateStatus("contact-123", "RESPONDED");
+    else org.mockito.Mockito.verify(contactoService).delete("contact-123");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PATCH", "DELETE"})
+  void contactMutationWithoutAdminPermissionReturnsJson403(String method) throws Exception {
+    Usuario administrator = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
+
+    mockMvc.perform(contactMutation(method).session(sessionFor(administrator)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
   }
 
   // --- PATCH /api/v1/applications/{id}/status ---
@@ -284,6 +335,12 @@ class SecurityConfigApplicationRoutesTest {
     MockHttpServletRequest request = new MockHttpServletRequest();
     sessionService.createSession(request, usuario);
     return (MockHttpSession) request.getSession(false);
+  }
+
+  private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder contactMutation(String method) {
+    return "PATCH".equals(method)
+        ? patch("/api/v1/contacts/contact-123").contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"RESPONDED\"}")
+        : delete("/api/v1/contacts/contact-123");
   }
 
   private void assertInvalidSession(MockHttpSession session) throws Exception {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
   formatValidationError,
@@ -10,10 +9,31 @@ import {
 } from '@/lib/apiValidation'
 import { toContactAdminDto } from '@/lib/dto/contact'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
 interface RouteParams {
   params: Promise<{
     id: string
   }>
+}
+
+async function authorizeSpringContactMutation(request: NextRequest) {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+  if (session.state === 'forbidden') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+  if (session.state === 'unavailable') {
+    return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
+  }
+
+  return {
+    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`
+  }
 }
 
 // GET /api/contacts/[id] - Obtener un contacto
@@ -97,28 +117,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   try {
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
-    session = await auth()
+    const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'contact.update_status',
-        resourceType: 'contact',
-        resourceId: id,
-        outcome: 'DENIED'
-      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
@@ -145,13 +151,17 @@ export async function PATCH(
       )
     }
 
+    const springSession = await authorizeSpringContactMutation(request)
+    if (springSession instanceof NextResponse) return springSession
+
     let springResponse: Response
     try {
       springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getSpringBackendHeaders()
+          ...getSpringBackendHeaders(),
+          Cookie: springSession.cookie
         },
         body: JSON.stringify({ status })
       })
@@ -178,21 +188,6 @@ export async function PATCH(
 
     const contact = await springResponse.json()
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'contact.update_status',
-      resourceType: 'contact',
-      resourceId: id,
-      outcome: 'SUCCESS',
-      metadata: {
-        newStatus: status
-      }
-    })
-
     return NextResponse.json(
       toContactAdminDto({
         id: contact.id,
@@ -206,20 +201,6 @@ export async function PATCH(
       })
     )
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'contact.update_status',
-      resourceType: 'contact',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al actualizar contacto', error)
     return NextResponse.json(
       { error: 'Error al actualizar contacto' },
@@ -233,28 +214,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   try {
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
-    session = await auth()
+    const session = await auth()
     if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'contact.delete',
-        resourceType: 'contact',
-        resourceId: id,
-        outcome: 'DENIED'
-      })
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
@@ -274,11 +241,17 @@ export async function DELETE(
       )
     }
 
+    const springSession = await authorizeSpringContactMutation(request)
+    if (springSession instanceof NextResponse) return springSession
+
     let springResponse: Response
     try {
       springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
         method: 'DELETE',
-        headers: getSpringBackendHeaders()
+        headers: {
+          ...getSpringBackendHeaders(),
+          Cookie: springSession.cookie
+        }
       })
     } catch (error) {
       logger.error('Spring backend unreachable for contact delete', error)
@@ -301,34 +274,8 @@ export async function DELETE(
       }
     }
 
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session.user?.id,
-        email: session.user?.email
-      },
-      action: 'contact.delete',
-      resourceType: 'contact',
-      resourceId: id,
-      outcome: 'SUCCESS'
-    })
-
     return NextResponse.json({ message: 'Contacto eliminado' })
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'contact.delete',
-      resourceType: 'contact',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
     logger.error('Error al eliminar contacto', error)
     return NextResponse.json(
       { error: 'Error al eliminar contacto' },
