@@ -234,13 +234,13 @@ public class SecurityConfig {
       return;
     }
     try {
-      String forwardedFor = request.getHeader("X-Forwarded-For");
+      AuditRequestContext auditContext = AuditRequestContextResolver.resolve(request);
       auditService.recordDenied(
           action,
           resourceType,
           resourceId,
-          forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim(),
-          request.getHeader("User-Agent"),
+          auditContext.ip(),
+          auditContext.userAgent(),
           Map.of("reason", "forbidden"));
     } catch (RuntimeException auditFailure) {
       log.error("Unable to persist {} DENIED audit event", action, auditFailure);

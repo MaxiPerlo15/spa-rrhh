@@ -3,6 +3,8 @@ package com.meinardi.rrhh.presentation;
 import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.domain.model.Contacto;
+import com.meinardi.rrhh.infrastructure.AuditRequestContext;
+import com.meinardi.rrhh.infrastructure.AuditRequestContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -54,29 +56,27 @@ public class ContactoRestController {
       @RequestBody java.util.Map<String, String> body,
       HttpServletRequest request) {
     String status = body.get("status");
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(request);
     return toResponse(
         auditedMutation.execute(
             "contact.update_status",
             "contact",
             id,
-            request.getHeader("X-Forwarded-For") == null
-                ? request.getRemoteAddr()
-                : request.getHeader("X-Forwarded-For"),
-            request.getHeader("User-Agent"),
+            auditContext.ip(),
+            auditContext.userAgent(),
             java.util.Map.of("newStatus", status),
             () -> contactoService.updateStatus(id, status)));
   }
 
   @DeleteMapping("/{id}")
   public java.util.Map<String, Boolean> delete(@PathVariable String id, HttpServletRequest request) {
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(request);
     auditedMutation.execute(
         "contact.delete",
         "contact",
         id,
-        request.getHeader("X-Forwarded-For") == null
-            ? request.getRemoteAddr()
-            : request.getHeader("X-Forwarded-For"),
-        request.getHeader("User-Agent"),
+        auditContext.ip(),
+        auditContext.userAgent(),
         java.util.Map.of(),
         () -> {
           contactoService.delete(id);

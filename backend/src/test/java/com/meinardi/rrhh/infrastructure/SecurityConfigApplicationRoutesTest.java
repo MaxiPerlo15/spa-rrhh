@@ -161,6 +161,27 @@ class SecurityConfigApplicationRoutesTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"PATCH", "DELETE"})
+  void anonymousContactMutationRecordsValidForwardedAuditContext(String method) throws Exception {
+    mockMvc
+        .perform(
+            contactMutation(method)
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "BFF test agent"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"),
+            org.mockito.ArgumentMatchers.eq("contact"),
+            org.mockito.ArgumentMatchers.eq("contact-123"),
+            org.mockito.ArgumentMatchers.eq("203.0.113.10"),
+            org.mockito.ArgumentMatchers.eq("BFF test agent"),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PATCH", "DELETE"})
   void contactMutationWithAdminDelegatesThroughAuditedMutation(String method) throws Exception {
     Usuario administrator = administrator();
     org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
@@ -168,12 +189,40 @@ class SecurityConfigApplicationRoutesTest {
         .when(auditedAdminMutation).execute(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
     if ("PATCH".equals(method)) org.mockito.Mockito.when(contactoService.updateStatus("contact-123", "RESPONDED")).thenReturn(org.mockito.Mockito.mock(com.meinardi.rrhh.domain.model.Contacto.class));
 
-    mockMvc.perform(contactMutation(method).session(sessionFor(administrator))).andExpect(status().isOk());
+    mockMvc
+        .perform(
+            contactMutation(method)
+                .session(sessionFor(administrator))
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "BFF test agent"))
+        .andExpect(status().isOk());
 
     org.mockito.Mockito.verify(auditedAdminMutation).execute(
-        org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq("contact-123"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
+        org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq("contact-123"), org.mockito.ArgumentMatchers.eq("203.0.113.10"), org.mockito.ArgumentMatchers.eq("BFF test agent"), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
     if ("PATCH".equals(method)) org.mockito.Mockito.verify(contactoService).updateStatus("contact-123", "RESPONDED");
     else org.mockito.Mockito.verify(contactoService).delete("contact-123");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PATCH", "DELETE"})
+  void contactMutationWithMalformedAndOversizedHeadersSanitizesSuccessfulAuditContext(String method) throws Exception {
+    Usuario administrator = administrator();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
+    org.mockito.Mockito.doAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get())
+        .when(auditedAdminMutation).execute(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
+    if ("PATCH".equals(method)) org.mockito.Mockito.when(contactoService.updateStatus("contact-123", "RESPONDED")).thenReturn(org.mockito.Mockito.mock(com.meinardi.rrhh.domain.model.Contacto.class));
+
+    mockMvc
+        .perform(
+            contactMutation(method)
+                .session(sessionFor(administrator))
+                .with(request -> { request.setRemoteAddr("10.0.0.4"); return request; })
+                .header("X-Forwarded-For", "203.0.113.+10")
+                .header("User-Agent", "a".repeat(513)))
+        .andExpect(status().isOk());
+
+    org.mockito.Mockito.verify(auditedAdminMutation).execute(
+        org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq("contact-123"), org.mockito.ArgumentMatchers.eq("10.0.0.4"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
   }
 
   @ParameterizedTest
@@ -182,9 +231,24 @@ class SecurityConfigApplicationRoutesTest {
     Usuario administrator = administratorWithoutPermission();
     org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(administrator));
 
-    mockMvc.perform(contactMutation(method).session(sessionFor(administrator)))
+    mockMvc
+        .perform(
+            contactMutation(method)
+                .session(sessionFor(administrator))
+                .with(request -> { request.setRemoteAddr("10.0.0.4"); return request; })
+                .header("X-Forwarded-For", "203.0.113.+10")
+                .header("User-Agent", "a".repeat(513)))
         .andExpect(status().isForbidden())
         .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("PATCH".equals(method) ? "contact.update_status" : "contact.delete"),
+            org.mockito.ArgumentMatchers.eq("contact"),
+            org.mockito.ArgumentMatchers.eq("contact-123"),
+            org.mockito.ArgumentMatchers.eq("10.0.0.4"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
   }
 
   // --- PATCH /api/v1/applications/{id}/status ---
