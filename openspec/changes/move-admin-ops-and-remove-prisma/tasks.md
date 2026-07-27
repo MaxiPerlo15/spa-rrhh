@@ -57,6 +57,8 @@ Chain strategy: feature-branch-chain
 
 - [x] 4.1 **PR2d** implement settings RED→GREEN→REFACTOR in `src/app/api/admin/settings/route.ts` after PR2c-e; preserve shape/errors; ≤400.
 - [ ] 4.2 Keep Prisma removal gated behind reconciliation, parity, smoke, archive, and no-reference checks.
+  - [x] 4.2a **PR4.2-0 planning evidence** Approve the content-only immutable-Flyway exception for exactly `backend/src/main/resources/db/migration/V2__add_reconciliation_evidence.sql` (`a8c2d28fe8f202c461ab290b7b13cd4f94aac1d4ba5bb4c0590ffff7be06798f`), `V3__add_reconciliation_approval_bindings.sql` (`cf9f5fb65d14462745cab8ad535d21584e7a25120d1e061104ff5e31423255bf`), and `V5__backfill_verified_admin_settings_contract.sql` (`df6ac016e73b83678591c39d695b9fbd8149e8d865ee1f9d12add757557b7a75`); their applied Flyway checksums MUST remain immutable.
+  - [ ] 4.2b **PR4.2-1 RED→GREEN→REFACTOR** Implement `npm run verify:orm-removal` with the exact SHA-256 manifest and Flyway validation; fail closed on a changed/missing/unreadable/extra entry or Flyway failure, and keep every other included tracked pathname and byte under the strict no-`prisma` scan. No broad migration, directory, source, or test exemption.
 
 ### Historical Evidence Constraint
 
