@@ -157,6 +157,7 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.verifyNoInteractions(contactoService, auditedAdminMutation);
   }
 
   @ParameterizedTest
@@ -249,6 +250,7 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.eq("10.0.0.4"),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(contactoService, auditedAdminMutation);
   }
 
   // --- PATCH /api/v1/applications/{id}/status ---

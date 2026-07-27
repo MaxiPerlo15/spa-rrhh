@@ -13,6 +13,7 @@ import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.AuditQuery;
 import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.ApplicationManager;
+import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.domain.model.AdminAuditLog;
 import com.meinardi.rrhh.domain.model.AuditOutcome;
@@ -156,6 +157,60 @@ class AdminAuditLogRepositoryIntegrationTest {
   }
 
   @Test
+  void persistsContactSuccessAuditsForPatchAndDelete() {
+    Contacto updated = contactoRepository.save(contact("success-update"));
+    Contacto deleted = contactoRepository.save(contact("success-delete"));
+
+    auditedMutation.execute("contact.update_status", "contact", updated.getId(), "203.0.113.10", "contact-integration-test", Map.of("newStatus", "RESPONDED"), () -> new ContactoService(contactoRepository).updateStatus(updated.getId(), "RESPONDED"));
+    auditedMutation.execute("contact.delete", "contact", deleted.getId(), "203.0.113.10", "contact-integration-test", Map.of(), () -> { new ContactoService(contactoRepository).delete(deleted.getId()); return null; });
+
+    assertThat(contactoRepository.findById(updated.getId()).orElseThrow().getEstadoActual())
+        .isEqualTo(com.meinardi.rrhh.domain.model.ContactStatus.RESPONDED);
+    assertThat(contactoRepository.findById(deleted.getId())).isEmpty();
+    assertThat(auditsFor("contact.update_status")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.SUCCESS);
+    assertThat(auditsFor("contact.delete")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.SUCCESS);
+  }
+
+  @Test
+  void keepsContactMutationErrorsDurableWhenTheMutationFails() {
+    Contacto contact = contactoRepository.save(contact("error-update"));
+
+    assertThatThrownBy(() -> auditedMutation.execute("contact.update_status", "contact", contact.getId(), null, null, Map.of("newStatus", "PENDING"), () -> new ContactoService(contactoRepository).updateStatus(contact.getId(), "PENDING")))
+        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    assertThatThrownBy(() -> auditedMutation.execute("contact.delete", "contact", "missing-contact", null, null, Map.of(), () -> { new ContactoService(contactoRepository).delete("missing-contact"); return null; }))
+        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+
+    assertThat(auditsFor("contact.update_status")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+    assertThat(auditsFor("contact.delete")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
+  void rollsBackContactPatchAndDeleteWhenTheirSuccessAuditsFail() {
+    Contacto updated = contactoRepository.save(contact("rollback-update"));
+    Contacto deleted = contactoRepository.save(contact("rollback-delete"));
+    doThrow(new IllegalStateException("audit unavailable"))
+        .when(auditService)
+        .recordSuccess(org.mockito.ArgumentMatchers.startsWith("contact."), org.mockito.ArgumentMatchers.eq("contact"), any(), any(), any(), any());
+
+    assertThatThrownBy(() -> auditedMutation.execute("contact.update_status", "contact", updated.getId(), null, null, Map.of("newStatus", "RESPONDED"), () -> new ContactoService(contactoRepository).updateStatus(updated.getId(), "RESPONDED")))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> auditedMutation.execute("contact.delete", "contact", deleted.getId(), null, null, Map.of(), () -> { new ContactoService(contactoRepository).delete(deleted.getId()); return null; }))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(contactoRepository.findById(updated.getId()).orElseThrow().getEstadoActual())
+        .isEqualTo(com.meinardi.rrhh.domain.model.ContactStatus.PENDING);
+    assertThat(contactoRepository.findById(deleted.getId())).isPresent();
+    assertThat(auditsFor("contact.update_status")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+    assertThat(auditsFor("contact.delete")).extracting(AdminAuditLog::getOutcome)
+        .containsExactly(AuditOutcome.ERROR);
+  }
+
+  @Test
   void recordsCandidateCreateSuccessTransactionally() {
     var result =
         auditedCandidateAdmin.manualCreate(
@@ -269,6 +324,14 @@ class AdminAuditLogRepositoryIntegrationTest {
     mutable.put("source", "changed");
     assertThat(entry.getMetadata()).containsEntry("source", "test");
     assertThatThrownBy(() -> entry.getMetadata().put("source", "changed")).isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  private Contacto contact(String suffix) {
+    return Contacto.create("Contact " + suffix, suffix + "@example.com", "+541111", "Subject", "Message", suffix);
+  }
+
+  private java.util.List<AdminAuditLog> auditsFor(String action) {
+    return repository.list(new AuditQuery(null, action, "contact", null, null), PageRequest.of(0, 20)).getContent();
   }
 
   private AdminAuditLog entry(String id, String createdAt, String action) {
