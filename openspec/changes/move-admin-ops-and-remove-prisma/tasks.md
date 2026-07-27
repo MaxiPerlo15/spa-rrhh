@@ -43,15 +43,15 @@ Chain strategy: feature-branch-chain
 
 - [x] 3.1 **PR2c-b RED** Add failing Vitest contracts for `src/app/api/admin/audit/route.ts`: filters/envelope, UTC dates, 400/401/403/503/500, and no Prisma fallback.
 - [x] 3.2 **PR2c-b GREEN→REFACTOR** Forward through `src/lib/server/springBackend.ts` while retaining `src/lib/apiValidation.ts` shape. Rollback adapter only; ≤400.
-- [ ] 3.3 **PR2c call-site chain** Cut over `src/app/api/vacancies/**` and `src/app/api/contacts/[id]/route.ts`; prove atomic SUCCESS and durable DENIED/ERROR. Base PR2c-b; rollback each call-site child independently; ≤400.
+- [x] 3.3 **PR2c call-site chain** Cut over `src/app/api/vacancies/**` and `src/app/api/contacts/[id]/route.ts`; prove atomic SUCCESS and durable DENIED/ERROR. Completed by committed ancestry from `339603a` (PR2c-c) through `6c031c5` (PR2c-f2); rollback each call-site child independently; ≤400.
   - [x] 3.3a **PR2c-c call-site A** Cut over `POST /api/vacancies`: Spring-session actor forwarding and transactional `vacancy.create` SUCCESS/ERROR audit. Rollback reverts only the POST call site and `AuditedVacancyCreator`.
-  - [ ] 3.3b **PR2c-f remaining WIP** Complete the remaining vacancy-detail and contact call sites, including their DENIED paths. The aggregate diff is validated but uncommitted and must not be marked complete.
-    - [ ] 3.3b.1 **PR2c-f0 foundation** Add `backend/src/main/**/AuditedAdminMutation.java` and its `AdminAuditLogRepositoryIntegrationTest` rollback/independent-ERROR proof. No HTTP call-site cutover; base PR2d; ≤140.
-    - [ ] 3.3b.2 **PR2c-f1 vacancy detail** Change vacancy-only hunks in `SecurityConfig{,Test}.java`, `VacancyRestController.java`, and `VacancyExceptionHandlerTest.java`; migrate `src/app/api/vacancies/[id]/route.ts` with `vacancyDetailRoute.test.ts`. Base PR2c-f0; ≤400.
-    - [ ] 3.3b.3 **PR2c-f2 contact** Change contact-only hunks in `SecurityConfig{,Test}.java` and `ContactoRestController.java`; migrate `src/app/api/contacts/[id]/route.ts` with `contactStatusRoute.test.ts`. Base PR2c-f1; ≤280.
+  - [x] 3.3b **PR2c-f remaining call sites** Complete the remaining vacancy-detail and contact call sites, including their DENIED paths. The previously uncommitted aggregate was delivered as the committed PR2c-f0 → PR2c-f2 ancestry ending at `6c031c5`.
+    - [x] 3.3b.1 **PR2c-f0 foundation** Add `backend/src/main/**/AuditedAdminMutation.java` and its `AdminAuditLogRepositoryIntegrationTest` rollback/independent-ERROR proof. Committed at `bde3dfd`; no HTTP call-site cutover; base PR2d; ≤140.
+    - [x] 3.3b.2 **PR2c-f1 vacancy detail** Change vacancy-only hunks in `SecurityConfig{,Test}.java`, `VacancyRestController.java`, and `VacancyExceptionHandlerTest.java`; migrate `src/app/api/vacancies/[id]/route.ts` with `vacancyDetailRoute.test.ts`. Delivered by committed descendants `badbe52` through `12c67cd` of PR2c-f0; ≤400.
+    - [x] 3.3b.3 **PR2c-f2 contact** Change contact-only hunks in `SecurityConfig{,Test}.java` and `ContactoRestController.java`; migrate `src/app/api/contacts/[id]/route.ts` with `contactStatusRoute.test.ts`. Delivered by committed descendants `fbd4c9f` through `6c031c5` of PR2c-f1; ≤280.
 - [x] 3.4 **PR2c-d RED→GREEN→REFACTOR** Cut over `src/app/api/applications/[id]/route.ts`; prove `application.view` ERROR and mutation rollback. Base PR2c-c; ≤400.
 - [x] 3.5 **PR2c-e RED→GREEN→REFACTOR** Cut over `src/app/api/admin/candidates/**`; prove `candidate.create` DENIED/SUCCESS rollback; remove only migrated `src/lib/adminAudit.ts` uses. Base PR2c-d; ≤400.
-- [ ] 3.6 Run focused JUnit/Vitest per slice, then audit Playwright, lint, and typecheck; record commands/results before rebasing PR2d.
+- [x] 3.6 Run focused JUnit/Vitest per slice, then audit Playwright, lint, and typecheck; record commands/results before rebasing PR2d. PASS recorded in `verify-report-pr2c-final-validation.md` against committed PR2c-f2 head `6c031c5b854e917d2207adafc83fc4f48f3bc63b`.
 
 ## Phase 4: Follow-up
 

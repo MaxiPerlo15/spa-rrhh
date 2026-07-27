@@ -16,6 +16,7 @@ const databasePassword = randomBytes(24).toString('hex')
 const adminEmail = `spring-e2e-${runId}@example.test`
 const adminPassword = randomBytes(24).toString('base64url')
 const internalApiToken = randomBytes(32).toString('hex')
+const springAuthE2eSpec = process.env.SPRING_AUTH_E2E_SPEC
 
 let springProcess: ReturnType<typeof spawn> | undefined
 let nextProcess: ReturnType<typeof spawn> | undefined
@@ -198,7 +199,8 @@ async function main() {
   await command(
     'npx',
     [
-       'playwright', 'test', 'tests/e2e/auth-spring-session.spec.ts', 'tests/e2e/admin-notifications.spec.ts',
+       'playwright', 'test', springAuthE2eSpec || 'tests/e2e/auth-spring-session.spec.ts',
+       ...(springAuthE2eSpec ? [] : ['tests/e2e/admin-notifications.spec.ts']),
       '--config', 'playwright.local.config.ts', '--project=chromium',
     ],
     {

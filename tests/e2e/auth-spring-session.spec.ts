@@ -3,10 +3,12 @@ import { expect, test } from '@playwright/test'
 const springAuthEnabled = process.env.SPRING_AUTH_ENABLED === 'true'
 const adminEmail = process.env.ADMIN_EMAIL
 const adminPassword = process.env.ADMIN_PASSWORD
+const springBackendUrl = process.env.BACKEND_URL?.replace(/\/+$/, '')
 
 test.describe('Admin Login via Spring Session', () => {
   test.skip(!springAuthEnabled, 'SPRING_AUTH_ENABLED must be true for Spring session tests')
   test.skip(!adminEmail || !adminPassword, 'ADMIN_EMAIL and ADMIN_PASSWORD required')
+  test.skip(!springBackendUrl, 'BACKEND_URL is required to verify the Spring session directly')
 
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies()
@@ -29,11 +31,17 @@ test.describe('Admin Login via Spring Session', () => {
     await expect(page).toHaveURL(/\/admin\/signin/)
   })
 
-  test('logs in via Spring and redirects to admin panel', async ({ page }) => {
+  test('logs in via Spring and hands the browser session to the admin proxy', async ({ page, context }) => {
     await page.fill('input[name="email"]', adminEmail!)
     await page.fill('input[name="password"]', adminPassword!)
     const relayResponse = page.waitForResponse((response) =>
       new URL(response.url()).pathname === '/api/auth/spring/login' && response.request().method() === 'POST'
+    )
+    const firstAdminRequest = page.waitForRequest((request) =>
+      new URL(request.url()).pathname === '/admin'
+    )
+    const firstAdminResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/admin'
     )
     await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
 
@@ -42,6 +50,34 @@ test.describe('Admin Login via Spring Session', () => {
     const setCookie = await response.headerValue('set-cookie')
     expect(setCookie).toContain('SESSIONID=')
     expect(setCookie).not.toMatch(/;\s*Secure\b/i)
+
+    const loginSessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+    expect(loginSessionCookie, 'the login relay must persist SESSIONID in the browser cookie jar').toBeDefined()
+    expect(loginSessionCookie?.path).toBe('/')
+    expect(loginSessionCookie?.httpOnly).toBe(true)
+
+    const [adminRequest, adminResponse] = await Promise.all([firstAdminRequest, firstAdminResponse])
+    const adminCookieHeader = await adminRequest.headerValue('cookie')
+    const adminRedirect = adminResponse.headers().location
+    const sessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+    expect(sessionCookie, 'the first /admin response must retain a browser SESSIONID').toBeDefined()
+    expect(sessionCookie?.path).toBe('/')
+    expect(sessionCookie?.httpOnly).toBe(true)
+    console.info(
+      `[Spring auth E2E] login SESSIONID jar path=${loginSessionCookie?.path} httpOnly=${loginSessionCookie?.httpOnly}; ` +
+      `/admin Cookie has login SESSIONID=${adminCookieHeader?.includes(`SESSIONID=${loginSessionCookie?.value}`) ?? false}; ` +
+      `/admin status=${adminResponse.status()} redirect=${adminRedirect ?? 'none'}; ` +
+      `proxy rotated SESSIONID=${sessionCookie?.value !== loginSessionCookie?.value}`
+    )
+    expect(adminCookieHeader, 'the first /admin request must send the login SESSIONID').toContain(`SESSIONID=${loginSessionCookie!.value}`)
+
+    const directSession = await context.request.get(`${springBackendUrl}/api/v1/auth/me`, {
+      headers: { Cookie: `SESSIONID=${sessionCookie!.value}` },
+      failOnStatusCode: false
+    })
+    console.info(`[Spring auth E2E] direct Spring /auth/me status=${directSession.status()}`)
+    expect(directSession.status(), 'the browser SESSIONID must authorize direct Spring /auth/me').toBe(200)
+
     await expect(page).toHaveURL('/admin', { timeout: 15000 })
     await expect(page.getByRole('heading', { level: 1, name: /Panel Administrativo/i })).toBeVisible()
   })
@@ -55,6 +91,7 @@ test.describe('Admin Login via Spring Session', () => {
     const cookies = await context.cookies()
     const sessionCookie = cookies.find(c => c.name === 'SESSIONID')
     expect(sessionCookie).toBeDefined()
+    expect(sessionCookie?.path).toBe('/')
     expect(sessionCookie?.httpOnly).toBe(true)
   })
 
