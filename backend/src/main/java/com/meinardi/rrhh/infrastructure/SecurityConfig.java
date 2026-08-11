@@ -61,10 +61,10 @@ public class SecurityConfig {
                         (request, response, exception) -> {
                           recordDenied(request, auditService);
                            if (request.getRequestURI().startsWith("/api/v1/admin/")
-                               || isContactMutation(request)
-                               || isCandidateCreate(request)
-                               || isCandidatePatch(request)
-                               || isVacancyCreate(request)) {
+                                || isContactMutation(request)
+                                || isCandidateCreate(request)
+                                || isCandidatePatch(request)
+                                || isVacancyAdminMutation(request)) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
@@ -99,10 +99,16 @@ public class SecurityConfig {
                                     internalApiToken)));
               }
 
-              if (allowUnauthenticatedMutations) {
-                auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
-                    .permitAll();
-              } else {
+                auth.requestMatchers(
+                        HttpMethod.PATCH,
+                        "/api/v1/vacancies/{id}",
+                        "/api/v1/vacancies/{id}/activate",
+                        "/api/v1/vacancies/{id}/deactivate")
+                    .hasAuthority("admin:access");
+               if (allowUnauthenticatedMutations) {
+                 auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
+                     .permitAll();
+               } else {
                 auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
                     .access(
                         (authentication, context) ->
@@ -217,9 +223,9 @@ public class SecurityConfig {
       action = "PATCH".equals(request.getMethod()) ? "contact.update_status" : "contact.delete";
       resourceId = path.substring("/api/v1/contacts/".length());
       resourceType = "contact";
-    } else if (isVacancyCreate(request)) {
-      action = "vacancy.create";
-      resourceId = null;
+    } else if (isVacancyAdminMutation(request)) {
+      action = vacancyAction(path);
+      resourceId = "/api/v1/vacancies".equals(path) ? null : vacancyId(path);
       resourceType = "vacancy";
     } else {
       return;
@@ -253,9 +259,24 @@ public class SecurityConfig {
         && request.getRequestURI().startsWith("/api/v1/candidates/");
   }
 
-  private static boolean isVacancyCreate(jakarta.servlet.http.HttpServletRequest request) {
-    return "POST".equals(request.getMethod())
-        && "/api/v1/vacancies".equals(request.getRequestURI());
+  private static boolean isVacancyAdminMutation(jakarta.servlet.http.HttpServletRequest request) {
+    String path = request.getRequestURI();
+    return ("POST".equals(request.getMethod()) && "/api/v1/vacancies".equals(path))
+        || ("PATCH".equals(request.getMethod())
+            && (path.matches("/api/v1/vacancies/[^/]+")
+                || path.matches("/api/v1/vacancies/[^/]+/(activate|deactivate)")));
+  }
+
+  private static String vacancyAction(String path) {
+    if (path.endsWith("/activate")) return "vacancy.activate";
+    if (path.endsWith("/deactivate")) return "vacancy.deactivate";
+    return "/api/v1/vacancies".equals(path) ? "vacancy.create" : "vacancy.update";
+  }
+
+  private static String vacancyId(String path) {
+    String suffix = path.substring("/api/v1/vacancies/".length());
+    int actionStart = suffix.indexOf('/');
+    return actionStart < 0 ? suffix : suffix.substring(0, actionStart);
   }
 
   private boolean requiresInternalApiToken(

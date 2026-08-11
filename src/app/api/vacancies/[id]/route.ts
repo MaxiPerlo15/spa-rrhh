@@ -42,6 +42,22 @@ class SpringVacancyMutationFailureError extends Error {
   }
 }
 
+class SpringVacancyDeniedError extends Error {
+  constructor(readonly response: Response) {
+    super('Spring backend denied vacancy mutation')
+  }
+}
+
+async function relaySpringVacancyDenial(response: Response) {
+  return relaySpringCookies(
+    new NextResponse(await response.text(), {
+      status: response.status,
+      headers: { 'Content-Type': response.headers.get('content-type') ?? 'application/json' }
+    }),
+    response.headers
+  )
+}
+
 async function rejectFailedSpringVacancyStatusMutation(
   response: Response,
   id: string,
@@ -139,7 +155,7 @@ async function getVacancyFromSpring(id: string) {
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
 }
 
-async function activateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
+async function activateVacancyInSpring(id: string, request: NextRequest) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -150,11 +166,14 @@ async function activateVacancyInSpring(id: string, request: NextRequest, cookie:
     headers: {
       ...getSpringBackendHeaders(),
       ...getAllowedBffRequestHeaders(request),
-      Cookie: cookie
+      ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
     }
   })
 
   try {
+    if (response.status === 401 || response.status === 403) {
+      throw new SpringVacancyDeniedError(response)
+    }
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
@@ -170,7 +189,7 @@ async function activateVacancyInSpring(id: string, request: NextRequest, cookie:
   }
 }
 
-async function deactivateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
+async function deactivateVacancyInSpring(id: string, request: NextRequest) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -181,11 +200,14 @@ async function deactivateVacancyInSpring(id: string, request: NextRequest, cooki
     headers: {
       ...getSpringBackendHeaders(),
       ...getAllowedBffRequestHeaders(request),
-      Cookie: cookie
+      ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
     }
   })
 
   try {
+    if (response.status === 401 || response.status === 403) {
+      throw new SpringVacancyDeniedError(response)
+    }
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
@@ -204,8 +226,7 @@ async function deactivateVacancyInSpring(id: string, request: NextRequest, cooki
 async function updateVacancyInSpring(
   id: string,
   data: ReturnType<typeof buildUpdatePayload>,
-  request: NextRequest,
-  cookie: string
+  request: NextRequest
 ) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -218,12 +239,15 @@ async function updateVacancyInSpring(
       'Content-Type': 'application/json',
       ...getSpringBackendHeaders(),
       ...getAllowedBffRequestHeaders(request),
-      Cookie: cookie
+      ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
     },
     body: JSON.stringify(data)
   })
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new SpringVacancyDeniedError(response)
+    }
     try {
         await rejectFailedSpringVacancyStatusMutation(
           response,
@@ -313,25 +337,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
   let authorizedSetCookie: string | undefined
   let mutationHeaders: Headers | undefined
   try {
-    // Verificar autenticación
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.update',
-        resourceType: 'vacancy',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
-
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
       return originRejection
@@ -380,20 +385,23 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     }
 
     if (isOnlyStatusChange && (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE' || requestedStatus === 'CLOSED')) {
-      const springSession = await authorizeSpringMutation(request)
+      const springSession = requestedStatus === 'CLOSED'
+        ? await authorizeSpringMutation(request)
+        : undefined
       if (springSession instanceof NextResponse) return springSession
-      authorizedSetCookie = springSession.setCookie
+      authorizedSetCookie = springSession?.setCookie
 
       let statusMutation
       try {
         statusMutation = requestedStatus === 'ACTIVE'
-          ? await activateVacancyInSpring(id, request, springSession.cookie)
+          ? await activateVacancyInSpring(id, request)
           : requestedStatus === 'INACTIVE'
-            ? await deactivateVacancyInSpring(id, request, springSession.cookie)
-            : await closeVacancyInSpring(id, request, springSession.cookie)
+            ? await deactivateVacancyInSpring(id, request)
+            : await closeVacancyInSpring(id, request, springSession!.cookie)
       } catch (error) {
         const cause = error instanceof SpringVacancyMutationError ? error.cause : error
         const errorHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+        if (cause instanceof SpringVacancyDeniedError) return relaySpringVacancyDenial(cause.response)
         const errorResponse = preservedSpringMutationErrorResponse(cause, authorizedSetCookie, errorHeaders)
         if (errorResponse) return errorResponse
         mutationHeaders = errorHeaders
@@ -403,11 +411,12 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       const vacancy = statusMutation.vacancy
       mutationHeaders = statusMutation.headers
       if (vacancy) {
+        session = await auth()
         await auditAdminAction({
           request,
           actor: {
-            id: session.user?.id,
-            email: session.user?.email
+            id: session?.user?.id,
+            email: session?.user?.email
           },
           action: requestedStatus === 'ACTIVE'
             ? 'vacancy.activate'
@@ -439,10 +448,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     }
 
     if (hasBusinessFieldChange) {
-      const springSession = await authorizeSpringMutation(request)
-      if (springSession instanceof NextResponse) return springSession
-      authorizedSetCookie = springSession.setCookie
-
       let springVacancy = null
       try {
         const mutation = await updateVacancyInSpring(id, buildUpdatePayload({
@@ -452,12 +457,13 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
           workday: bodyValidation.data.workday,
           modality: bodyValidation.data.modality,
           requirements: bodyValidation.data.requirements
-        }), request, springSession.cookie)
+        }), request)
         springVacancy = mutation.vacancy
         mutationHeaders = mutation.headers
       } catch (error) {
         const cause = error instanceof SpringVacancyMutationError ? error.cause : error
         mutationHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+        if (cause instanceof SpringVacancyDeniedError) return relaySpringVacancyDenial(cause.response)
         if (cause instanceof SpringVacancyNotFoundError) {
           return NextResponse.json(
             { error: 'Vacante no encontrada' },
@@ -474,11 +480,12 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       }
 
       if (springVacancy) {
+        session = await auth()
         await auditAdminAction({
           request,
           actor: {
-            id: session.user?.id,
-            email: session.user?.email
+            id: session?.user?.id,
+            email: session?.user?.email
           },
           action: 'vacancy.update',
           resourceType: 'vacancy',
@@ -493,7 +500,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
         revalidatePublicVacanciesCache()
 
         const response = NextResponse.json(springVacancy)
-        relaySpringCookies(response, springSession.setCookie)
         return relaySpringCookies(response, mutationHeaders)
       }
     }

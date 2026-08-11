@@ -244,6 +244,53 @@ class SecurityConfigApplicationRoutesTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"", "/activate", "/deactivate"})
+  void anonymousVacancyDetailMutationReturnsJson401RecordsDeniedAndDoesNotMutate(String suffix)
+      throws Exception {
+    mockMvc
+        .perform(vacancyDetailMutation(suffix))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq(vacancyAction(suffix)),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            org.mockito.ArgumentMatchers.eq("vacancy-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(auditedAdminMutation);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "/activate", "/deactivate"})
+  void forbiddenVacancyDetailMutationReturnsJson403RecordsContextAndDoesNotMutate(String suffix)
+      throws Exception {
+    Usuario user = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+
+    mockMvc
+        .perform(
+            vacancyDetailMutation(suffix)
+                .session(sessionFor(user))
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "vacancy-detail-test"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq(vacancyAction(suffix)),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            org.mockito.ArgumentMatchers.eq("vacancy-123"),
+            org.mockito.ArgumentMatchers.eq("203.0.113.10"),
+            org.mockito.ArgumentMatchers.eq("vacancy-detail-test"),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(auditedAdminMutation);
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"PATCH", "DELETE"})
   void anonymousContactMutationReturnsJson401AndRecordsDeniedInSpring(String method) throws Exception {
     mockMvc
@@ -516,6 +563,21 @@ class SecurityConfigApplicationRoutesTest {
         .contentType(MediaType.APPLICATION_JSON)
         .content(
             "{\"titulo\":\"Platform Engineer\",\"descripcion\":\"Build reliable systems\",\"ubicacionNombre\":\"Remote\",\"jornada\":\"FULL_TIME\",\"modalidad\":\"REMOTE\"}");
+  }
+
+  private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder vacancyDetailMutation(
+      String suffix) {
+    return patch("/api/v1/vacancies/vacancy-123" + suffix)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"titulo\":\"Updated vacancy\"}");
+  }
+
+  private String vacancyAction(String suffix) {
+    return switch (suffix) {
+      case "/activate" -> "vacancy.activate";
+      case "/deactivate" -> "vacancy.deactivate";
+      default -> "vacancy.update";
+    };
   }
 
   private void assertInvalidSession(MockHttpSession session) throws Exception {
