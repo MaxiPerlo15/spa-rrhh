@@ -7,7 +7,6 @@ import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib
 import { normalizeLocation } from '@/lib/utils'
 import { revalidatePublicVacanciesCache } from '@/lib/server/publicVacancies'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
-import { getSpringSession } from '@/lib/springSession'
 import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 import {
   type SpringVacancyResponse,
@@ -87,7 +86,6 @@ function springMutationFailureMetadata(error: unknown) {
 
 function preservedSpringMutationErrorResponse(
   cause: unknown,
-  authorizedSetCookie: string | undefined,
   mutationHeaders: Headers | undefined
 ) {
   const response = cause instanceof SpringVacancyNotFoundError
@@ -97,11 +95,10 @@ function preservedSpringMutationErrorResponse(
       : undefined
 
   if (!response) return undefined
-  relaySpringCookies(response, authorizedSetCookie)
   return relaySpringCookies(response, mutationHeaders)
 }
 
-async function closeVacancyInSpring(id: string, request: NextRequest, cookie: string) {
+async function closeVacancyInSpring(id: string, request: NextRequest) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -112,11 +109,14 @@ async function closeVacancyInSpring(id: string, request: NextRequest, cookie: st
     headers: {
       ...getSpringBackendHeaders(),
       ...getAllowedBffRequestHeaders(request),
-      Cookie: cookie
+      ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
     }
   })
 
   try {
+    if (response.status === 401 || response.status === 403) {
+      throw new SpringVacancyDeniedError(response)
+    }
     await rejectFailedSpringVacancyStatusMutation(
       response,
       id,
@@ -271,25 +271,6 @@ interface RouteParams {
   }>
 }
 
-async function authorizeSpringMutation(request: NextRequest) {
-  const sessionId = request.cookies.get('SESSIONID')?.value
-  if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-
-  const session = await getSpringSession(`SESSIONID=${sessionId}`)
-  if (session.state === 'anonymous') {
-    const response = NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    relaySpringCookies(response, session.setCookie)
-    return response
-  }
-  if (session.state === 'forbidden') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  if (session.state === 'unavailable') return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
-
-  return {
-    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`,
-    setCookie: session.setCookie
-  }
-}
-
 // GET /api/vacancies/[id] - Obtener una vacante específica
 export async function GET(
   request: NextRequest,
@@ -334,7 +315,6 @@ export async function GET(
 async function updateVacancy(request: NextRequest, params: Promise<{ id: string }>) {
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
-  let authorizedSetCookie: string | undefined
   let mutationHeaders: Headers | undefined
   try {
     const originRejection = rejectIfUntrustedOrigin(request)
@@ -385,24 +365,18 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     }
 
     if (isOnlyStatusChange && (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE' || requestedStatus === 'CLOSED')) {
-      const springSession = requestedStatus === 'CLOSED'
-        ? await authorizeSpringMutation(request)
-        : undefined
-      if (springSession instanceof NextResponse) return springSession
-      authorizedSetCookie = springSession?.setCookie
-
       let statusMutation
       try {
         statusMutation = requestedStatus === 'ACTIVE'
           ? await activateVacancyInSpring(id, request)
           : requestedStatus === 'INACTIVE'
             ? await deactivateVacancyInSpring(id, request)
-            : await closeVacancyInSpring(id, request, springSession!.cookie)
+            : await closeVacancyInSpring(id, request)
       } catch (error) {
         const cause = error instanceof SpringVacancyMutationError ? error.cause : error
         const errorHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
         if (cause instanceof SpringVacancyDeniedError) return relaySpringVacancyDenial(cause.response)
-        const errorResponse = preservedSpringMutationErrorResponse(cause, authorizedSetCookie, errorHeaders)
+        const errorResponse = preservedSpringMutationErrorResponse(cause, errorHeaders)
         if (errorResponse) return errorResponse
         mutationHeaders = errorHeaders
         throw cause
@@ -435,7 +409,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
         revalidatePublicVacanciesCache()
 
         const response = NextResponse.json(vacancy)
-        relaySpringCookies(response, authorizedSetCookie)
         return relaySpringCookies(response, mutationHeaders)
       }
     }
@@ -527,7 +500,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       { status: 500 }
     )
     if (mutationHeaders) {
-      relaySpringCookies(response, authorizedSetCookie)
       relaySpringCookies(response, mutationHeaders)
     }
     return response
@@ -557,28 +529,8 @@ export async function DELETE(
 ) {
   let session = null as Awaited<ReturnType<typeof auth>>
   let resourceId: string | undefined
-  let authorizedSetCookie: string | undefined
   let mutationHeaders: Headers | undefined
   try {
-    // Verificar autenticación
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.close',
-        resourceType: 'vacancy',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
-
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
       return originRejection
@@ -600,27 +552,26 @@ export async function DELETE(
 
     let closedVacancy = null
     try {
-      const springSession = await authorizeSpringMutation(request)
-      if (springSession instanceof NextResponse) return springSession
-      authorizedSetCookie = springSession.setCookie
-      const mutation = await closeVacancyInSpring(id, request, springSession.cookie)
+      const mutation = await closeVacancyInSpring(id, request)
       closedVacancy = mutation.vacancy
       mutationHeaders = mutation.headers
     } catch (error) {
       const cause = error instanceof SpringVacancyMutationError ? error.cause : error
       const errorHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
-      const errorResponse = preservedSpringMutationErrorResponse(cause, authorizedSetCookie, errorHeaders)
+      if (cause instanceof SpringVacancyDeniedError) return relaySpringVacancyDenial(cause.response)
+      const errorResponse = preservedSpringMutationErrorResponse(cause, errorHeaders)
       if (errorResponse) return errorResponse
       mutationHeaders = errorHeaders
       throw cause
     }
 
     if (closedVacancy) {
+      session = await auth()
       await auditAdminAction({
         request,
         actor: {
-          id: session.user?.id,
-          email: session.user?.email
+          id: session?.user?.id,
+          email: session?.user?.email
         },
         action: 'vacancy.close',
         resourceType: 'vacancy',
@@ -635,7 +586,6 @@ export async function DELETE(
       revalidatePublicVacanciesCache()
 
       const response = NextResponse.json(closedVacancy)
-      relaySpringCookies(response, authorizedSetCookie)
       return relaySpringCookies(response, mutationHeaders)
     }
   } catch (error) {
@@ -660,7 +610,6 @@ export async function DELETE(
       { status: 500 }
     )
     if (mutationHeaders) {
-      relaySpringCookies(response, authorizedSetCookie)
       relaySpringCookies(response, mutationHeaders)
     }
     return response

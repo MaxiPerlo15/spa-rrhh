@@ -244,7 +244,7 @@ class SecurityConfigApplicationRoutesTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "/activate", "/deactivate"})
+  @ValueSource(strings = {"", "/activate", "/deactivate", "/close"})
   void anonymousVacancyDetailMutationReturnsJson401RecordsDeniedAndDoesNotMutate(String suffix)
       throws Exception {
     mockMvc
@@ -264,7 +264,7 @@ class SecurityConfigApplicationRoutesTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "/activate", "/deactivate"})
+  @ValueSource(strings = {"", "/activate", "/deactivate", "/close"})
   void forbiddenVacancyDetailMutationReturnsJson403RecordsContextAndDoesNotMutate(String suffix)
       throws Exception {
     Usuario user = administratorWithoutPermission();
@@ -576,6 +576,7 @@ class SecurityConfigApplicationRoutesTest {
     return switch (suffix) {
       case "/activate" -> "vacancy.activate";
       case "/deactivate" -> "vacancy.deactivate";
+      case "/close" -> "vacancy.close";
       default -> "vacancy.update";
     };
   }

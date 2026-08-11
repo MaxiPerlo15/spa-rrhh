@@ -100,10 +100,11 @@ public class SecurityConfig {
               }
 
                 auth.requestMatchers(
-                        HttpMethod.PATCH,
-                        "/api/v1/vacancies/{id}",
-                        "/api/v1/vacancies/{id}/activate",
-                        "/api/v1/vacancies/{id}/deactivate")
+                         HttpMethod.PATCH,
+                         "/api/v1/vacancies/{id}",
+                         "/api/v1/vacancies/{id}/activate",
+                         "/api/v1/vacancies/{id}/deactivate",
+                         "/api/v1/vacancies/{id}/close")
                     .hasAuthority("admin:access");
                if (allowUnauthenticatedMutations) {
                  auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
@@ -263,13 +264,14 @@ public class SecurityConfig {
     String path = request.getRequestURI();
     return ("POST".equals(request.getMethod()) && "/api/v1/vacancies".equals(path))
         || ("PATCH".equals(request.getMethod())
-            && (path.matches("/api/v1/vacancies/[^/]+")
-                || path.matches("/api/v1/vacancies/[^/]+/(activate|deactivate)")));
+             && (path.matches("/api/v1/vacancies/[^/]+")
+                 || path.matches("/api/v1/vacancies/[^/]+/(activate|deactivate|close)")));
   }
 
   private static String vacancyAction(String path) {
     if (path.endsWith("/activate")) return "vacancy.activate";
     if (path.endsWith("/deactivate")) return "vacancy.deactivate";
+    if (path.endsWith("/close")) return "vacancy.close";
     return "/api/v1/vacancies".equals(path) ? "vacancy.create" : "vacancy.update";
   }
 
