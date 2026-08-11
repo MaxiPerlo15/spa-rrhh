@@ -1,18 +1,23 @@
 package com.meinardi.rrhh.presentation;
 
-import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
-import com.meinardi.rrhh.application.CreateVacancyCommand;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
+import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
 import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.UpdateVacancyCommand;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import com.meinardi.rrhh.domain.model.Vacante;
+import com.meinardi.rrhh.infrastructure.AuditRequestContext;
+import com.meinardi.rrhh.infrastructure.AuditRequestContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/vacancies")
 public class VacancyRestController {
   private final AuditedVacancyCreator auditedVacancyCreator;
+  private final AuditedAdminMutation auditedMutation;
   private final GetVacancyInputBoundary getVacancyInputBoundary;
   private final UpdateVacancyInputBoundary updateVacancyInputBoundary;
   private final ActivateVacancyInputBoundary activateVacancyInputBoundary;
@@ -38,6 +44,7 @@ public class VacancyRestController {
 
   public VacancyRestController(
       AuditedVacancyCreator auditedVacancyCreator,
+      AuditedAdminMutation auditedMutation,
       GetVacancyInputBoundary getVacancyInputBoundary,
       UpdateVacancyInputBoundary updateVacancyInputBoundary,
       ActivateVacancyInputBoundary activateVacancyInputBoundary,
@@ -45,6 +52,7 @@ public class VacancyRestController {
       CloseVacancyInputBoundary closeVacancyInputBoundary,
       ListVacanciesInputBoundary listVacanciesInputBoundary) {
     this.auditedVacancyCreator = auditedVacancyCreator;
+    this.auditedMutation = auditedMutation;
     this.getVacancyInputBoundary = getVacancyInputBoundary;
     this.updateVacancyInputBoundary = updateVacancyInputBoundary;
     this.activateVacancyInputBoundary = activateVacancyInputBoundary;
@@ -76,26 +84,55 @@ public class VacancyRestController {
   }
 
   @PatchMapping("/{id}")
-  public VacancyResponse update(@PathVariable String id, @Valid @RequestBody UpdateVacancyCommand command) {
-    Vacante updated = updateVacancyInputBoundary.updateVacancy(id, command);
+  public VacancyResponse update(
+      @PathVariable String id,
+      @Valid @RequestBody UpdateVacancyCommand command,
+      HttpServletRequest request) {
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(request);
+    Vacante updated =
+        auditedMutation.execute(
+            "vacancy.update",
+            "vacancy",
+            id,
+            auditContext.ip(),
+            auditContext.userAgent(),
+            Map.of(),
+        () -> updateVacancyInputBoundary.updateVacancy(id, command));
     return VacancyResponse.from(updated);
   }
 
   @PatchMapping("/{id}/close")
-  public VacancyResponse close(@PathVariable String id) {
-    Vacante closed = closeVacancyInputBoundary.closeVacancy(id);
+  public VacancyResponse close(@PathVariable String id, HttpServletRequest request) {
+    Vacante closed =
+        audited("vacancy.close", id, request, () -> closeVacancyInputBoundary.closeVacancy(id));
     return VacancyResponse.from(closed);
   }
 
   @PatchMapping("/{id}/activate")
-  public VacancyResponse activate(@PathVariable String id) {
-    Vacante activated = activateVacancyInputBoundary.activateVacancy(id);
+  public VacancyResponse activate(@PathVariable String id, HttpServletRequest request) {
+    Vacante activated =
+        audited("vacancy.activate", id, request, () -> activateVacancyInputBoundary.activateVacancy(id));
     return VacancyResponse.from(activated);
   }
 
   @PatchMapping("/{id}/deactivate")
-  public VacancyResponse deactivate(@PathVariable String id) {
-    Vacante deactivated = deactivateVacancyInputBoundary.deactivateVacancy(id);
+  public VacancyResponse deactivate(@PathVariable String id, HttpServletRequest request) {
+    Vacante deactivated =
+        audited(
+            "vacancy.deactivate", id, request, () -> deactivateVacancyInputBoundary.deactivateVacancy(id));
     return VacancyResponse.from(deactivated);
+  }
+
+  private Vacante audited(
+      String action, String id, HttpServletRequest request, Supplier<Vacante> mutation) {
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(request);
+    return auditedMutation.execute(
+        action,
+        "vacancy",
+        id,
+        auditContext.ip(),
+        auditContext.userAgent(),
+        Map.of(),
+        mutation);
   }
 }

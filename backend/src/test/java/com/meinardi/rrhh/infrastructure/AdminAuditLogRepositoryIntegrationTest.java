@@ -15,10 +15,13 @@ import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.ApplicationManager;
 import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
+import com.meinardi.rrhh.application.UpdateVacancyCommand;
+import com.meinardi.rrhh.application.VacancyManager;
 import com.meinardi.rrhh.domain.model.AdminAuditLog;
 import com.meinardi.rrhh.domain.model.AuditOutcome;
 import com.meinardi.rrhh.domain.model.Jornada;
 import com.meinardi.rrhh.domain.model.Modalidad;
+import com.meinardi.rrhh.domain.model.VacancyStatus;
 import com.meinardi.rrhh.domain.model.Candidato;
 import com.meinardi.rrhh.domain.model.Postulacion;
 import com.meinardi.rrhh.domain.model.Vacante;
@@ -55,6 +58,7 @@ class AdminAuditLogRepositoryIntegrationTest {
   @Autowired private AuditedAdminMutation auditedMutation;
   @Autowired private AuditedApplicationAdmin auditedApplicationManager;
   @Autowired private AuditedCandidateAdmin auditedCandidateAdmin;
+  @Autowired private VacancyManager vacancyManager;
   @Autowired private VacanteRepository vacanteRepository;
   @Autowired private CandidatoRepository candidatoRepository;
   @Autowired private PostulacionRepository postulacionRepository;
@@ -319,6 +323,102 @@ class AdminAuditLogRepositoryIntegrationTest {
   }
 
   @Test
+  void keepsVacancyMutationSuccessAuditsAtomicWithAnOuterRollback() {
+    Vacante updated = vacanteRepository.save(vacancy("Original"));
+    Vacante activated = vacanteRepository.save(vacancy("Activate"));
+    Vacante deactivated = vacanteRepository.save(vacancy("Deactivate"));
+    deactivated.activar();
+    vacanteRepository.save(deactivated);
+    Vacante closed = vacanteRepository.save(vacancy("Close"));
+
+    transactions.executeWithoutResult(
+        status -> {
+          auditedMutation.execute(
+              "vacancy.update",
+              "vacancy",
+              updated.getId(),
+              null,
+              null,
+              Map.of(),
+              () ->
+                  vacancyManager.updateVacancy(
+                      updated.getId(),
+                      new UpdateVacancyCommand("Updated", null, null, null, null, null, null)));
+          auditedMutation.execute(
+              "vacancy.activate",
+              "vacancy",
+              activated.getId(),
+              null,
+              null,
+              Map.of(),
+              () -> vacancyManager.activateVacancy(activated.getId()));
+          auditedMutation.execute(
+              "vacancy.deactivate",
+              "vacancy",
+              deactivated.getId(),
+              null,
+              null,
+              Map.of(),
+              () -> vacancyManager.deactivateVacancy(deactivated.getId()));
+          auditedMutation.execute(
+              "vacancy.close",
+              "vacancy",
+              closed.getId(),
+              null,
+              null,
+              Map.of(),
+              () -> vacancyManager.closeVacancy(closed.getId()));
+          status.setRollbackOnly();
+        });
+
+    assertThat(vacanteRepository.findById(updated.getId()).orElseThrow().getTitulo()).isEqualTo("Original");
+    assertThat(vacanteRepository.findById(activated.getId()).orElseThrow().getEstadoActual())
+        .isEqualTo(VacancyStatus.CREATED);
+    assertThat(vacanteRepository.findById(deactivated.getId()).orElseThrow().getEstadoActual())
+        .isEqualTo(VacancyStatus.ACTIVE);
+    assertThat(vacanteRepository.findById(closed.getId()).orElseThrow().getEstadoActual())
+        .isEqualTo(VacancyStatus.CREATED);
+    assertThat(
+            repository
+                .list(new AuditQuery(null, null, "vacancy", null, null), PageRequest.of(0, 20))
+                .getContent())
+        .isEmpty();
+  }
+
+  @Test
+  void keepsVacancyMutationErrorAuditsDurableAcrossAnOuterRollback() {
+    transactions.executeWithoutResult(
+        status -> {
+          assertVacancyMutationFails(
+              "vacancy.update",
+              "missing-update",
+              () ->
+                  vacancyManager.updateVacancy(
+                      "missing-update",
+                      new UpdateVacancyCommand("Updated", null, null, null, null, null, null)));
+          assertVacancyMutationFails(
+              "vacancy.activate",
+              "missing-activate",
+              () -> vacancyManager.activateVacancy("missing-activate"));
+          assertVacancyMutationFails(
+              "vacancy.deactivate",
+              "missing-deactivate",
+              () -> vacancyManager.deactivateVacancy("missing-deactivate"));
+          assertVacancyMutationFails(
+              "vacancy.close", "missing-close", () -> vacancyManager.closeVacancy("missing-close"));
+          status.setRollbackOnly();
+        });
+
+    assertThat(repository.list(new AuditQuery(null, null, "vacancy", null, null), PageRequest.of(0, 20)).getContent())
+        .extracting(AdminAuditLog::getAction, AdminAuditLog::getOutcome)
+        .containsExactlyInAnyOrder(
+            org.assertj.core.groups.Tuple.tuple("vacancy.update", AuditOutcome.ERROR),
+            org.assertj.core.groups.Tuple.tuple("vacancy.activate", AuditOutcome.ERROR),
+            org.assertj.core.groups.Tuple.tuple("vacancy.deactivate", AuditOutcome.ERROR),
+            org.assertj.core.groups.Tuple.tuple("vacancy.close", AuditOutcome.ERROR));
+  }
+
+  @Test
   void keepsAuditFieldsImmutableAfterCreation() {
     Map<String, Object> mutable = new java.util.HashMap<>(Map.of("source", "test")); AdminAuditLog entry = entry("immutable", "admin@example.com", "vacancy.update", "vacancy", "2026-07-22T00:00:00Z", mutable);
     mutable.put("source", "changed");
@@ -328,6 +428,27 @@ class AdminAuditLogRepositoryIntegrationTest {
 
   private Contacto contact(String suffix) {
     return Contacto.create("Contact " + suffix, suffix + "@example.com", "+541111", "Subject", "Message", suffix);
+  }
+
+  private Vacante vacancy(String title) {
+    return Vacante.create(title, "desc", null, new Ubicacion("Remote", "Remote"), Jornada.FULL_TIME, Modalidad.REMOTE);
+  }
+
+  private void assertVacancyMutationFails(String action, String id, Runnable mutation) {
+    assertThatThrownBy(
+            () ->
+                auditedMutation.execute(
+                    action,
+                    "vacancy",
+                    id,
+                    null,
+                    null,
+                    Map.of(),
+                    () -> {
+                      mutation.run();
+                      return null;
+                    }))
+        .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
   }
 
   private java.util.List<AdminAuditLog> auditsFor(String action) {

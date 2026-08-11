@@ -3,6 +3,7 @@ package com.meinardi.rrhh.presentation;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
@@ -20,6 +22,7 @@ import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.UpdateVacancyCommand;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,12 +38,20 @@ class VacancyExceptionHandlerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private AuditedVacancyCreator auditedVacancyCreator;
+  @MockitoBean private AuditedAdminMutation auditedMutation;
   @MockitoBean private GetVacancyInputBoundary getVacancyInputBoundary;
   @MockitoBean private UpdateVacancyInputBoundary updateVacancyInputBoundary;
   @MockitoBean private ActivateVacancyInputBoundary activateVacancyInputBoundary;
   @MockitoBean private DeactivateVacancyInputBoundary deactivateVacancyInputBoundary;
   @MockitoBean private CloseVacancyInputBoundary closeVacancyInputBoundary;
   @MockitoBean private ListVacanciesInputBoundary listVacanciesInputBoundary;
+
+  @BeforeEach
+  void passThroughAuditedMutations() {
+    lenient()
+        .when(auditedMutation.execute(any(), any(), any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get());
+  }
 
   @Test
   void getVacancyReturnsNotFoundWhenVacancyDoesNotExist() throws Exception {
