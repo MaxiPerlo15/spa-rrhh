@@ -1,17 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const authMock = vi.fn()
 const rejectIfUntrustedOriginMock = vi.fn()
-const auditAdminActionMock = vi.fn()
-
-vi.mock('@/lib/auth', () => ({
-  auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
-}))
 
 vi.mock('@/lib/csrf', () => ({
   rejectIfUntrustedOrigin: rejectIfUntrustedOriginMock
@@ -44,8 +34,9 @@ describe('/api/admin/candidates POST', () => {
     rejectIfUntrustedOriginMock.mockReturnValue(null)
   })
 
-  it('rechaza acceso sin autenticación de admin', async () => {
-    authMock.mockResolvedValue(null)
+  it('returns 503 without a configured Spring backend without local audit or upstream mutation', async () => {
+    const { getBackendUrl } = await import('@/lib/server/springBackend')
+    vi.mocked(getBackendUrl).mockReturnValueOnce(null)
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
@@ -56,14 +47,12 @@ describe('/api/admin/candidates POST', () => {
     const response = await POST(request)
     const body = await response.json()
 
-    expect(response.status).toBe(401)
-    expect(body).toMatchObject({ error: 'No autorizado' })
+    expect(response.status).toBe(503)
+    expect(body).toEqual({ error: 'Spring backend not configured' })
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('rechaza candidatos manuales duplicados por identidad', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
-    })
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -92,9 +81,6 @@ describe('/api/admin/candidates POST', () => {
   })
 
   it('crea un candidato manual como postulación sin vacante asociada', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' }
-    })
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -102,7 +88,12 @@ describe('/api/admin/candidates POST', () => {
           personKey: 'abc123',
           applicationId: 'app_manual_1'
         }),
-        { status: 201 }
+        {
+          status: 201,
+          headers: {
+            'set-cookie': 'SESSIONID=renewed-session; Path=/; HttpOnly'
+          }
+        }
       )
     )
 
@@ -110,7 +101,12 @@ describe('/api/admin/candidates POST', () => {
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
       body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: 'SESSIONID=browser-session',
+        'x-forwarded-for': '203.0.113.10, 10.0.0.4',
+        'user-agent': 'Candidate BFF test agent'
+      }
     })
 
     const response = await POST(request)
@@ -130,8 +126,38 @@ describe('/api/admin/candidates POST', () => {
           email: 'ana@example.com',
           phone: '+54 9 11 1234-5678',
           notes: 'Referida por cliente.'
+        }),
+        headers: expect.objectContaining({
+          Cookie: 'SESSIONID=browser-session',
+          'X-Forwarded-For': '203.0.113.10',
+          'User-Agent': 'Candidate BFF test agent'
         })
       })
     )
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=renewed-session')
+  })
+
+  it('redacts non-JSON Spring errors while relaying Spring cookies', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response('Spring diagnostic: postgres password=do-not-leak', {
+        status: 502,
+        headers: { 'set-cookie': 'SESSIONID=expired; Path=/; Max-Age=0' }
+      })
+    )
+
+    const { POST } = await import('@/app/api/admin/candidates/route')
+    const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    })
+
+    const response = await POST(request)
+    const body = await response.json()
+
+    expect(response.status).toBe(502)
+    expect(body).toEqual({ error: 'Error al registrar candidato manual' })
+    expect(JSON.stringify(body)).not.toContain('postgres password')
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=expired')
   })
 })

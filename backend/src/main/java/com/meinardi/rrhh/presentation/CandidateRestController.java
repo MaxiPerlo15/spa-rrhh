@@ -2,6 +2,8 @@ package com.meinardi.rrhh.presentation;
 
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.CandidateAdminService;
+import com.meinardi.rrhh.infrastructure.AuditRequestContext;
+import com.meinardi.rrhh.infrastructure.AuditRequestContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -27,14 +29,15 @@ public class CandidateRestController {
   @ResponseStatus(HttpStatus.CREATED)
   public CandidateCreateResponse create(
       @Valid @RequestBody CandidateCreateRequest request, HttpServletRequest servletRequest) {
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(servletRequest);
     CandidateAdminService.CreateResult result =
         candidateAdmin.manualCreate(
             request.candidateName(),
             request.email(),
             request.phone(),
             request.notes(),
-            clientIp(servletRequest),
-            servletRequest.getHeader("User-Agent"));
+            auditContext.ip(),
+            auditContext.userAgent());
     return new CandidateCreateResponse(result.candidateId(), null, result.applicationId());
   }
 

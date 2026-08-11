@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -107,10 +108,11 @@ class SecurityConfigApplicationRoutesTest {
   void candidateCreateDenialIsRecordedInSpring() throws Exception {
     mockMvc
         .perform(
-            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/candidates")
+            post("/api/v1/candidates")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
 
     org.mockito.Mockito.verify(auditService)
         .recordDenied(
@@ -120,6 +122,32 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void candidateCreateWithNoAdminPermissionReturnsJson403AndRecordsDeniedInSpring()
+      throws Exception {
+    Usuario user = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+
+    mockMvc
+        .perform(
+            post("/api/v1/candidates")
+                .session(sessionFor(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("candidate.create"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(auditedCandidateAdmin);
   }
 
   @Test
