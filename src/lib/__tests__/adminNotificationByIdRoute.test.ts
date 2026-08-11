@@ -55,6 +55,51 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
     })
   })
 
+  it.each([
+    ['PATCH', 'spring-preferences=dark; Path=/; HttpOnly; SameSite=Lax'],
+    ['DELETE', 'spring-preferences=light; Path=/; HttpOnly; SameSite=Lax']
+  ])('forwards the rotated validation session and appends cookies for %s', async (_method, upstreamCookie) => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: validationCookie })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'ok' }), {
+      headers: { 'Content-Type': 'application/json', 'Set-Cookie': upstreamCookie }
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { PATCH, DELETE } = await import('@/app/api/admin/notifications/[id]/route')
+
+    const response = _method === 'PATCH'
+      ? await PATCH(request('PATCH', JSON.stringify({ isRead: true })), params)
+      : await DELETE(request('DELETE'), params)
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      headers: expect.objectContaining({ Cookie: 'SESSIONID=S1' })
+    }))
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
+    expect(response.headers.get('Set-Cookie')).toContain(upstreamCookie)
+  })
+
+  it.each([
+    ['malformed PATCH body', 400],
+    ['untrusted PATCH origin', 403]
+  ])('keeps the rotated validation cookie on local %s rejections without proxying', async (_name, status) => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: validationCookie })
+    rejectIfUntrustedOriginMock.mockReturnValue(_name === 'untrusted PATCH origin'
+      ? new Response(JSON.stringify({ error: 'Origen no permitido' }), { status: 403 })
+      : null)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { PATCH } = await import('@/app/api/admin/notifications/[id]/route')
+
+    const response = _name === 'malformed PATCH body'
+      ? await PATCH(request('PATCH', '{'), params)
+      : await PATCH(request('PATCH', JSON.stringify({ isRead: true })), params)
+
+    expect(response.status).toBe(status)
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('forwards a successful DELETE message unchanged', async () => {
     const deleted = { message: 'Notificación eliminada' }
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(deleted), { headers: { 'Content-Type': 'application/json' } }))
@@ -82,6 +127,20 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
     expect(response.status).toBe(400)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toEqual({ error: 'Malformed request body' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('relays the rotated validation cookie for a parsed-invalid PATCH DTO without proxying', async () => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: validationCookie })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { PATCH } = await import('@/app/api/admin/notifications/[id]/route')
+
+    const response = await PATCH(request('PATCH', JSON.stringify({ isRead: 'true' })), params)
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

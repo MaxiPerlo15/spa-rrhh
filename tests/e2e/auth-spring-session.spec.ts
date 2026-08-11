@@ -31,6 +31,33 @@ test.describe('Admin Login via Spring Session', () => {
     await expect(page).toHaveURL(/\/admin\/signin/)
   })
 
+  test('authorizes the first protected notification BFF call after relay login', async ({ context }) => {
+    const relayResponse = await context.request.post('/api/auth/spring/login', {
+      data: { email: adminEmail, password: adminPassword }
+    })
+
+    expect(relayResponse.status()).toBe(200)
+    expect(relayResponse.headers()['set-cookie']).toContain('SESSIONID=')
+    const loginSessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+    expect(loginSessionCookie, 'the login relay must persist SESSIONID before the first protected BFF request').toBeDefined()
+    expect(loginSessionCookie?.path).toBe('/')
+    expect(loginSessionCookie?.httpOnly).toBe(true)
+
+    const notificationsResponse = await context.request.get('/api/admin/notifications?view=all&page=1&limit=20')
+    expect(notificationsResponse.status(), 'the first protected BFF request must remain authorized after Spring rotation').toBe(200)
+
+    const rotatedSessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+    expect(rotatedSessionCookie, 'the protected BFF response must retain a browser SESSIONID').toBeDefined()
+    expect(rotatedSessionCookie?.path).toBe('/')
+    expect(rotatedSessionCookie?.httpOnly).toBe(true)
+
+    const directSession = await context.request.get(`${springBackendUrl}/api/v1/auth/me`, {
+      headers: { Cookie: `SESSIONID=${rotatedSessionCookie!.value}` },
+      failOnStatusCode: false
+    })
+    expect(directSession.status(), 'the retained browser session must authorize direct Spring /auth/me').toBe(200)
+  })
+
   test('logs in via Spring and hands the browser session to the admin proxy', async ({ page, context }) => {
     await page.fill('input[name="email"]', adminEmail!)
     await page.fill('input[name="password"]', adminPassword!)

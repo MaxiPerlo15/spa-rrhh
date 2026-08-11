@@ -55,6 +55,45 @@ describe('/api/admin/notifications collection adapter', () => {
     })
   })
 
+  it('forwards the rotated validation session and appends validation and upstream cookies', async () => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    const upstreamCookie = 'spring-preferences=dark; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ ...session, setCookie: validationCookie })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }), {
+      headers: { 'Content-Type': 'application/json', 'Set-Cookie': upstreamCookie }
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { GET } = await import('@/app/api/admin/notifications/route')
+
+    const response = await GET(request('http://localhost:3000/api/admin/notifications?view=all&page=1&limit=20'))
+
+    expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/admin/notifications?view=all&page=1&limit=20', expect.objectContaining({
+      headers: expect.objectContaining({ Cookie: 'SESSIONID=S1' })
+    }))
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
+    expect(response.headers.get('Set-Cookie')).toContain(upstreamCookie)
+  })
+
+  it.each([
+    ['invalid GET query', 400],
+    ['untrusted POST origin', 403]
+  ])('keeps the rotated validation cookie on local %s rejections without proxying', async (_name, status) => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ ...session, setCookie: validationCookie })
+    rejectIfUntrustedOriginMock.mockReturnValue(new Response(JSON.stringify({ error: 'Origen no permitido' }), { status: 403 }))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { GET, POST } = await import('@/app/api/admin/notifications/route')
+
+    const response = _name === 'invalid GET query'
+      ? await GET(request('http://localhost:3000/api/admin/notifications?view=invalid'))
+      : await POST(request('http://localhost:3000/api/admin/notifications', { method: 'POST', body: JSON.stringify({ title: 'Title', message: 'Message' }) }))
+
+    expect(response.status).toBe(status)
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('preserves POST creation, CSRF protection, and the Spring 201 DTO casing', async () => {
     const payload = { title: 'New application', message: 'Ada applied.', level: 'SUCCESS', action: { label: 'Review', type: 'APPLICATION', resourceId: 'ckz1234567890123456789012' } }
     const created = { id: 'notification-1', ...payload, level: 'success', isRead: false }
@@ -78,6 +117,21 @@ describe('/api/admin/notifications collection adapter', () => {
     expect(response.status).toBe(400)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toEqual({ error: 'Malformed request body' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('relays the rotated validation cookie for a parsed-invalid POST DTO without proxying', async () => {
+    const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
+    getSpringSessionMock.mockResolvedValue({ ...session, setCookie: validationCookie })
+    rejectIfUntrustedOriginMock.mockReturnValue(null)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { POST } = await import('@/app/api/admin/notifications/route')
+
+    const response = await POST(request('http://localhost:3000/api/admin/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '', message: 'Message' }) }))
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('Set-Cookie')).toContain(validationCookie)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
