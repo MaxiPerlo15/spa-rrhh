@@ -63,7 +63,8 @@ public class SecurityConfig {
                            if (request.getRequestURI().startsWith("/api/v1/admin/")
                                || isContactMutation(request)
                                || isCandidateCreate(request)
-                               || isCandidatePatch(request)) {
+                               || isCandidatePatch(request)
+                               || isVacancyCreate(request)) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
@@ -99,18 +100,9 @@ public class SecurityConfig {
               }
 
               if (allowUnauthenticatedMutations) {
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
-                    .permitAll();
                 auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
                     .permitAll();
               } else {
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
-                    .access(
-                        (authentication, context) ->
-                            new AuthorizationDecision(
-                                hasValidInternalApiToken(
-                                    context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                    internalApiToken)));
                 auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
                     .access(
                         (authentication, context) ->
@@ -119,6 +111,8 @@ public class SecurityConfig {
                                     context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
                                     internalApiToken)));
               }
+              auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
+                  .hasAuthority("admin:access");
 
               // Public contact submit — no auth required (rate limit + captcha enforced by Next BFF)
               auth.requestMatchers(HttpMethod.POST, "/api/v1/contacts")
@@ -223,6 +217,10 @@ public class SecurityConfig {
       action = "PATCH".equals(request.getMethod()) ? "contact.update_status" : "contact.delete";
       resourceId = path.substring("/api/v1/contacts/".length());
       resourceType = "contact";
+    } else if (isVacancyCreate(request)) {
+      action = "vacancy.create";
+      resourceId = null;
+      resourceType = "vacancy";
     } else {
       return;
     }
@@ -253,6 +251,11 @@ public class SecurityConfig {
   private static boolean isCandidatePatch(jakarta.servlet.http.HttpServletRequest request) {
     return "PATCH".equals(request.getMethod())
         && request.getRequestURI().startsWith("/api/v1/candidates/");
+  }
+
+  private static boolean isVacancyCreate(jakarta.servlet.http.HttpServletRequest request) {
+    return "POST".equals(request.getMethod())
+        && "/api/v1/vacancies".equals(request.getRequestURI());
   }
 
   private boolean requiresInternalApiToken(

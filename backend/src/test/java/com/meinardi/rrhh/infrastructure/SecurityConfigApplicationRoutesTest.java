@@ -22,6 +22,7 @@ import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
+import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
@@ -33,6 +34,7 @@ import com.meinardi.rrhh.presentation.NotificationController;
 import com.meinardi.rrhh.presentation.AuditController;
 import com.meinardi.rrhh.presentation.CandidateRestController;
 import com.meinardi.rrhh.presentation.ContactoRestController;
+import com.meinardi.rrhh.presentation.VacancyRestController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,7 +52,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class})
+@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class, VacancyRestController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -83,6 +85,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private AuditService auditService;
   @MockitoBean private AuditedAdminMutation auditedAdminMutation;
+  @MockitoBean private AuditedVacancyCreator auditedVacancyCreator;
   @MockitoBean private AuditedCandidateAdmin auditedCandidateAdmin;
   @MockitoBean private ContactoService contactoService;
   @Autowired private SessionService sessionService;
@@ -194,6 +197,50 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
     org.mockito.Mockito.verifyNoInteractions(auditedCandidateAdmin);
+  }
+
+  @Test
+  void anonymousVacancyCreateReturnsJson401RecordsDeniedAndDoesNotMutate() throws Exception {
+    mockMvc
+        .perform(vacancyCreate())
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("vacancy.create"),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(auditedVacancyCreator);
+  }
+
+  @Test
+  void forbiddenVacancyCreateReturnsJson403RecordsForwardedContextAndDoesNotMutate()
+      throws Exception {
+    Usuario user = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+
+    mockMvc
+        .perform(
+            vacancyCreate()
+                .session(sessionFor(user))
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "vacancy-post-test"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("vacancy.create"),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq("203.0.113.10"),
+            org.mockito.ArgumentMatchers.eq("vacancy-post-test"),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(auditedVacancyCreator);
   }
 
   @ParameterizedTest
@@ -462,6 +509,13 @@ class SecurityConfigApplicationRoutesTest {
     return "PATCH".equals(method)
         ? patch("/api/v1/contacts/contact-123").contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"RESPONDED\"}")
         : delete("/api/v1/contacts/contact-123");
+  }
+
+  private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder vacancyCreate() {
+    return post("/api/v1/vacancies")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(
+            "{\"titulo\":\"Platform Engineer\",\"descripcion\":\"Build reliable systems\",\"ubicacionNombre\":\"Remote\",\"jornada\":\"FULL_TIME\",\"modalidad\":\"REMOTE\"}");
   }
 
   private void assertInvalidSession(MockHttpSession session) throws Exception {
