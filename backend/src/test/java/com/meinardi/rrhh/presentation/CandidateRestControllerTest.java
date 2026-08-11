@@ -77,7 +77,7 @@ class CandidateRestControllerTest {
 
   @Test
   void update_returns200WithCandidateId() throws Exception {
-    when(candidateAdmin.updateIdentity("cand-1", "Maria G.", "new@test.com", "+54 11 1111-2222", "127.0.0.1", null))
+    when(candidateAdmin.updateIdentity("cand-1", "Maria G.", "new@test.com", "+54 11 1111-2222", "203.0.113.10", "BFF test agent"))
         .thenReturn(new CandidateAdminService.UpdateResult("cand-1"));
 
     mockMvc
@@ -85,7 +85,9 @@ class CandidateRestControllerTest {
             patch("/api/v1/candidates/cand-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"candidateName\":\"Maria G.\",\"email\":\"new@test.com\",\"phone\":\"+54 11 1111-2222\"}"))
+                    "{\"candidateName\":\"Maria G.\",\"email\":\"new@test.com\",\"phone\":\"+54 11 1111-2222\"}")
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "BFF test agent"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.candidateId").value("cand-1"));
   }

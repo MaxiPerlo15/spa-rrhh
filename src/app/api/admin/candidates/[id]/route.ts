@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateAdminCandidateSchema } from '@/lib/apiValidation'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 
 interface RouteParams {
   params: Promise<{
@@ -16,24 +15,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      const { id } = await params
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'candidate.update',
-        resourceType: 'candidate',
-        resourceId: id,
-        outcome: 'DENIED'
-      })
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+  let springHeaders: Headers | undefined
 
+  try {
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
       return originRejection
@@ -67,10 +51,13 @@ export async function PATCH(
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getSpringBackendHeaders()
+          ...getSpringBackendHeaders(),
+          ...getAllowedBffRequestHeaders(request),
+          ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
         },
         body: JSON.stringify({ candidateName, email, phone })
       })
+      springHeaders = springResponse.headers
     } catch (error) {
       logger.error('Spring backend unreachable for candidate update', error)
       return NextResponse.json(
@@ -82,24 +69,40 @@ export async function PATCH(
     if (!springResponse.ok) {
       try {
         const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relaySpringCookies(
+          NextResponse.json(errorJson, { status: springResponse.status }),
+          springResponse.headers
+        )
       } catch {
-        const errorBody = await springResponse.text()
-        return NextResponse.json(
-          { error: errorBody || 'Error al actualizar candidato' },
-          { status: springResponse.status }
+        logger.error(
+          'Spring backend returned non-JSON candidate update error',
+          new Error('Spring candidate update failed'),
+          { category: 'spring_candidate_mutation_failure', status: springResponse.status }
+        )
+        return relaySpringCookies(
+          NextResponse.json(
+            { error: 'Error al actualizar candidato' },
+            { status: springResponse.status }
+          ),
+          springResponse.headers
         )
       }
     }
 
     const responseBody = await springResponse.json()
 
-    return NextResponse.json(responseBody)
+    return relaySpringCookies(
+      NextResponse.json(responseBody, { status: springResponse.status }),
+      springResponse.headers
+    )
   } catch (error) {
     logger.error('Error al actualizar candidato', error)
-    return NextResponse.json(
-      { error: 'Error al actualizar candidato' },
-      { status: 500 }
+    return relaySpringCookies(
+      NextResponse.json(
+        { error: 'Error al actualizar candidato' },
+        { status: 500 }
+      ),
+      springHeaders
     )
   }
 }

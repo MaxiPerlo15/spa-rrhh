@@ -45,8 +45,9 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     rejectIfUntrustedOriginMock.mockReturnValue(null)
   })
 
-  it('rechaza acceso sin autenticación de admin', async () => {
-    authMock.mockResolvedValue(null)
+  it('returns 503 without a configured Spring backend without local audit or upstream mutation', async () => {
+    const { getBackendUrl } = await import('@/lib/server/springBackend')
+    vi.mocked(getBackendUrl).mockReturnValueOnce(null)
     const { PATCH } = await import('@/app/api/admin/candidates/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/admin/candidates/${VALID_UUID}`, {
       method: 'PATCH',
@@ -57,8 +58,10 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     const response = await PATCH(request, { params: Promise.resolve({ id: VALID_UUID }) })
     const body = await response.json()
 
-    expect(response.status).toBe(401)
-    expect(body).toMatchObject({ error: 'No autorizado' })
+    expect(response.status).toBe(503)
+    expect(body).toEqual({ error: 'Spring backend not configured' })
+    expect(auditAdminActionMock).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('rechaza modificaciones que colisionan con otra identidad existente', async () => {

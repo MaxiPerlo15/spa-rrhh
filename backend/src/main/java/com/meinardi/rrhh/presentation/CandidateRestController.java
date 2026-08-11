@@ -46,19 +46,15 @@ public class CandidateRestController {
       @PathVariable String id,
       @Valid @RequestBody CandidateUpdateRequest request,
       HttpServletRequest servletRequest) {
+    AuditRequestContext auditContext = AuditRequestContextResolver.resolve(servletRequest);
     CandidateAdminService.UpdateResult result =
         candidateAdmin.updateIdentity(
             id,
             request.candidateName(),
             request.email(),
             request.phone(),
-            clientIp(servletRequest),
-            servletRequest.getHeader("User-Agent"));
+            auditContext.ip(),
+            auditContext.userAgent());
     return new CandidateUpdateResponse(result.candidateId(), java.util.List.of());
-  }
-
-  private String clientIp(HttpServletRequest request) {
-    String forwardedFor = request.getHeader("X-Forwarded-For");
-    return forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim();
   }
 }
