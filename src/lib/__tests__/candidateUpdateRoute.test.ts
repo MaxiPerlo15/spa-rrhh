@@ -2,14 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -84,7 +79,7 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 
-  it('relays Spring 403 and its cookie without performing local authorization or auditing', async () => {
+  it('relays Spring 403 and its cookie without performing local authorization', async () => {
     authMock.mockResolvedValue(null)
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'forbidden' }), {
       status: 403,
@@ -102,7 +97,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toEqual({ error: 'forbidden' })
     expect(fetchSpy).toHaveBeenCalledOnce()
-    expect(auditAdminActionMock).not.toHaveBeenCalled()
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 

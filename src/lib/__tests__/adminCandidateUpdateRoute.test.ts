@@ -3,14 +3,9 @@ import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
 const rejectIfUntrustedOriginMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -45,7 +40,7 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     rejectIfUntrustedOriginMock.mockReturnValue(null)
   })
 
-  it('returns 503 without a configured Spring backend without local audit or upstream mutation', async () => {
+  it('returns 503 without a configured Spring backend or upstream mutation', async () => {
     const { getBackendUrl } = await import('@/lib/server/springBackend')
     vi.mocked(getBackendUrl).mockReturnValueOnce(null)
     const { PATCH } = await import('@/app/api/admin/candidates/[id]/route')
@@ -60,7 +55,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
 
     expect(response.status).toBe(503)
     expect(body).toEqual({ error: 'Spring backend not configured' })
-    expect(auditAdminActionMock).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

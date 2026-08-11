@@ -3,7 +3,6 @@ import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
 const vacancyCreateMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 const getSpringSessionMock = vi.fn()
 const ORIGINAL_ENV = process.env
 
@@ -18,10 +17,6 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn()
     }
   }
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/springSession', () => ({
@@ -120,7 +115,7 @@ describe('/api/vacancies', () => {
     expect(payload.error).toBe('Vacancy backend not configured')
   })
 
-  it('relays an authorized creation to Spring with safe request context and no Prisma audit write', async () => {
+  it('relays an authorized creation to Spring with safe request context', async () => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     const fetchMock = vi.fn().mockResolvedValue({
@@ -173,13 +168,12 @@ describe('/api/vacancies', () => {
         }
       })
     )
-    expect(auditAdminActionMock).not.toHaveBeenCalled()
   })
 
   it.each([
     [401, { error: 'unauthorized', source: 'spring' }, ['SESSIONID=expired; Max-Age=0; Path=/; HttpOnly']],
     [403, { error: 'forbidden', source: 'spring' }, ['SESSIONID=rotated; Path=/; HttpOnly', 'XSRF-TOKEN=token; Path=/']]
-  ])('relays Spring POST denial %i exactly without local session authorization or audit', async (status, body, setCookies) => {
+  ])('relays Spring POST denial %i exactly without local session authorization', async (status, body, setCookies) => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     getSpringSessionMock.mockRejectedValue(new Error('BFF preflight must not run'))
@@ -214,7 +208,6 @@ describe('/api/vacancies', () => {
     expect(response.status).toBe(status)
     await expect(response.json()).resolves.toEqual(body)
     expect(getSpringSessionMock).not.toHaveBeenCalled()
-    expect(auditAdminActionMock).not.toHaveBeenCalled()
     expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual(setCookies)
     expect(fetch).toHaveBeenCalledWith(
       'https://spring.example.com/api/v1/vacancies',
