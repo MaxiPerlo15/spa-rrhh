@@ -1,35 +1,4 @@
-import type { NextRequest } from 'next/server'
 import { isIP } from 'node:net'
-
-export type BffAuditEvent = {
-  actor?: { id?: string | null; email?: string | null }
-  action: string
-  resourceType: string
-  resourceId?: string
-  metadata?: Record<string, unknown>
-}
-
-export async function recordDeniedBffAudit(request: NextRequest, event: BffAuditEvent) {
-  const { auditAdminAction } = await import('@/lib/adminAudit')
-  await auditAdminAction({ ...event, request, outcome: 'DENIED' })
-}
-
-export async function recordErrorBffAudit(
-  request: NextRequest,
-  event: BffAuditEvent,
-  error: unknown
-) {
-  const { auditAdminAction } = await import('@/lib/adminAudit')
-  await auditAdminAction({
-    ...event,
-    request,
-    outcome: 'ERROR',
-    metadata: {
-      ...event.metadata,
-      error: error instanceof Error ? error.message : String(error)
-    }
-  })
-}
 
 export function getAllowedBffRequestHeaders(request: Pick<Request, 'headers'>): Record<string, string> {
   const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()

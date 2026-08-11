@@ -1,35 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
-
-const { auditAdminActionMock } = vi.hoisted(() => ({ auditAdminActionMock: vi.fn() }))
-
-vi.mock('@/lib/adminAudit', () => ({ auditAdminAction: auditAdminActionMock }))
+import { describe, expect, it } from 'vitest'
 
 import {
   getAllowedBffRequestHeaders,
-  recordDeniedBffAudit,
-  recordErrorBffAudit,
   relaySpringCookies,
   type SpringCookieSource
 } from '../adminBffBoundary'
 
 describe('adminBffBoundary', () => {
-  const request = new NextRequest('http://localhost/api/admin/resource', {
+  const request = new Request('http://localhost/api/admin/resource', {
     headers: { 'x-forwarded-for': '203.0.113.10, 10.0.0.1', 'user-agent': 'Vitest' }
-  })
-  const event = { action: 'vacancy.update', resourceType: 'vacancy', resourceId: 'vacancy-1' }
-
-  it('records denied and error outcomes with request context', async () => {
-    await recordDeniedBffAudit(request, event)
-    await recordErrorBffAudit(request, { ...event, metadata: { source: 'bff' } }, new Error('offline'))
-
-    expect(auditAdminActionMock).toHaveBeenNthCalledWith(1, { ...event, request, outcome: 'DENIED' })
-    expect(auditAdminActionMock).toHaveBeenNthCalledWith(2, {
-      ...event,
-      request,
-      outcome: 'ERROR',
-      metadata: { source: 'bff', error: 'offline' }
-    })
   })
 
   it('forwards only allowlisted, safe request context headers', () => {
