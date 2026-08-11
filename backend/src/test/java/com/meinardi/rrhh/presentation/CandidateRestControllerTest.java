@@ -28,7 +28,7 @@ class CandidateRestControllerTest {
 
   @Test
   void create_returns201WithCandidateIdAndApplicationId() throws Exception {
-    when(candidateAdmin.manualCreate("Maria", "maria@test.com", "+54 11 9999-0000", "Notes", "127.0.0.1", null))
+    when(candidateAdmin.manualCreate("Maria", "maria@test.com", "+54 11 9999-0000", "Notes", "203.0.113.10", "BFF test agent"))
         .thenReturn(new CandidateAdminService.CreateResult("cand-1", "app-1"));
 
     mockMvc
@@ -36,7 +36,9 @@ class CandidateRestControllerTest {
             post("/api/v1/candidates")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\",\"notes\":\"Notes\"}"))
+                    "{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\",\"notes\":\"Notes\"}")
+                .header("X-Forwarded-For", "203.0.113.10")
+                .header("User-Agent", "BFF test agent"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.candidateId").value("cand-1"))
         .andExpect(jsonPath("$.applicationId").value("app-1"));
@@ -55,6 +57,22 @@ class CandidateRestControllerTest {
                     "{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("DUPLICATE_CANDIDATE"));
+  }
+
+  @Test
+  void create_sanitizesUntrustedForwardedAuditContext() throws Exception {
+    when(candidateAdmin.manualCreate("Maria", "maria@test.com", "+54 11 9999-0000", null, "10.0.0.4", null))
+        .thenReturn(new CandidateAdminService.CreateResult("cand-1", "app-1"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/candidates")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}")
+                .with(request -> { request.setRemoteAddr("10.0.0.4"); return request; })
+                .header("X-Forwarded-For", "203.0.113.+10")
+                .header("User-Agent", "a".repeat(513)))
+        .andExpect(status().isCreated());
   }
 
   @Test

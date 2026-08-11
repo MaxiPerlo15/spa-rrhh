@@ -60,7 +60,9 @@ public class SecurityConfig {
                     .authenticationEntryPoint(
                         (request, response, exception) -> {
                           recordDenied(request, auditService);
-                          if (request.getRequestURI().startsWith("/api/v1/admin/") || isContactMutation(request)) {
+                          if (request.getRequestURI().startsWith("/api/v1/admin/")
+                              || isContactMutation(request)
+                              || isCandidateMutation(request)) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
@@ -141,21 +143,11 @@ public class SecurityConfig {
                auth.requestMatchers(HttpMethod.DELETE, "/api/v1/contacts/{id}")
                   .hasAuthority("admin:access");
 
-              // Admin candidate create and update — requires internal API token
+              // Admin candidate create and update — requires Spring admin session
               auth.requestMatchers(HttpMethod.POST, "/api/v1/candidates")
-                  .access(
-                      (authentication, context) ->
-                          new AuthorizationDecision(
-                              hasValidInternalApiToken(
-                                  context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                  internalApiToken)));
+                  .hasAuthority("admin:access");
               auth.requestMatchers(HttpMethod.PATCH, "/api/v1/candidates/{id}")
-                  .access(
-                      (authentication, context) ->
-                          new AuthorizationDecision(
-                              hasValidInternalApiToken(
-                                  context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                  internalApiToken)));
+                  .hasAuthority("admin:access");
 
               // Public application intake — no auth required (rate limit + captcha enforced by Next BFF)
               auth.requestMatchers(HttpMethod.POST, "/api/v1/applications")
@@ -250,6 +242,12 @@ public class SecurityConfig {
   private static boolean isContactMutation(jakarta.servlet.http.HttpServletRequest request) {
     return ("PATCH".equals(request.getMethod()) || "DELETE".equals(request.getMethod()))
         && request.getRequestURI().startsWith("/api/v1/contacts/");
+  }
+
+  private static boolean isCandidateMutation(jakarta.servlet.http.HttpServletRequest request) {
+    return ("POST".equals(request.getMethod()) && "/api/v1/candidates".equals(request.getRequestURI()))
+        || ("PATCH".equals(request.getMethod())
+            && request.getRequestURI().startsWith("/api/v1/candidates/"));
   }
 
   private boolean requiresInternalApiToken(

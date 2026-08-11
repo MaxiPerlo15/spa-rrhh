@@ -1,17 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const authMock = vi.fn()
-const auditAdminActionMock = vi.fn()
-
-vi.mock('@/lib/auth', () => ({
-  auth: authMock
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
-}))
-
 vi.mock('@/lib/csrf', () => ({
   rejectIfUntrustedOrigin: vi.fn(() => null)
 }))
@@ -22,6 +11,11 @@ vi.mock('@/lib/server/springBackend', () => ({
 }))
 
 const fetchSpy = vi.spyOn(globalThis, 'fetch')
+const loggerErrorMock = vi.fn()
+
+vi.mock('@/lib/logger', () => ({
+  logger: { error: loggerErrorMock }
+}))
 
 describe('/api/admin/candidates POST', () => {
   const payload = {
@@ -37,9 +31,6 @@ describe('/api/admin/candidates POST', () => {
   })
 
   it('proxyea el POST a Spring y retorna 201 con el DTO', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
-    })
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -47,7 +38,7 @@ describe('/api/admin/candidates POST', () => {
           personKey: 'abc123',
           applicationId: 'app-456'
         }),
-        { status: 201 }
+        { status: 201, headers: { 'Set-Cookie': 'SESSIONID=rotated; Path=/; HttpOnly' } }
       )
     )
 
@@ -55,7 +46,12 @@ describe('/api/admin/candidates POST', () => {
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
       body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'SESSIONID=original; XSRF-TOKEN=token',
+        'X-Forwarded-For': '203.0.113.10, proxy',
+        'User-Agent': 'Candidate test agent'
+      }
     })
 
     const response = await POST(request)
@@ -69,12 +65,23 @@ describe('/api/admin/candidates POST', () => {
     })
     expect(fetchSpy).toHaveBeenCalledWith(
       'http://localhost:8080/api/v1/candidates',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Cookie: 'SESSIONID=original; XSRF-TOKEN=token',
+          'X-Forwarded-For': '203.0.113.10',
+          'User-Agent': 'Candidate test agent'
+        })
+      })
     )
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 
-  it('retorna 401 cuando no hay sesión admin', async () => {
-    authMock.mockResolvedValue(null)
+  it('relays Spring 401 and its cookie without performing local authorization or auditing', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { 'Set-Cookie': 'SESSIONID=expired; Max-Age=0; Path=/' }
+    }))
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
@@ -85,46 +92,27 @@ describe('/api/admin/candidates POST', () => {
     const response = await POST(request)
 
     expect(response.status).toBe(401)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    expect(auditAdminActionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        request,
-        action: 'candidate.create',
-        resourceType: 'candidate',
-        outcome: 'DENIED'
-      })
-    )
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=expired')
   })
 
-  it('audita el actor cuando su rol no puede crear candidatos', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'user-1', role: 'USER', email: 'user@test.com' }
-    })
+  it('relays a Spring cookie when a successful response body cannot be parsed', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response('not-json', {
+      status: 201,
+      headers: { 'Set-Cookie': 'SESSIONID=rotated; Path=/; HttpOnly' }
+    }))
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
+      method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }
     })
 
     const response = await POST(request)
 
-    expect(response.status).toBe(401)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    expect(auditAdminActionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: { id: 'user-1', email: 'user@test.com' },
-        action: 'candidate.create',
-        resourceType: 'candidate',
-        outcome: 'DENIED'
-      })
-    )
+    expect(response.status).toBe(500)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 
   it('retorna 409 cuando Spring retorna DUPLICATE_CANDIDATE', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
-    })
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: 'Duplicado', code: 'DUPLICATE_CANDIDATE' }),
@@ -146,10 +134,31 @@ describe('/api/admin/candidates POST', () => {
     expect(body.code).toBe('DUPLICATE_CANDIDATE')
   })
 
+  it('redacts a non-JSON Spring error while preserving its status and cookie', async () => {
+    const sentinel = 'SENTINEL: Spring database password=do-not-leak'
+    fetchSpy.mockResolvedValueOnce(new Response(sentinel, {
+      status: 502,
+      headers: { 'Set-Cookie': 'SESSIONID=expired; Max-Age=0; Path=/' }
+    }))
+
+    const { POST } = await import('@/app/api/admin/candidates/route')
+    const response = await POST(new NextRequest('http://localhost:3000/api/admin/candidates', {
+      method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(502)
+    expect(body).toEqual({ error: 'Error al registrar candidato manual' })
+    expect(JSON.stringify(body)).not.toContain(sentinel)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=expired')
+    expect(loggerErrorMock).toHaveBeenLastCalledWith(
+      'Spring backend returned non-JSON candidate create error',
+      expect.objectContaining({ message: 'Spring candidate create failed' }),
+      { category: 'spring_candidate_mutation_failure', status: 502 }
+    )
+  })
+
   it('retorna 503 cuando BACKEND_URL no está configurado', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
-    })
     const { getBackendUrl } = await import('@/lib/server/springBackend')
     vi.mocked(getBackendUrl).mockReturnValueOnce(null)
 

@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { createAdminCandidateSchema, formatValidationError } from '@/lib/apiValidation'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'candidate.create',
-        resourceType: 'candidate',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+  let springHeaders: Headers | undefined
 
+  try {
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
       return originRejection
@@ -50,10 +36,13 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getSpringBackendHeaders()
+          ...getSpringBackendHeaders(),
+          ...getAllowedBffRequestHeaders(request),
+          ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {})
         },
         body: JSON.stringify({ candidateName, email, phone, notes })
       })
+      springHeaders = springResponse.headers
     } catch (error) {
       logger.error('Spring backend unreachable for candidate create', error)
       return NextResponse.json(
@@ -65,24 +54,28 @@ export async function POST(request: NextRequest) {
     if (!springResponse.ok) {
       try {
         const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relaySpringCookies(NextResponse.json(errorJson, { status: springResponse.status }), springResponse.headers)
       } catch {
-        const errorBody = await springResponse.text()
-        return NextResponse.json(
-          { error: errorBody || 'Error al registrar candidato manual' },
-          { status: springResponse.status }
+        logger.error(
+          'Spring backend returned non-JSON candidate create error',
+          new Error('Spring candidate create failed'),
+          { category: 'spring_candidate_mutation_failure', status: springResponse.status }
         )
+        return relaySpringCookies(NextResponse.json(
+          { error: 'Error al registrar candidato manual' },
+          { status: springResponse.status }
+        ), springResponse.headers)
       }
     }
 
     const responseBody = await springResponse.json()
 
-    return NextResponse.json(responseBody, { status: springResponse.status })
+    return relaySpringCookies(NextResponse.json(responseBody, { status: springResponse.status }), springResponse.headers)
   } catch (error) {
     logger.error('Error al registrar candidato manual', error)
-    return NextResponse.json(
+    return relaySpringCookies(NextResponse.json(
       { error: 'Error al registrar candidato manual' },
       { status: 500 }
-    )
+    ), springHeaders)
   }
 }

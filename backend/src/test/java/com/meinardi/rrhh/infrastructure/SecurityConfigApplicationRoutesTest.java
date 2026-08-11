@@ -110,7 +110,8 @@ class SecurityConfigApplicationRoutesTest {
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/candidates")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
 
     org.mockito.Mockito.verify(auditService)
         .recordDenied(
@@ -129,7 +130,8 @@ class SecurityConfigApplicationRoutesTest {
             patch("/api/v1/candidates/candidate-123")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
 
     org.mockito.Mockito.verify(auditService)
         .recordDenied(
@@ -139,6 +141,32 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void candidateUpdateWithNoAdminPermissionReturnsJson403AndRecordsDeniedInSpring()
+      throws Exception {
+    Usuario user = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+
+    mockMvc
+        .perform(
+            patch("/api/v1/candidates/candidate-123")
+                .session(sessionFor(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"candidateName\":\"Maria\",\"email\":\"maria@test.com\",\"phone\":\"+54 11 9999-0000\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("candidate.update"),
+            org.mockito.ArgumentMatchers.eq("candidate"),
+            org.mockito.ArgumentMatchers.eq("candidate-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.verifyNoInteractions(auditedCandidateAdmin);
   }
 
   @ParameterizedTest
