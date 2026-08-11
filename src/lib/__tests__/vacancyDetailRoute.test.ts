@@ -5,7 +5,6 @@ const authMock = vi.fn()
 const findFirstMock = vi.fn()
 const findUniqueMock = vi.fn()
 const updateMock = vi.fn()
-const auditAdminActionMock = vi.fn()
 const getSpringSessionMock = vi.fn()
 const loggerErrorMock = vi.fn()
 const ORIGINAL_ENV = process.env
@@ -22,10 +21,6 @@ vi.mock('@/lib/prisma', () => ({
       update: updateMock
     }
   }
-}))
-
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
 }))
 
 vi.mock('@/lib/springSession', () => ({
@@ -587,7 +582,7 @@ describe('/api/vacancies/[id]', () => {
     { label: 'deactivation', method: 'PATCH', body: { status: 'INACTIVE' }, path: '/deactivate' },
     { label: 'PATCH closure', method: 'PATCH', body: { status: 'CLOSED' }, path: '/close' },
     { label: 'DELETE closure', method: 'DELETE', path: '/close' }
-  ] as const)('relays Spring 401 and 403 denials directly for $label without local authorization or audit', async ({ method, body, path }) => {
+  ] as const)('relays Spring 401 and 403 denials directly for $label without local authorization', async ({ method, body, path }) => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     authMock.mockRejectedValue(new Error('NextAuth must not gate Spring denials'))
@@ -626,7 +621,6 @@ describe('/api/vacancies/[id]', () => {
       expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual(cookies)
       expect(authMock).not.toHaveBeenCalled()
       expect(getSpringSessionMock).not.toHaveBeenCalled()
-      expect(auditAdminActionMock).not.toHaveBeenCalled()
       expect(fetch).toHaveBeenLastCalledWith(
         `https://spring.example.com/api/v1/vacancies/${vacancyId}${path}`,
         expect.objectContaining({
@@ -639,46 +633,6 @@ describe('/api/vacancies/[id]', () => {
       )
       expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).not.toHaveProperty('Authorization')
     }
-  })
-
-  it.each([
-    { label: 'update', method: 'PUT', body: { title: 'Updated Engineer' }, path: '', status: 'ACTIVE', action: 'vacancy.update' },
-    { label: 'activation', method: 'PUT', body: { status: 'ACTIVE' }, path: '/activate', status: 'ACTIVE', action: 'vacancy.activate' },
-    { label: 'deactivation', method: 'PUT', body: { status: 'INACTIVE' }, path: '/deactivate', status: 'INACTIVE', action: 'vacancy.deactivate' },
-    { label: 'PATCH closure', method: 'PATCH', body: { status: 'CLOSED' }, path: '/close', status: 'CLOSED', action: 'vacancy.close' },
-    { label: 'DELETE closure', method: 'DELETE', path: '/close', status: 'CLOSED', action: 'vacancy.close' }
-  ] as const)('retains the local SUCCESS audit after a Spring $label', async ({ method, body, path, status, action }) => {
-    process.env.BACKEND_URL = 'https://spring.example.com/'
-    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
-    authMock.mockResolvedValue({ user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' } })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null, getSetCookie: () => [] },
-      json: () => Promise.resolve(springVacancyResponse(status))
-    }))
-
-    const { PATCH, PUT, DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const handler = { PATCH, PUT, DELETE }[method]
-    const response = await handler(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
-      method,
-      headers: { Cookie: 'SESSIONID=browser-session' },
-      body: JSON.stringify(body)
-    }), { params: Promise.resolve({ id: vacancyId }) })
-
-    if (!response) throw new Error('Expected a vacancy route response')
-    expect(response.status).toBe(200)
-    expect(fetch).toHaveBeenCalledWith(
-      `https://spring.example.com/api/v1/vacancies/${vacancyId}${path}`,
-      expect.anything()
-    )
-    expect(auditAdminActionMock).toHaveBeenCalledWith(expect.objectContaining({
-      actor: { id: 'usr_admin', email: 'admin@example.com' },
-      action,
-      resourceType: 'vacancy',
-      resourceId: vacancyId,
-      outcome: 'SUCCESS',
-      metadata: expect.objectContaining({ backend: 'spring' })
-    }))
   })
 
   it.each([
@@ -720,10 +674,6 @@ describe('/api/vacancies/[id]', () => {
     expect(response.status).toBe(500)
     await expect(response.json()).resolves.toEqual({ error: method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante' })
     expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
-    expect(auditAdminActionMock).toHaveBeenLastCalledWith(expect.objectContaining({
-      outcome: 'ERROR',
-      metadata: { category: 'spring_mutation_failure', status: 503 }
-    }))
     expect(loggerErrorMock).toHaveBeenLastCalledWith(
       method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante',
       expect.objectContaining({
@@ -733,11 +683,10 @@ describe('/api/vacancies/[id]', () => {
       }),
       { category: 'spring_mutation_failure', status: 503 }
     )
-    expect(JSON.stringify(auditAdminActionMock.mock.calls)).not.toContain(upstreamBody)
     expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain(upstreamBody)
   })
 
-  it('returns the PATCH close 500 contract, relays ordered cookies and safe context, and retains its local ERROR audit', async () => {
+  it('returns the PATCH close 500 contract, relays ordered cookies and safe context', async () => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     authMock.mockResolvedValue({ user: { id: 'usr_admin', email: 'admin@example.com', role: 'ADMIN' } })
@@ -782,12 +731,5 @@ describe('/api/vacancies/[id]', () => {
       })
     )
     expect(vi.mocked(fetch).mock.calls[0][1]?.headers).not.toHaveProperty('Authorization')
-    expect(auditAdminActionMock).toHaveBeenLastCalledWith(expect.objectContaining({
-      action: 'vacancy.update',
-      resourceType: 'vacancy',
-      resourceId: vacancyId,
-      outcome: 'ERROR',
-      metadata: { category: 'spring_mutation_failure', status: 503 }
-    }))
   })
 })

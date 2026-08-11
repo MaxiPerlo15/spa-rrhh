@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
 import { normalizeLocation } from '@/lib/utils'
@@ -313,8 +312,6 @@ export async function GET(
 
 // Función compartida para actualizar vacante
 async function updateVacancy(request: NextRequest, params: Promise<{ id: string }>) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   let mutationHeaders: Headers | undefined
   try {
     const originRejection = rejectIfUntrustedOrigin(request)
@@ -334,7 +331,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
 
     const body = await request.json()
     const bodyValidation = updateVacancySchema.safeParse(body)
@@ -385,27 +381,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       const vacancy = statusMutation.vacancy
       mutationHeaders = statusMutation.headers
       if (vacancy) {
-        session = await auth()
-        await auditAdminAction({
-          request,
-          actor: {
-            id: session?.user?.id,
-            email: session?.user?.email
-          },
-          action: requestedStatus === 'ACTIVE'
-            ? 'vacancy.activate'
-            : requestedStatus === 'INACTIVE'
-              ? 'vacancy.deactivate'
-              : 'vacancy.close',
-          resourceType: 'vacancy',
-          resourceId: vacancy.id,
-          outcome: 'SUCCESS',
-          metadata: {
-            title: vacancy.title,
-            newStatus: vacancy.status,
-            backend: 'spring'
-          }
-        })
         revalidatePublicVacanciesCache()
 
         const response = NextResponse.json(vacancy)
@@ -453,23 +428,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
       }
 
       if (springVacancy) {
-        session = await auth()
-        await auditAdminAction({
-          request,
-          actor: {
-            id: session?.user?.id,
-            email: session?.user?.email
-          },
-          action: 'vacancy.update',
-          resourceType: 'vacancy',
-          resourceId: springVacancy.id,
-          outcome: 'SUCCESS',
-          metadata: {
-            changedFields: Object.keys(normalizedBody).filter((field) => field !== 'status'),
-            title: springVacancy.title,
-            backend: 'spring'
-          }
-        })
         revalidatePublicVacanciesCache()
 
         const response = NextResponse.json(springVacancy)
@@ -480,20 +438,6 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     throw new Error('Spring backend did not complete the vacancy update')
   } catch (error) {
     const failureMetadata = springMutationFailureMetadata(error)
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'vacancy.update',
-      resourceType: 'vacancy',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        ...(failureMetadata ?? { error: error instanceof Error ? error.message : String(error) })
-      }
-    })
     logger.error('Error al actualizar vacante', error, failureMetadata)
     const response = NextResponse.json(
       { error: 'Error al actualizar vacante' },
@@ -527,8 +471,6 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
-  let resourceId: string | undefined
   let mutationHeaders: Headers | undefined
   try {
     const originRejection = rejectIfUntrustedOrigin(request)
@@ -548,7 +490,6 @@ export async function DELETE(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    resourceId = id
 
     let closedVacancy = null
     try {
@@ -566,23 +507,6 @@ export async function DELETE(
     }
 
     if (closedVacancy) {
-      session = await auth()
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.close',
-        resourceType: 'vacancy',
-        resourceId: id,
-        outcome: 'SUCCESS',
-        metadata: {
-          title: closedVacancy.title,
-          newStatus: closedVacancy.status,
-          backend: 'spring'
-        }
-      })
       revalidatePublicVacanciesCache()
 
       const response = NextResponse.json(closedVacancy)
@@ -590,20 +514,6 @@ export async function DELETE(
     }
   } catch (error) {
     const failureMetadata = springMutationFailureMetadata(error)
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'vacancy.close',
-      resourceType: 'vacancy',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        ...(failureMetadata ?? { error: error instanceof Error ? error.message : String(error) })
-      }
-    })
     logger.error('Error al cerrar vacante', error, failureMetadata)
     const response = NextResponse.json(
       { error: 'Error al cerrar vacante' },
