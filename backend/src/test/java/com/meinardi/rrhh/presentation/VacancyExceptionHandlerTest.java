@@ -3,6 +3,9 @@ package com.meinardi.rrhh.presentation;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -49,8 +52,10 @@ class VacancyExceptionHandlerTest {
   @BeforeEach
   void passThroughAuditedMutations() {
     lenient()
-        .when(auditedMutation.execute(any(), any(), any(), any(), any(), any(), any()))
-        .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get());
+        .doAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get())
+        .when(auditedMutation)
+        .execute(
+            any(), any(), any(), nullable(String.class), nullable(String.class), any(), any());
   }
 
   @Test
@@ -66,8 +71,11 @@ class VacancyExceptionHandlerTest {
 
   @Test
   void activateVacancyReturnsConflictWhenBusinessRuleFails() throws Exception {
-    when(activateVacancyInputBoundary.activateVacancy("vacancy-id"))
-        .thenThrow(new IllegalStateException("La vacante ya se encuentra activa"));
+    doThrow(new IllegalStateException("La vacante ya se encuentra activa"))
+        .when(auditedMutation)
+        .execute(
+            eq("vacancy.activate"), eq("vacancy"), eq("vacancy-id"), nullable(String.class),
+            nullable(String.class), any(), any());
 
     mockMvc
         .perform(patch("/api/v1/vacancies/vacancy-id/activate"))
@@ -99,8 +107,11 @@ class VacancyExceptionHandlerTest {
 
   @Test
   void updateVacancyReturnsBadRequestWhenCommandIsInvalid() throws Exception {
-    when(updateVacancyInputBoundary.updateVacancy(eq("vacancy-id"), any(UpdateVacancyCommand.class)))
-        .thenThrow(new IllegalArgumentException("descripcion is required"));
+    doThrow(new IllegalArgumentException("descripcion is required"))
+        .when(auditedMutation)
+        .execute(
+            eq("vacancy.update"), eq("vacancy"), eq("vacancy-id"), nullable(String.class),
+            nullable(String.class), any(), any());
 
     mockMvc
         .perform(

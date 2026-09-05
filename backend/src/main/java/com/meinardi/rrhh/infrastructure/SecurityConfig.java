@@ -206,7 +206,7 @@ public class SecurityConfig {
         && configuredToken.equals(providedToken);
   }
 
-  private static void recordDenied(
+  static void recordDenied(
       jakarta.servlet.http.HttpServletRequest request, AuditService auditService) {
     String path = request.getRequestURI();
     String action;

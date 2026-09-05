@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.ApplicationAdminInputBoundary;
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.ApplicationIntakeInputBoundary;
 import com.meinardi.rrhh.application.ApplicationListInputBoundary;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
@@ -104,5 +105,24 @@ class SecurityConfigTest {
     filter.doFilter(request, response, chain);
 
     assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+  }
+
+  @Test
+  void recordsDeniedVacancyAndContactMutationsInSpring() {
+    AuditService auditService = mock(AuditService.class);
+    HttpServletRequest vacancyRequest = mock(HttpServletRequest.class);
+    when(vacancyRequest.getMethod()).thenReturn("PATCH");
+    when(vacancyRequest.getRequestURI()).thenReturn("/api/v1/vacancies/vacancy-1/close");
+    when(vacancyRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+    HttpServletRequest contactRequest = mock(HttpServletRequest.class);
+    when(contactRequest.getMethod()).thenReturn("DELETE");
+    when(contactRequest.getRequestURI()).thenReturn("/api/v1/contacts/contact-1");
+    when(contactRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+
+    SecurityConfig.recordDenied(vacancyRequest, auditService);
+    SecurityConfig.recordDenied(contactRequest, auditService);
+
+    org.mockito.Mockito.verify(auditService).recordDenied(org.mockito.ArgumentMatchers.eq("vacancy.close"), org.mockito.ArgumentMatchers.eq("vacancy"), org.mockito.ArgumentMatchers.eq("vacancy-1"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.verify(auditService).recordDenied(org.mockito.ArgumentMatchers.eq("contact.delete"), org.mockito.ArgumentMatchers.eq("contact"), org.mockito.ArgumentMatchers.eq("contact-1"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 }
