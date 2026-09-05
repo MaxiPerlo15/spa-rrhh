@@ -1,11 +1,11 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR2b-c
+# Apply Progress: Move Admin Operations and Remove Prisma — PR2c audit
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Boundary: `PR2b-b → PR2b-c`; Next notification item PATCH/DELETE Spring proxy, item contracts, and Chromium proof only.
-- Excluded: collection changes, audit, settings, retention, and Prisma removal.
-- Rollback: revert the item proxy, its contracts, the ephemeral E2E fixture, and task evidence as one slice.
+- Boundary: `PR2b-c → PR2c`; Spring audit read/write ownership and the thin Next audit adapter only.
+- Excluded: notification changes, settings, retention, and Prisma decommission.
+- Rollback: revert the audit controller/adapter contracts and the Spring forwarding helper as one slice.
 
 ## Completed Tasks
 
@@ -32,6 +32,7 @@
 | 3.9 | `tests/e2e/auth-spring-session.spec.ts` | Chromium E2E | ✅ Earlier proof exposed an immediate cookie race and missing confirmation interaction | ✅ Hardened proof failed until it awaited `/admin`, dismisses the fixture onboarding, and confirms logout | ✅ Login, cookie persistence, direct `/admin`, logout expiry, anonymous redirect | ✅ Test-only stabilization; production forwarding unchanged |
 | 3.12 | `src/lib/__tests__/adminNotificationByIdRoute.test.ts`, `tests/e2e/admin-notifications.spec.ts` | Vitest + Chromium | ✅ Legacy item-route test: 1/1 passed before replacement | ✅ Six Spring-proxy contracts were written first and failed while the legacy Prisma route loaded | ✅ 6/6 focused item contracts passed after the minimal proxy; PATCH and DELETE exercise distinct paths | ✅ Chromium used temporary PostgreSQL 16, Spring, and an ephemeral admin; persisted read state and deletion through browser-issued Next requests |
 | 3.13 | `tasks.md`, this artifact | Evidence | N/A — documentation-only | N/A — no production behavior | N/A — records only executed evidence | ✅ Explicitly preserves the reconstructed-history limitation |
+| 3.14 | None — stopped before RED | Vitest + JUnit | ✅ Spring notification safety net: 9/9 passed | ❌ Blocked: Vitest executable absent in this worktree | ❌ Not started | ❌ Not started | ❌ Not started |
 
 ## Verification
 
@@ -42,11 +43,19 @@
 - `npm run test:unit` — 81 files, 460 tests passed.
 - `cd backend && mvn test -Dtest=NotificationControllerTest,NotificationServiceTest,AdminNotificationRepositoryIntegrationTest` — 10/10 passed.
 - `npm run test:e2e:spring-auth` — temporary PostgreSQL 16 + Spring + Next Chromium proof passed (including item PATCH read-state persistence and DELETE removal).
+- `npm run test:unit -- src/lib/__tests__/apiValidation.branches.test.ts` — blocked: `vitest` is not installed in this worktree.
 
 ## Evidence Constraint
 
 Original migration RED history was not retained after reconstruction. The PR2b-c item-adapter RED→GREEN evidence above is executed in this worktree; it MUST NOT be generalized to pre-existing Spring notification or collection changes.
 
+## PR2c Attempt
+
+- Strict TDD safety net: `cd backend && mvn test -Dtest=NotificationControllerTest,NotificationServiceTest` passed (9/9).
+- Strict TDD blocker: `npm run test:unit -- src/lib/__tests__/apiValidation.branches.test.ts` could not start because `vitest` is not installed in this isolated worktree (`sh: vitest: command not found`). No application code or test was written.
+- Scope estimate: completing the required Spring audit GET/POST contracts, Next no-store/session adapter, existing audit-write forwarding, focused JUnit/Vitest coverage, and SDD evidence exceeds the 400 changed-line work-unit budget. The current audit route replacement alone accounts for 117 deletions plus its adapter/tests; the Spring contract and audit-write migration require additional production and test files.
+- Decision: stopped cleanly before implementation. Task 3.14 remains unchecked; no settings, retention, or Prisma-decommission work was touched.
+
 ## Status
 
-Tasks 3.12–3.13 are complete. The next work unit is PR2c audit, targeting PR2b-c. No collection, audit, settings, retention, or Prisma code was changed in this slice.
+Tasks 3.12–3.13 are complete. PR2c task 3.14 is blocked pending a smaller approved child slice and dependency bootstrap for focused Vitest execution. No application code changed in this attempt.
