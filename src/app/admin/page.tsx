@@ -1765,7 +1765,8 @@ export default function AdminDashboard() {
       onConfirm: async () => {
         try {
           if (springAuthEnabled) {
-            await fetch('/api/auth/spring/logout', { method: 'POST' })
+            const response = await fetch('/api/auth/spring/logout', { method: 'POST' })
+            if (!response.ok) throw new Error('Spring logout failed')
           } else {
             const callbackUrl = `${window.location.origin}/admin/signin`
             await signOut({

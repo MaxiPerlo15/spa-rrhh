@@ -143,8 +143,15 @@ export function validateRuntimeEnv() {
   validateDatabaseUrl(context, errors, warnings)
   validateBackendUrl(context, errors, warnings)
 
+  // The server-side proxy and browser bundle must select the same auth mode.
+  const springAuthEnabled = process.env.SPRING_AUTH_ENABLED === 'true'
+  const browserSpringAuthEnabled = process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED === 'true'
+  if (springAuthEnabled !== browserSpringAuthEnabled) {
+    errors.push('- SPRING_AUTH_ENABLED and NEXT_PUBLIC_SPRING_AUTH_ENABLED must match')
+  }
+
   // Spring auth feature flag validation
-  if (process.env.SPRING_AUTH_ENABLED === 'true') {
+  if (springAuthEnabled) {
     if (!process.env.BACKEND_URL) {
       errors.push('- BACKEND_URL is required when SPRING_AUTH_ENABLED is true')
     }

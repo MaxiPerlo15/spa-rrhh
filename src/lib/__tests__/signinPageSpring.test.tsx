@@ -97,7 +97,7 @@ describe('SignInPage — Spring relay mode', () => {
     await waitFor(() => {
       expect(showSuccessMock).toHaveBeenCalledWith('Inicio de sesión exitoso. Redirigiendo al panel.')
       expect(pushMock).toHaveBeenCalledWith('/admin')
-      expect(refreshMock).toHaveBeenCalled()
+      expect(refreshMock).not.toHaveBeenCalled()
     })
   })
 

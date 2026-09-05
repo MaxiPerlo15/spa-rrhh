@@ -49,7 +49,6 @@ export default function SignInPage() {
 
         showSuccess('Inicio de sesión exitoso. Redirigiendo al panel.')
         router.push('/admin')
-        router.refresh()
         return
       }
 

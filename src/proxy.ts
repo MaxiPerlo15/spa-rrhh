@@ -1,7 +1,7 @@
 import { withAuth } from "next-auth/middleware"
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server"
 import { applyCorsHeaders, isAllowedOrigin, isPublicCorsRequest } from "@/lib/cors"
-import { getSpringSession, type SpringSession } from "@/lib/springSession"
+import { getSpringSession } from "@/lib/springSession"
 
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -66,9 +66,19 @@ function extractSessionCookie(request: NextRequest): string {
   return sessionMatch ? `SESSIONID=${sessionMatch[1]}` : ''
 }
 
-function withSpringSessionCookie(response: NextResponse, session: SpringSession) {
-  if ((session.state === 'authorized' || session.state === 'anonymous') && session.setCookie) {
-    response.headers.set('Set-Cookie', session.setCookie)
+function isSameOriginRequest(request: NextRequest, origin: string | null) {
+  if (!origin || origin === request.nextUrl.origin) return true
+
+  try {
+    return new URL(origin).host === request.headers.get('host')?.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
+function withSpringSessionCookie(response: NextResponse, session: { setCookie?: string }) {
+  if (session.setCookie) {
+    response.headers.append('Set-Cookie', session.setCookie)
   }
   return response
 }
@@ -98,7 +108,7 @@ async function adminProxyWithSpringSession(request: NextRequest) {
     )
   }
   if (session.state === 'forbidden') {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    return withSpringSessionCookie(NextResponse.json({ error: 'forbidden' }, { status: 403 }), session)
   }
   if (session.state === 'unavailable') {
     return NextResponse.json({ error: 'spring_session_unavailable' }, { status: 503 })
@@ -116,7 +126,7 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
     const pathname = request.nextUrl.pathname
     const origin = request.headers.get("origin")
     const requestedHeaders = request.headers.get("access-control-request-headers")
-    const isCrossOriginRequest = Boolean(origin && origin !== request.nextUrl.origin)
+    const isCrossOriginRequest = !isSameOriginRequest(request, origin)
 
     if (isCrossOriginRequest && origin && !isAllowedOrigin(origin)) {
       return NextResponse.json({ error: "Origen no permitido" }, { status: 403 })

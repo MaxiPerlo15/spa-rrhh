@@ -8,10 +8,16 @@ export type SpringSessionUser = {
 export type SpringSession =
   | { state: 'authorized'; user: SpringSessionUser; setCookie?: string }
   | { state: 'anonymous'; setCookie?: string }
-  | { state: 'forbidden' }
+  | { state: 'forbidden'; setCookie?: string }
   | { state: 'unavailable' }
 
 const ADMIN_ACCESS = 'admin:access'
+
+function sessionCookie(headers: Headers): string | undefined {
+  const responseHeaders = headers as Headers & { getSetCookie?: () => string[] }
+  const cookies = responseHeaders.getSetCookie?.() ?? [headers.get('set-cookie')]
+  return cookies.find((cookie): cookie is string => Boolean(cookie?.startsWith('SESSIONID=')))
+}
 
 function isSpringSessionUser(value: unknown): value is SpringSessionUser {
   if (!value || typeof value !== 'object') return false
@@ -48,13 +54,17 @@ export async function getSpringSession(
       headers: { Cookie: cookieHeader },
       credentials: 'omit'
     })
-    const setCookie = response.headers?.get('set-cookie') ?? undefined
 
+    const updatedSessionCookie = response.headers ? sessionCookie(response.headers) : undefined
     if (response.status === 401) {
-      return setCookie ? { state: 'anonymous', setCookie } : { state: 'anonymous' }
+      return updatedSessionCookie
+        ? { state: 'anonymous', setCookie: updatedSessionCookie }
+        : { state: 'anonymous' }
     }
     if (response.status === 403) {
-      return { state: 'forbidden' }
+      return updatedSessionCookie
+        ? { state: 'forbidden', setCookie: updatedSessionCookie }
+        : { state: 'forbidden' }
     }
     if (!response.ok) {
       return { state: 'unavailable' }
@@ -65,9 +75,13 @@ export async function getSpringSession(
       return { state: 'unavailable' }
     }
     if (!user.rol.permisos.includes(ADMIN_ACCESS)) {
-      return { state: 'forbidden' }
+      return updatedSessionCookie
+        ? { state: 'forbidden', setCookie: updatedSessionCookie }
+        : { state: 'forbidden' }
     }
-    return setCookie ? { state: 'authorized', user, setCookie } : { state: 'authorized', user }
+    return updatedSessionCookie
+      ? { state: 'authorized', user, setCookie: updatedSessionCookie }
+      : { state: 'authorized', user }
   } catch {
     return { state: 'unavailable' }
   }

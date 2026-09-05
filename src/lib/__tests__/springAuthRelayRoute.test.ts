@@ -8,93 +8,105 @@ vi.mock('@/lib/server/springBackend', () => ({
   getSpringBackendHeaders: getSpringBackendHeadersMock
 }))
 
-describe('Spring auth relays', () => {
+describe('Spring authentication relays', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getBackendUrlMock.mockReturnValue('https://spring.example.com')
-    getSpringBackendHeadersMock.mockReturnValue({ 'X-Backend-Api-Key': 'relay-token' })
+    getSpringBackendHeadersMock.mockReturnValue({ 'X-Backend-Api-Key': 'test-token' })
   })
 
-  it('relays login credentials to Spring, forwards its session cookie, and redacts an upstream error body', async () => {
+  it('forwards a successful same-origin login and Spring session cookie', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ token: 'do-not-expose' }), {
-        status: 401,
-        headers: { 'Set-Cookie': 'SESSIONID=expired; Path=/; HttpOnly' }
+      new Response(JSON.stringify({ userId: 'u1', email: 'admin@example.com' }), {
+        status: 200,
+        headers: { 'Set-Cookie': 'SESSIONID=spring-session; Path=/; HttpOnly; SameSite=Lax' }
       })
     )
     vi.stubGlobal('fetch', fetchMock)
 
     const { POST } = await import('@/app/api/auth/spring/login/route')
     const response = await POST(
-      new Request('http://localhost/api/auth/spring/login', {
+      new Request('http://next.example.com/api/auth/spring/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@example.com', password: 'Password123!' })
+        body: JSON.stringify({ email: 'admin@example.com', password: 'not-exposed' })
       })
     )
 
-    expect(response.status).toBe(401)
-    expect(response.headers.get('Set-Cookie')).toContain('SESSIONID=expired')
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid credentials' })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ userId: 'u1', email: 'admin@example.com' })
+    expect(response.headers.get('Set-Cookie')).toContain('SESSIONID=spring-session')
     expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Backend-Api-Key': 'relay-token'
+        'X-Backend-Api-Key': 'test-token'
       },
-      body: JSON.stringify({ email: 'admin@example.com', password: 'Password123!' }),
-      cache: 'no-store'
+      body: JSON.stringify({ email: 'admin@example.com', password: 'not-exposed' }),
+      cache: 'no-store',
+      credentials: 'omit'
     })
   })
 
-  it('relays logout with the browser session cookie and forwards Spring cookie clearing', async () => {
+  it('maps rejected Spring credentials without relaying Spring error details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'internal Spring detail' }), { status: 401 }))
+    )
+
+    const { POST } = await import('@/app/api/auth/spring/login/route')
+    const response = await POST(
+      new Request('http://next.example.com/api/auth/spring/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'admin@example.com', password: 'wrong' })
+      })
+    )
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: 'invalid_credentials' })
+  })
+
+  it('forwards the browser session to Spring logout and relays its clearing cookie', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(null, {
         status: 204,
-        headers: { 'Set-Cookie': 'SESSIONID=; Path=/; Max-Age=0; HttpOnly' }
+        headers: { 'Set-Cookie': 'SESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax' }
       })
     )
     vi.stubGlobal('fetch', fetchMock)
 
     const { POST } = await import('@/app/api/auth/spring/logout/route')
     const response = await POST(
-      new Request('http://localhost/api/auth/spring/logout', {
+      new Request('http://next.example.com/api/auth/spring/logout', {
         method: 'POST',
-        headers: { Cookie: 'SESSIONID=active-session; other=value' }
+        headers: { Cookie: 'other=value; SESSIONID=spring-session' }
       })
     )
 
     expect(response.status).toBe(204)
-    expect(response.headers.get('Set-Cookie')).toContain('Max-Age=0')
+    expect(response.headers.get('Set-Cookie')).toContain('SESSIONID=; Max-Age=0')
     expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/auth/logout', {
       method: 'POST',
       headers: {
-        Cookie: 'SESSIONID=active-session; other=value',
-        'X-Backend-Api-Key': 'relay-token'
+        Cookie: 'other=value; SESSIONID=spring-session',
+        'X-Backend-Api-Key': 'test-token'
       },
-      cache: 'no-store'
+      cache: 'no-store',
+      credentials: 'omit'
     })
   })
 
-  it('returns the successful Spring login body with its session cookie', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ userId: 'admin-1', email: 'admin@example.com' }), {
-        status: 200,
-        headers: { 'Set-Cookie': 'SESSIONID=active-session; Path=/; HttpOnly' }
-      })
-    )
-    vi.stubGlobal('fetch', fetchMock)
+  it('maps an unavailable Spring backend without exposing credentials or backend errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')))
 
     const { POST } = await import('@/app/api/auth/spring/login/route')
     const response = await POST(
-      new Request('http://localhost/api/auth/spring/login', {
+      new Request('http://next.example.com/api/auth/spring/login', {
         method: 'POST',
-        body: JSON.stringify({ email: 'admin@example.com', password: 'Password123!' })
+        body: JSON.stringify({ email: 'admin@example.com', password: 'not-exposed' })
       })
     )
 
-    expect(response.status).toBe(200)
-    expect(response.headers.get('Set-Cookie')).toContain('SESSIONID=active-session')
-    await expect(response.json()).resolves.toEqual({ userId: 'admin-1', email: 'admin@example.com' })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'spring_auth_unavailable' })
   })
 })
