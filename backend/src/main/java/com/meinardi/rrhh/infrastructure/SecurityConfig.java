@@ -59,7 +59,7 @@ public class SecurityConfig {
                 exceptions
                     .authenticationEntryPoint(
                         (request, response, exception) -> {
-                          recordCandidateDenied(request, auditService);
+                            recordDenied(request, auditService);
                           if (request.getRequestURI().startsWith("/api/v1/admin/")) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
@@ -68,7 +68,7 @@ public class SecurityConfig {
                         })
                      .accessDeniedHandler(
                          (request, response, exception) -> {
-                           recordCandidateDenied(request, auditService);
+                           recordDenied(request, auditService);
                            writeJsonError(response, 403, "forbidden");
                          }))
         .sessionManagement(
@@ -222,17 +222,28 @@ public class SecurityConfig {
         && configuredToken.equals(providedToken);
   }
 
-  private void recordCandidateDenied(
+  static void recordDenied(
       jakarta.servlet.http.HttpServletRequest request, AuditService auditService) {
     String path = request.getRequestURI();
     String action;
     String resourceId;
+    String resourceType;
     if ("POST".equals(request.getMethod()) && "/api/v1/candidates".equals(path)) {
       action = "candidate.create";
       resourceId = null;
+      resourceType = "candidate";
     } else if ("PATCH".equals(request.getMethod()) && path.startsWith("/api/v1/candidates/")) {
       action = "candidate.update";
       resourceId = path.substring("/api/v1/candidates/".length());
+      resourceType = "candidate";
+    } else if ("PATCH".equals(request.getMethod()) && path.startsWith("/api/v1/vacancies/")) {
+      resourceId = path.substring("/api/v1/vacancies/".length()).replaceFirst("/(activate|deactivate|close)$", "");
+      action = path.endsWith("/activate") ? "vacancy.activate" : path.endsWith("/deactivate") ? "vacancy.deactivate" : path.endsWith("/close") ? "vacancy.close" : "vacancy.update";
+      resourceType = "vacancy";
+    } else if ("DELETE".equals(request.getMethod()) && path.startsWith("/api/v1/vacancies/")) {
+      action = "vacancy.close";
+      resourceId = path.substring("/api/v1/vacancies/".length());
+      resourceType = "vacancy";
     } else {
       return;
     }
@@ -240,7 +251,7 @@ public class SecurityConfig {
       String forwardedFor = request.getHeader("X-Forwarded-For");
       auditService.recordDenied(
           action,
-          "candidate",
+           resourceType,
           resourceId,
           forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim(),
           request.getHeader("User-Agent"),

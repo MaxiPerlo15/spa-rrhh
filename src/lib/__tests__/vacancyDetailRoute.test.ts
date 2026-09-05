@@ -6,6 +6,7 @@ const findFirstMock = vi.fn()
 const findUniqueMock = vi.fn()
 const updateMock = vi.fn()
 const auditAdminActionMock = vi.fn()
+const getSpringSessionMock = vi.fn()
 const ORIGINAL_ENV = process.env
 
 vi.mock('@/lib/auth', () => ({
@@ -26,6 +27,10 @@ vi.mock('@/lib/adminAudit', () => ({
   auditAdminAction: auditAdminActionMock
 }))
 
+vi.mock('@/lib/springSession', () => ({
+  getSpringSession: getSpringSessionMock
+}))
+
 vi.mock('@/lib/server/publicVacancies', () => ({
   revalidatePublicVacanciesCache: vi.fn()
 }))
@@ -40,6 +45,11 @@ describe('/api/vacancies/[id]', () => {
     vi.resetModules()
     vi.clearAllMocks()
     vi.unstubAllGlobals()
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: {}
+    })
   })
 
   afterEach(() => {
@@ -69,7 +79,7 @@ describe('/api/vacancies/[id]', () => {
     })
 
     const { DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE' })
+    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE', headers: { Cookie: 'SESSIONID=spring-admin-session' } })
     const response = await DELETE(request, { params: Promise.resolve({ id: vacancyId }) })
     const payload = await response!.json()
 
@@ -90,6 +100,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ title: 'Updated Engineer' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -182,7 +193,7 @@ describe('/api/vacancies/[id]', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE' })
+    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE', headers: { Cookie: 'SESSIONID=spring-admin-session' } })
     const response = await DELETE(request, { params: Promise.resolve({ id: vacancyId }) })
 
     expect(response!.status).toBe(404)
@@ -207,7 +218,7 @@ describe('/api/vacancies/[id]', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE' })
+    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE', headers: { Cookie: 'SESSIONID=spring-admin-session' } })
     const response = await DELETE(request, { params: Promise.resolve({ id: vacancyId }) })
     const payload = await response!.json()
 
@@ -236,6 +247,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ status: 'ACTIVE' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -265,6 +277,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ status: 'INACTIVE' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -288,6 +301,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ salary: '1000', benefits: 'Health insurance' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -318,6 +332,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ title: 'Backend Engineer' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -326,5 +341,67 @@ describe('/api/vacancies/[id]', () => {
     expect(response.status).toBe(409)
     expect(payload.error).toBe('title already exists')
     expect(updateMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards the rotated Spring session to a vacancy update and relays it to the browser', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        id: vacancyId,
+        titulo: 'Updated Engineer',
+        descripcion: 'Desc',
+        requisitos: null,
+        ubicacionNombre: 'Remote',
+        ubicacionDescripcion: 'Remote',
+        jornada: 'FULL_TIME',
+        modalidad: 'REMOTE',
+        estadoActual: 'ACTIVE',
+        fechaCreacion: '2026-03-01T00:00:00.000Z',
+        fechaPublicacion: '2026-03-02T00:00:00.000Z'
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { PATCH } = await import('@/app/api/vacancies/[id]/route')
+    const response = await PATCH(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=active-session' },
+      body: JSON.stringify({ title: 'Updated Engineer' })
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=active-session')
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://spring.example.com/api/v1/vacancies/${vacancyId}`,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Cookie: 'SESSIONID=rotated-session',
+          'X-Backend-Api-Key': 'shared-secret'
+        })
+      })
+    )
+    expect(auditAdminActionMock).not.toHaveBeenCalled()
+  })
+
+  it('relays Spring expiry when a vacancy update is denied before the mutation', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    getSpringSessionMock.mockResolvedValueOnce({
+      state: 'anonymous',
+      setCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly'
+    })
+
+    const { PATCH } = await import('@/app/api/vacancies/[id]/route')
+    const response = await PATCH(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=expired-session' },
+      body: JSON.stringify({ title: 'Updated Engineer' })
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(auditAdminActionMock).not.toHaveBeenCalled()
   })
 })

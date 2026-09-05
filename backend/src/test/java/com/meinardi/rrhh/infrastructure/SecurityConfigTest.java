@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.ApplicationAdminInputBoundary;
+import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.ApplicationIntakeInputBoundary;
 import com.meinardi.rrhh.application.ApplicationListInputBoundary;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
@@ -104,5 +105,18 @@ class SecurityConfigTest {
     filter.doFilter(request, response, chain);
 
     assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+  }
+
+  @Test
+  void recordsDeniedVacancyMutationsInSpring() {
+    AuditService auditService = mock(AuditService.class);
+    HttpServletRequest vacancyRequest = mock(HttpServletRequest.class);
+    when(vacancyRequest.getMethod()).thenReturn("PATCH");
+    when(vacancyRequest.getRequestURI()).thenReturn("/api/v1/vacancies/vacancy-1/close");
+    when(vacancyRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+
+    SecurityConfig.recordDenied(vacancyRequest, auditService);
+
+    org.mockito.Mockito.verify(auditService).recordDenied(org.mockito.ArgumentMatchers.eq("vacancy.close"), org.mockito.ArgumentMatchers.eq("vacancy"), org.mockito.ArgumentMatchers.eq("vacancy-1"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 }
