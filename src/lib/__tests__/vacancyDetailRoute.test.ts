@@ -729,7 +729,7 @@ describe('/api/vacancies/[id]', () => {
     { label: 'PATCH deactivation', method: 'PATCH', body: { status: 'INACTIVE' }, path: '/deactivate', status: 'INACTIVE' },
     { label: 'PATCH closure', method: 'PATCH', body: { status: 'CLOSED' }, path: '/close', status: 'CLOSED' },
     { label: 'DELETE closure', method: 'DELETE', path: '/close', status: 'CLOSED' }
-  ] as const)('relays the rotated Spring session, safe context, and cookies for $label', async ({ method, body, path, status }) => {
+  ] as const)('relays the original Spring cookie, safe context, and mutation cookies for $label', async ({ method, body, path, status }) => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
     authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } })
@@ -761,23 +761,21 @@ describe('/api/vacancies/[id]', () => {
       ...(body ? { body: JSON.stringify(body) } : {})
     }), { params: Promise.resolve({ id: vacancyId }) })
 
-    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session')
+    if (!response) throw new Error('Expected a vacancy route response')
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledWith(
       `https://spring.example.com/api/v1/vacancies/${vacancyId}${path}`,
       expect.objectContaining({
         headers: expect.objectContaining({
           'X-Backend-Api-Key': 'shared-secret',
-          Cookie: 'SESSIONID=rotated-session',
+          Cookie: 'SESSIONID=original-session',
           'X-Forwarded-For': '203.0.113.10',
           'User-Agent': 'Vitest'
         })
       })
     )
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization')
-    expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([
-      rotatedSessionCookie,
-      mutationCookie
-    ])
+    expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([mutationCookie])
   })
 
   it.each([
