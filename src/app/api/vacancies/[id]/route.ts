@@ -53,7 +53,23 @@ async function rejectFailedSpringVacancyStatusMutation(
   }
 }
 
-async function closeVacancyInSpring(id: string, cookie?: string) {
+function preservedSpringMutationErrorResponse(
+  cause: unknown,
+  authorizedSetCookie: string | undefined,
+  mutationHeaders: Headers | undefined
+) {
+  const response = cause instanceof SpringVacancyNotFoundError
+    ? NextResponse.json({ error: 'Vacante no encontrada' }, { status: 404 })
+    : cause instanceof SpringVacancyWriteError
+      ? NextResponse.json({ error: cause.message }, { status: cause.status })
+      : undefined
+
+  if (!response) return undefined
+  relaySpringCookies(response, authorizedSetCookie)
+  return relaySpringCookies(response, mutationHeaders)
+}
+
+async function closeVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -63,7 +79,8 @@ async function closeVacancyInSpring(id: string, cookie?: string) {
     method: 'PATCH',
     headers: {
       ...getSpringBackendHeaders(),
-      ...(cookie ? { Cookie: cookie } : {})
+      ...getAllowedBffRequestHeaders(request),
+      Cookie: cookie
     }
   })
 
@@ -78,7 +95,10 @@ async function closeVacancyInSpring(id: string, cookie?: string) {
     throw new SpringVacancyMutationError(response.headers, error)
   }
 
-  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+  return {
+    vacancy: mapSpringToDto(await response.json() as SpringVacancyResponse),
+    headers: response.headers
+  }
 }
 
 async function getVacancyFromSpring(id: string) {
@@ -104,7 +124,7 @@ async function getVacancyFromSpring(id: string) {
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
 }
 
-async function activateVacancyInSpring(id: string) {
+async function activateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -112,20 +132,31 @@ async function activateVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/activate`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: {
+      ...getSpringBackendHeaders(),
+      ...getAllowedBffRequestHeaders(request),
+      Cookie: cookie
+    }
   })
 
-  await rejectFailedSpringVacancyStatusMutation(
-    response,
-    id,
-    'activation',
-    'No se pudo activar la vacante por una regla de negocio'
-  )
+  try {
+    await rejectFailedSpringVacancyStatusMutation(
+      response,
+      id,
+      'activation',
+      'No se pudo activar la vacante por una regla de negocio'
+    )
+  } catch (error) {
+    throw new SpringVacancyMutationError(response.headers, error)
+  }
 
-  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+  return {
+    vacancy: mapSpringToDto(await response.json() as SpringVacancyResponse),
+    headers: response.headers
+  }
 }
 
-async function deactivateVacancyInSpring(id: string) {
+async function deactivateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -133,17 +164,28 @@ async function deactivateVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/deactivate`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: {
+      ...getSpringBackendHeaders(),
+      ...getAllowedBffRequestHeaders(request),
+      Cookie: cookie
+    }
   })
 
-  await rejectFailedSpringVacancyStatusMutation(
-    response,
-    id,
-    'deactivation',
-    'No se pudo desactivar la vacante por una regla de negocio'
-  )
+  try {
+    await rejectFailedSpringVacancyStatusMutation(
+      response,
+      id,
+      'deactivation',
+      'No se pudo desactivar la vacante por una regla de negocio'
+    )
+  } catch (error) {
+    throw new SpringVacancyMutationError(response.headers, error)
+  }
 
-  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+  return {
+    vacancy: mapSpringToDto(await response.json() as SpringVacancyResponse),
+    headers: response.headers
+  }
 }
 
 async function updateVacancyInSpring(
@@ -322,29 +364,28 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     }
 
     if (isOnlyStatusChange && (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE' || requestedStatus === 'CLOSED')) {
-      let vacancy = null
+      const springSession = await authorizeSpringMutation(request)
+      if (springSession instanceof NextResponse) return springSession
+      authorizedSetCookie = springSession.setCookie
+
+      let statusMutation
       try {
-        vacancy = requestedStatus === 'ACTIVE'
-          ? await activateVacancyInSpring(id)
+        statusMutation = requestedStatus === 'ACTIVE'
+          ? await activateVacancyInSpring(id, request, springSession.cookie)
           : requestedStatus === 'INACTIVE'
-            ? await deactivateVacancyInSpring(id)
-            : await closeVacancyInSpring(id)
+            ? await deactivateVacancyInSpring(id, request, springSession.cookie)
+            : await closeVacancyInSpring(id, request, springSession.cookie)
       } catch (error) {
-        if (error instanceof SpringVacancyNotFoundError) {
-          return NextResponse.json(
-            { error: 'Vacante no encontrada' },
-            { status: 404 }
-          )
-        }
-        if (error instanceof SpringVacancyWriteError) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: error.status }
-          )
-        }
-        throw error
+        const cause = error instanceof SpringVacancyMutationError ? error.cause : error
+        const errorHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+        const errorResponse = preservedSpringMutationErrorResponse(cause, authorizedSetCookie, errorHeaders)
+        if (errorResponse) return errorResponse
+        mutationHeaders = errorHeaders
+        throw cause
       }
 
+      const vacancy = statusMutation.vacancy
+      mutationHeaders = statusMutation.headers
       if (vacancy) {
         await auditAdminAction({
           request,
@@ -368,7 +409,9 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
         })
         revalidatePublicVacanciesCache()
 
-        return NextResponse.json(vacancy)
+        const response = NextResponse.json(vacancy)
+        relaySpringCookies(response, authorizedSetCookie)
+        return relaySpringCookies(response, mutationHeaders)
       }
     }
 
@@ -534,27 +577,18 @@ export async function DELETE(
 
     let closedVacancy = null
     try {
-      const springSession = request.cookies.get('SESSIONID')
-        ? await authorizeSpringMutation(request)
-        : undefined
+      const springSession = await authorizeSpringMutation(request)
       if (springSession instanceof NextResponse) return springSession
-      authorizedSetCookie = springSession?.setCookie
-      closedVacancy = await closeVacancyInSpring(id, springSession?.cookie)
+      authorizedSetCookie = springSession.setCookie
+      const mutation = await closeVacancyInSpring(id, request, springSession.cookie)
+      closedVacancy = mutation.vacancy
+      mutationHeaders = mutation.headers
     } catch (error) {
       const cause = error instanceof SpringVacancyMutationError ? error.cause : error
-      mutationHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
-      if (cause instanceof SpringVacancyNotFoundError) {
-        return NextResponse.json(
-          { error: 'Vacante no encontrada' },
-          { status: 404 }
-        )
-      }
-      if (cause instanceof SpringVacancyWriteError) {
-        return NextResponse.json(
-          { error: cause.message },
-          { status: cause.status }
-        )
-      }
+      const errorHeaders = error instanceof SpringVacancyMutationError ? error.headers : undefined
+      const errorResponse = preservedSpringMutationErrorResponse(cause, authorizedSetCookie, errorHeaders)
+      if (errorResponse) return errorResponse
+      mutationHeaders = errorHeaders
       throw cause
     }
 
@@ -577,7 +611,9 @@ export async function DELETE(
       })
       revalidatePublicVacanciesCache()
 
-      return NextResponse.json(closedVacancy)
+      const response = NextResponse.json(closedVacancy)
+      relaySpringCookies(response, authorizedSetCookie)
+      return relaySpringCookies(response, mutationHeaders)
     }
   } catch (error) {
     await auditAdminAction({

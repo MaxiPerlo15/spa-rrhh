@@ -37,6 +37,24 @@ vi.mock('@/lib/server/publicVacancies', () => ({
 
 describe('/api/vacancies/[id]', () => {
   const vacancyId = 'cmc7q8v1r0000v5r4f9k0m2n3'
+  const rotatedSessionCookie = 'SESSIONID=rotated-session; Path=/; HttpOnly'
+  const mutationCookie = 'XSRF-TOKEN=mutation-token; Path=/; SameSite=Lax'
+
+  function springVacancyResponse(status = 'ACTIVE') {
+    return {
+      id: vacancyId,
+      titulo: 'Updated Engineer',
+      descripcion: 'Desc',
+      requisitos: null,
+      ubicacionNombre: 'Cordoba',
+      ubicacionDescripcion: 'Cordoba',
+      jornada: 'FULL_TIME',
+      modalidad: 'REMOTE',
+      estadoActual: status,
+      fechaCreacion: '2026-03-01T00:00:00.000Z',
+      fechaPublicacion: '2026-03-02T00:00:00.000Z'
+    }
+  }
 
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV }
@@ -179,6 +197,7 @@ describe('/api/vacancies/[id]', () => {
         role: 'ADMIN'
       }
     })
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized' })
     const fetchMock = vi.fn(() => Promise.resolve({
       ok: false,
       status: 404,
@@ -187,7 +206,10 @@ describe('/api/vacancies/[id]', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE' })
+    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method: 'DELETE',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' }
+    })
     const response = await DELETE(request, { params: Promise.resolve({ id: vacancyId }) })
 
     expect(response!.status).toBe(404)
@@ -204,6 +226,7 @@ describe('/api/vacancies/[id]', () => {
         role: 'ADMIN'
       }
     })
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized' })
     const fetchMock = vi.fn(() => Promise.resolve({
       ok: false,
       status: 409,
@@ -212,7 +235,10 @@ describe('/api/vacancies/[id]', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { DELETE } = await import('@/app/api/vacancies/[id]/route')
-    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, { method: 'DELETE' })
+    const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method: 'DELETE',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' }
+    })
     const response = await DELETE(request, { params: Promise.resolve({ id: vacancyId }) })
     const payload = await response!.json()
 
@@ -231,6 +257,7 @@ describe('/api/vacancies/[id]', () => {
         role: 'ADMIN'
       }
     })
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized' })
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 409,
@@ -241,6 +268,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ status: 'ACTIVE' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -260,6 +288,7 @@ describe('/api/vacancies/[id]', () => {
         role: 'ADMIN'
       }
     })
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized' })
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 404,
@@ -270,6 +299,7 @@ describe('/api/vacancies/[id]', () => {
     const { PATCH } = await import('@/app/api/vacancies/[id]/route')
     const request = new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
       method: 'PATCH',
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
       body: JSON.stringify({ status: 'INACTIVE' })
     })
     const response = await PATCH(request, { params: Promise.resolve({ id: vacancyId }) })
@@ -461,6 +491,64 @@ describe('/api/vacancies/[id]', () => {
   })
 
   it.each([
+    { label: 'PUT data update', method: 'PUT', body: { title: 'Updated Engineer' }, path: '', status: 'ACTIVE' },
+    { label: 'PATCH activation', method: 'PATCH', body: { status: 'ACTIVE' }, path: '/activate', status: 'ACTIVE' },
+    { label: 'PATCH deactivation', method: 'PATCH', body: { status: 'INACTIVE' }, path: '/deactivate', status: 'INACTIVE' },
+    { label: 'PATCH closure', method: 'PATCH', body: { status: 'CLOSED' }, path: '/close', status: 'CLOSED' },
+    { label: 'DELETE closure', method: 'DELETE', path: '/close', status: 'CLOSED' }
+  ] as const)('relays the rotated Spring session, safe context, and cookies for $label', async ({ method, body, path, status }) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } })
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: rotatedSessionCookie,
+      user: { userId: 'spring-admin', email: 'admin@example.com' }
+    })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (name: string) => name === 'set-cookie' ? mutationCookie : null,
+        getSetCookie: () => [mutationCookie]
+      },
+      json: () => Promise.resolve(springVacancyResponse(status))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { PATCH, PUT, DELETE } = await import('@/app/api/vacancies/[id]/route')
+    const handler = { PATCH, PUT, DELETE }[method]
+    const response = await handler(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method,
+      headers: {
+        Cookie: 'SESSIONID=original-session',
+        'X-Forwarded-For': '203.0.113.10, 10.0.0.1',
+        'User-Agent': 'Vitest',
+        Authorization: 'Bearer do-not-forward'
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    if (!response) throw new Error('Expected a vacancy route response')
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session')
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://spring.example.com/api/v1/vacancies/${vacancyId}${path}`,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-Backend-Api-Key': 'shared-secret',
+          Cookie: 'SESSIONID=rotated-session',
+          'X-Forwarded-For': '203.0.113.10',
+          'User-Agent': 'Vitest'
+        })
+      })
+    )
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization')
+    expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([
+      rotatedSessionCookie,
+      mutationCookie
+    ])
+  })
+
+  it.each([
     { method: 'PATCH', body: { title: 'Updated Engineer' } },
     { method: 'PUT', body: { title: 'Updated Engineer' } },
     { method: 'DELETE' }
@@ -496,7 +584,57 @@ describe('/api/vacancies/[id]', () => {
     if (!response) throw new Error('Expected a vacancy route response')
     expect(response.status).toBe(500)
     await expect(response.json()).resolves.toEqual({ error: method === 'DELETE' ? 'Error al cerrar vacante' : 'Error al actualizar vacante' })
-    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
-    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=mutation-token')
+    expect((response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([rotatedSessionCookie, mutationCookie])
+  })
+
+  it.each([
+    { method: 'PATCH', state: 'anonymous', status: 401, error: 'No autorizado' }, { method: 'DELETE', state: 'anonymous', status: 401, error: 'No autorizado' },
+    { method: 'PATCH', state: 'forbidden', status: 403, error: 'No autorizado' }, { method: 'DELETE', state: 'forbidden', status: 403, error: 'No autorizado' },
+    { method: 'PATCH', state: 'unavailable', status: 503, error: 'Spring backend unavailable' }, { method: 'DELETE', state: 'unavailable', status: 503, error: 'Spring backend unavailable' }
+  ] as const)('does not mutate when Spring session authorization is $state for $method', async ({ method, state, status, error }) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } })
+    getSpringSessionMock.mockResolvedValue({ state })
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)
+    const { PATCH, DELETE } = await import('@/app/api/vacancies/[id]/route'); const handler = method === 'PATCH' ? PATCH : DELETE
+    const response = await handler(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method,
+      headers: { Cookie: 'SESSIONID=spring-admin-session' },
+      ...(method === 'PATCH' ? { body: JSON.stringify({ status: 'ACTIVE' }) } : {})
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response!.status).toBe(status); await expect(response!.json()).resolves.toEqual({ error }); expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { method: 'PATCH', body: { status: 'ACTIVE' }, status: 404 }, { method: 'DELETE', status: 404 },
+    { method: 'PATCH', body: { status: 'ACTIVE' }, status: 400 }, { method: 'DELETE', status: 400 },
+    { method: 'PATCH', body: { status: 'ACTIVE' }, status: 409 }, { method: 'DELETE', status: 409 }
+  ] as const)('preserves Spring $status errors and relays cookies in order for $method', async ({ method, body, status }) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'; process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    authMock.mockResolvedValue({ user: { id: 'usr_admin', role: 'ADMIN' } }); getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: rotatedSessionCookie })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status,
+      headers: {
+        get: (name: string) => name === 'set-cookie' ? mutationCookie : null,
+        getSetCookie: () => [mutationCookie]
+      },
+      text: () => Promise.resolve(status === 404 ? 'not found' : JSON.stringify({ message: `Spring ${status}` }))
+    }))
+
+    const { PATCH, DELETE } = await import('@/app/api/vacancies/[id]/route'); const handler = method === 'PATCH' ? PATCH : DELETE
+    const response = await handler(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      method,
+      headers: { Cookie: 'SESSIONID=original-session' },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response!.status).toBe(status); await expect(response!.json()).resolves.toEqual({ error: status === 404 ? 'Vacante no encontrada' : `Spring ${status}` })
+    expect((response!.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()).toEqual([
+      rotatedSessionCookie,
+      mutationCookie
+    ])
   })
 })
