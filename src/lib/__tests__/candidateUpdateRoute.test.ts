@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const authMock = vi.fn()
-
-vi.mock('@/lib/auth', () => ({
-  auth: authMock
-}))
-
 vi.mock('@/lib/csrf', () => ({
   rejectIfUntrustedOrigin: vi.fn(() => null)
 }))
@@ -79,8 +73,7 @@ describe('/api/admin/candidates/[id] PATCH', () => {
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
 
-  it('relays Spring 403 and its cookie without performing local authorization', async () => {
-    authMock.mockResolvedValue(null)
+  it('relays Spring 403 and its cookie without local authorization', async () => {
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'forbidden' }), {
       status: 403,
       headers: { 'Set-Cookie': 'SESSIONID=rotated; Path=/; HttpOnly' }
@@ -120,9 +113,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
   })
 
   it('retorna 409 cuando Spring retorna CANDIDATE_IDENTITY_CONFLICT', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
-    })
     fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: 'Conflicto', code: 'CANDIDATE_IDENTITY_CONFLICT' }),
@@ -169,9 +159,6 @@ describe('/api/admin/candidates/[id] PATCH', () => {
   })
 
   it('retorna 503 cuando BACKEND_URL no está configurado', async () => {
-    authMock.mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
-    })
     const { getBackendUrl } = await import('@/lib/server/springBackend')
     vi.mocked(getBackendUrl).mockReturnValueOnce(null)
 
