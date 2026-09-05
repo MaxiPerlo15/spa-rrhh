@@ -174,11 +174,16 @@ class ApplicationRestControllerTest {
   @Test
   void getReturns200WithValidApiKey() throws Exception {
     Postulacion p = createActivePostulacion("app-1");
-    when(applicationListInputBoundary.listApplications(null, null)).thenReturn(List.of(p));
+    when(applicationListInputBoundary.listApplications(null, null, "Test + User", "candidateName", "asc"))
+        .thenReturn(List.of(p));
 
     mockMvc
         .perform(
-            get("/api/v1/applications").header("X-Backend-Api-Key", VALID_TOKEN))
+            get("/api/v1/applications")
+                .header("X-Backend-Api-Key", VALID_TOKEN)
+                .param("search", "Test + User")
+                .param("sortBy", "candidateName")
+                .param("sortDirection", "asc"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value("app-1"))
         .andExpect(jsonPath("$[0].candidateName").value("Test User"))

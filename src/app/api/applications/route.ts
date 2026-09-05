@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ApplicationStatus } from '@/domain/application/ApplicationStatusMachine'
-import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import {
   applicationsListQuerySchema,
@@ -10,6 +9,7 @@ import {
 import { toApplicationAdminDto } from '@/lib/dto/application'
 import { guardPublicRequest, isPublicRequestGuardError } from '@/lib/publicRequestGuard'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { authorizeDashboardRead, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 
 type SpringApplicationListResponse = {
   id: string
@@ -28,19 +28,22 @@ type SpringApplicationListResponse = {
 // GET /api/applications - Listar todas las aplicaciones (admin) — Spring-backed
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
+    const authorization = await authorizeDashboardRead(request)
+    if (authorization.state !== 'authorized') {
+      return relaySpringCookies(
+        NextResponse.json(
+          { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+          { status: authorization.status }
+        ),
+        authorization.responseCookies
       )
     }
 
     const backendUrl = getBackendUrl()
     if (!backendUrl) {
-      return NextResponse.json(
-        { error: 'Spring backend not configured' },
-        { status: 503 }
+      return relaySpringCookies(
+        NextResponse.json({ error: 'Spring backend not configured' }, { status: 503 }),
+        authorization.responseCookies
       )
     }
 
@@ -50,7 +53,10 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status') ?? undefined
     })
     if (!queryValidation.success) {
-      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+      return relaySpringCookies(
+        NextResponse.json(formatValidationError(queryValidation.error), { status: 400 }),
+        authorization.responseCookies
+      )
     }
 
     const params = new URLSearchParams()
@@ -62,36 +68,30 @@ export async function GET(request: NextRequest) {
 
     let springResponse: Response
     try {
-      springResponse = await fetch(url, {
-        method: 'GET',
-        headers: getSpringBackendHeaders()
+        springResponse = await fetch(url, {
+          method: 'GET',
+          headers: { ...getSpringBackendHeaders(), ...(authorization.cookie ? { Cookie: authorization.cookie } : {}) }
       })
     } catch (error) {
       logger.error('Spring backend unreachable for application list', error)
-      return NextResponse.json(
-        { error: 'Spring backend unavailable' },
-        { status: 503 }
-      )
+        return relaySpringCookies(NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 }), authorization.responseCookies)
     }
 
     if (!springResponse.ok) {
       let errorBody: string
       try {
         const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relaySpringCookies(relaySpringCookies(NextResponse.json(errorJson, { status: springResponse.status }), authorization.responseCookies), springResponse.headers)
       } catch {
         errorBody = await springResponse.text()
       }
       logger.error('Spring backend rejected application list', { status: springResponse.status, body: errorBody })
-      return NextResponse.json(
-        { error: errorBody || 'Error al obtener aplicaciones' },
-        { status: springResponse.status }
-      )
+      return relaySpringCookies(relaySpringCookies(NextResponse.json({ error: errorBody || 'Error al obtener aplicaciones' }, { status: springResponse.status }), authorization.responseCookies), springResponse.headers)
     }
 
     const applications: SpringApplicationListResponse[] = await springResponse.json()
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       applications.map((app) =>
         toApplicationAdminDto({
           id: app.id,
@@ -110,6 +110,8 @@ export async function GET(request: NextRequest) {
         })
       )
     )
+    relaySpringCookies(response, authorization.responseCookies)
+    return relaySpringCookies(response, springResponse.headers)
   } catch (error) {
     logger.error('Error al obtener aplicaciones', error)
     return NextResponse.json(

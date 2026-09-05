@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
 const getSpringSessionMock = vi.fn()
+const ORIGINAL_ENV = process.env
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
@@ -18,7 +19,8 @@ vi.mock('@/lib/csrf', () => ({
 
 vi.mock('@/lib/server/springBackend', () => ({
   getBackendUrl: vi.fn(() => 'http://localhost:8080'),
-  getSpringBackendHeaders: vi.fn(() => ({}))
+  getSpringBackendHeaders: vi.fn(() => ({})),
+  isSpringAuthEnabled: () => process.env.SPRING_AUTH_ENABLED === 'true'
 }))
 
 const fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -28,11 +30,17 @@ const getSetCookies = (response: Response) => (
 
 describe('/api/contacts/[id] GET', () => {
   beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV, SPRING_AUTH_ENABLED: 'true' }
     vi.resetModules()
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    process.env = ORIGINAL_ENV
+  })
+
   it('devuelve el contacto desde Spring con campos concretos', async () => {
+    delete process.env.SPRING_AUTH_ENABLED
     authMock.mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
     })
@@ -75,16 +83,68 @@ describe('/api/contacts/[id] GET', () => {
       expect.objectContaining({ method: 'GET' })
     )
   })
+
+  it('uses the Spring session for detail reads and relays rotated and upstream cookies', async () => {
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly'
+    })
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      id: 'cmdbcontactstatus0000000001', name: 'Carlos Lopez', email: 'carlos@example.com',
+      phone: null, subject: 'Recruitment', message: 'Message', status: 'PENDING',
+      createdAt: '2026-03-01T08:00:00.000Z'
+    }), { status: 200, headers: { 'Set-Cookie': 'XSRF-TOKEN=upstream; Path=/' } }))
+
+    const { GET } = await import('@/app/api/contacts/[id]/route')
+    const response = await GET(new NextRequest('http://localhost:3000/api/contacts/cmdbcontactstatus0000000001', {
+      headers: { Cookie: 'SESSIONID=original-session; XSRF-TOKEN=csrf' }
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(200)
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session; XSRF-TOKEN=csrf')
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/contacts/cmdbcontactstatus0000000001',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Cookie: 'SESSIONID=rotated-session; XSRF-TOKEN=csrf' })
+      })
+    )
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=upstream')
+    expect(authMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['anonymous', 401],
+    ['forbidden', 403],
+    ['unavailable', 503]
+  ] as const)('returns Spring %s for contact detail without NextAuth fallback', async (state, status) => {
+    getSpringSessionMock.mockResolvedValue({ state })
+    const { GET } = await import('@/app/api/contacts/[id]/route')
+    const response = await GET(new NextRequest('http://localhost:3000/api/contacts/cmdbcontactstatus0000000001', {
+      headers: { Cookie: 'SESSIONID=original-session' }
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(status)
+    expect(await response.json()).toEqual({ error: state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(authMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('/api/contacts/[id] PATCH', () => {
   beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV, SPRING_AUTH_ENABLED: 'true' }
     vi.resetModules()
     vi.clearAllMocks()
     getSpringSessionMock.mockResolvedValue({
       state: 'authorized',
       setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly'
     })
+  })
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV
   })
 
   it('rechaza una transición inválida cuando Spring retorna 400', async () => {
@@ -155,6 +215,31 @@ describe('/api/contacts/[id] PATCH', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it.each(['PATCH', 'DELETE'] as const)('%s uses the NextAuth fallback only when Spring auth is disabled', async method => {
+    delete process.env.SPRING_AUTH_ENABLED
+    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    getSpringSessionMock.mockRejectedValue(new Error('Spring session must not run in legacy mode'))
+    fetchSpy.mockResolvedValueOnce(new Response(method === 'PATCH' ? JSON.stringify({
+      id: 'cmdbcontactstatus0000000001', name: 'Carlos Lopez', email: 'carlos@example.com',
+      phone: null, subject: 'Recruitment', message: 'Message', status: 'RESPONDED',
+      createdAt: '2026-03-01T08:00:00.000Z'
+    }) : null, { status: 200 }))
+
+    const { PATCH, DELETE } = await import('@/app/api/contacts/[id]/route')
+    const handler = method === 'PATCH' ? PATCH : DELETE
+    const response = await handler(new NextRequest('http://localhost:3000/api/contacts/cmdbcontactstatus0000000001', {
+      method,
+      ...(method === 'PATCH' ? { body: JSON.stringify({ status: 'RESPONDED' }) } : {})
+    }), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(200)
+    expect(authMock).toHaveBeenCalledOnce()
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
+    expect(fetchSpy.mock.calls[0][1]?.headers).toEqual(method === 'PATCH' ? {
+      'Content-Type': 'application/json'
+    } : {})
+  })
+
   it.each(['PATCH', 'DELETE'])('%s retorna 401 y no muta sin SESSIONID', async method => {
     authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
     const { PATCH, DELETE } = await import('@/app/api/contacts/[id]/route')
@@ -177,7 +262,7 @@ describe('/api/contacts/[id] PATCH', () => {
     ['PATCH', 'anonymous', 401], ['PATCH', 'forbidden', 403], ['PATCH', 'unavailable', 503],
     ['DELETE', 'anonymous', 401], ['DELETE', 'forbidden', 403], ['DELETE', 'unavailable', 503]
   ])('%s does not mutate when the Spring session is %s', async (method, state, status) => {
-    authMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
+    authMock.mockRejectedValue(new Error('NextAuth must not gate Spring contact mutations'))
     getSpringSessionMock.mockResolvedValue({ state })
     const { PATCH, DELETE } = await import('@/app/api/contacts/[id]/route')
     const request = new NextRequest('http://localhost:3000/api/contacts/cmdbcontactstatus0000000001', {

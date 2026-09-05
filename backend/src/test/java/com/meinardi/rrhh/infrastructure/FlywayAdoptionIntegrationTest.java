@@ -45,7 +45,7 @@ class FlywayAdoptionIntegrationTest {
 
     new FlywayCatalogAdopter(dataSource).adopt(flyway());
 
-    assertThat(flyway().info().current().getVersion().getVersion()).isEqualTo("6");
+    assertThat(flyway().info().current().getVersion().getVersion()).isEqualTo("7");
     assertThat(applicationObjects()).contains("User:id", "usuario:id", "vacante:id");
   }
 

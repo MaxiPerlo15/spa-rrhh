@@ -1,13 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const authMock = vi.fn()
+const { authMock, getSpringSessionMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  getSpringSessionMock: vi.fn()
+}))
 const rateLimitMock = vi.fn()
 const verifyTurnstileTokenMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
 }))
+vi.mock('@/lib/springSession', () => ({ getSpringSession: getSpringSessionMock }))
 
 vi.mock('@/lib/rateLimit', () => ({
   getClientIp: vi.fn(() => '127.0.0.1'),
@@ -20,7 +24,8 @@ vi.mock('@/lib/botProtection', () => ({
 
 vi.mock('@/lib/server/springBackend', () => ({
   getBackendUrl: vi.fn(() => 'http://localhost:8080'),
-  getSpringBackendHeaders: vi.fn(() => ({}))
+  getSpringBackendHeaders: vi.fn(() => ({})),
+  isSpringAuthEnabled: () => process.env.SPRING_AUTH_ENABLED === 'true'
 }))
 
 const fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -129,7 +134,54 @@ describe('/api/contacts GET', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    delete process.env.SPRING_AUTH_ENABLED
   })
+
+  afterEach(() => {
+    delete process.env.SPRING_AUTH_ENABLED
+  })
+
+  it('forwards S1, relays cookies append-only, and leaves status unforwarded', async () => {
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized', user: {}, setCookie: 'SESSIONID=S1; Path=/; HttpOnly'
+    })
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify([]), {
+      status: 200,
+      headers: [['Set-Cookie', 'XSRF-TOKEN=next; Path=/']]
+    }))
+
+    const { GET } = await import('@/app/api/contacts/route')
+    const response = await GET(new NextRequest('http://localhost/api/contacts?status=PENDING', {
+      headers: { Cookie: 'SESSIONID=S0; XSRF-TOKEN=csrf' }
+    }))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=S1')
+    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=next')
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/contacts',
+      expect.objectContaining({ headers: expect.objectContaining({ Cookie: 'SESSIONID=S1; XSRF-TOKEN=csrf' }) })
+    )
+  })
+
+  it.each([['anonymous', 401], ['forbidden', 403], ['unavailable', 503]] as const)(
+    'returns Spring %s without falling back to NextAuth', async (state, status) => {
+      process.env.SPRING_AUTH_ENABLED = 'true'
+      getSpringSessionMock.mockResolvedValue({ state })
+      const { GET } = await import('@/app/api/contacts/route')
+
+      const response = await GET(new NextRequest('http://localhost/api/contacts'))
+
+      expect(response.status).toBe(status)
+      if (state === 'unavailable') {
+        await expect(response.json()).resolves.toEqual({ error: 'Spring backend unavailable' })
+      }
+      expect(authMock).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    }
+  )
 
   it('devuelve el listado de contactos desde Spring con campos concretos', async () => {
     authMock.mockResolvedValue({
@@ -195,5 +247,7 @@ describe('/api/contacts GET', () => {
       'http://localhost:8080/api/v1/contacts',
       expect.objectContaining({ method: 'GET' })
     )
+    expect(authMock).toHaveBeenCalledOnce()
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
   })
 })

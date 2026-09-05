@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import {
@@ -21,7 +20,7 @@ import {
   rejectUnsupportedSpringVacancyFields,
   SpringVacancyWriteError
 } from '@/lib/server/springVacancyGateway'
-import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
+import { authorizeDashboardRead, getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 
 class SpringVacancyDeniedError extends Error {
   constructor(readonly response: Response) {
@@ -83,7 +82,7 @@ function json(body: unknown, status: number) {
   return NextResponse.json(body, { status })
 }
 
-async function listVacanciesInSpring(all: boolean) {
+async function listVacanciesInSpring(all: boolean, cookie?: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy listing')
@@ -91,16 +90,9 @@ async function listVacanciesInSpring(all: boolean) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies?all=${all}`, {
     method: 'GET',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...(cookie ? { Cookie: cookie } : {}) }
   })
-
-  if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(`Spring backend rejected vacancy list (${response.status}): ${errorBody}`)
-  }
-
-  const vacancies = await response.json() as SpringVacancyResponse[]
-  return vacancies.map(mapSpringToDto)
+  return response
 }
 
 // GET /api/vacancies - Listar vacantes
@@ -122,19 +114,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Solo admins pueden pedir todas las vacantes
-    if (all) {
-      const session = await auth()
-      if (!session || session.user?.role !== 'ADMIN') {
-        return NextResponse.json(
-          { error: 'No autorizado' },
-          { status: 401 }
-        )
-      }
+    const authorization = all ? await authorizeDashboardRead(request) : null
+    if (authorization && authorization.state !== 'authorized') {
+      return relaySpringCookies(
+        NextResponse.json(
+          { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+          { status: authorization.status }
+        ),
+        authorization.responseCookies
+      )
     }
 
-    const springVacancies = await listVacanciesInSpring(all)
-    return NextResponse.json(springVacancies)
+    const springResponse = await listVacanciesInSpring(all, authorization?.cookie)
+    if (!springResponse.ok) {
+      if (!all) throw new Error(`Spring backend rejected public vacancy list (${springResponse.status})`)
+      return relaySpringCookies(
+        relaySpringCookies(new NextResponse(await springResponse.text(), { status: springResponse.status }), authorization?.responseCookies),
+        springResponse.headers
+      )
+    }
+    const response = NextResponse.json((await springResponse.json() as SpringVacancyResponse[]).map(mapSpringToDto))
+    relaySpringCookies(response, authorization?.responseCookies)
+    return relaySpringCookies(response, springResponse.headers)
   } catch (error) {
     logger.error('Error al obtener vacantes', error)
     return NextResponse.json(

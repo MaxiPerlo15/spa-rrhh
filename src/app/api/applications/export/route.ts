@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { resolveApplicationCandidate } from '@/lib/candidateRecord'
 import { ExportApplicationsUseCase } from '@/application/exports/ExportApplicationsUseCase'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import {
+  authorizeDashboardRead,
+  relaySpringCookies,
+  type SpringCookieSource
+} from '@/lib/server/adminBffBoundary'
 
 const exportApplicationsQuerySchema = z.object({
   status: z.enum(['PENDING', 'REVIEWING', 'INTERVIEWED', 'ACCEPTED', 'REJECTED']).optional(),
@@ -21,12 +23,9 @@ const exportApplicationsQuerySchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+  let responseCookies: SpringCookieSource
 
+  try {
     const searchParams = request.nextUrl.searchParams
     const queryValidation = exportApplicationsQuerySchema.safeParse({
       status: searchParams.get('status') ?? undefined,
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!queryValidation.success) {
-      return NextResponse.json(
+      return json(
         {
           error: 'Parámetros inválidos',
           details: queryValidation.error.issues.map((issue) => ({
@@ -45,70 +44,106 @@ export async function GET(request: NextRequest) {
             message: issue.message
           }))
         },
-        { status: 400 }
+        400
       )
     }
 
-    const { status, vacancyId, search, sortBy, sortDirection } = queryValidation.data
-    const where = {
-      ...(status ? { status } : {}),
-      ...(vacancyId ? { vacancyId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { candidate: { is: { name: { contains: search, mode: 'insensitive' as const } } } },
-              { candidate: { is: { lastName: { contains: search, mode: 'insensitive' as const } } } },
-              { candidate: { is: { email: { contains: search, mode: 'insensitive' as const } } } }
-            ]
-          }
-        : {})
+    const authorization = await authorizeDashboardRead(request)
+    responseCookies = authorization.responseCookies
+    if (authorization.state !== 'authorized') {
+      return json(
+        { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+        authorization.status,
+        responseCookies
+      )
     }
 
-    const orderBy: Prisma.ApplicationOrderByWithRelationInput[] =
-      sortBy === 'submittedAt'
-        ? [{ submittedAt: sortDirection }]
-        : sortBy === 'candidateName'
-          ? [{ candidate: { name: sortDirection } }, { submittedAt: 'desc' }]
-          : [{ status: sortDirection }, { submittedAt: 'desc' }]
+    const backendUrl = getBackendUrl()
+    if (!backendUrl) {
+      return json({ error: 'Spring backend not configured' }, 503, responseCookies)
+    }
 
-    const applications = await prisma.application.findMany({
-      where,
-      select: {
-        candidateId: true,
-        submittedAt: true,
-        candidate: {
-          select: {
-            id: true,
-            name: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            resumeUrl: true,
-            resumeFileName: true,
-            resumeKey: true
-          }
+    const { status, vacancyId, search, sortBy, sortDirection } = queryValidation.data
+    const params = new URLSearchParams()
+    if (status) params.set('status', status)
+    if (vacancyId) params.set('vacancyId', vacancyId)
+    if (search) params.set('search', search)
+    if (sortBy) params.set('sortBy', sortBy)
+    if (sortDirection) params.set('sortDirection', sortDirection)
+
+    let springResponse: Response
+    try {
+      springResponse = await fetch(`${backendUrl}/api/v1/applications?${params.toString()}`, {
+        cache: 'no-store',
+        headers: {
+          ...getSpringBackendHeaders(),
+          Cookie: authorization.cookie
         }
-      },
-      orderBy
-    })
+      })
+    } catch (error) {
+      logger.error('Spring backend unreachable for application export', error)
+      return json({ error: 'Spring backend unavailable' }, 503, responseCookies)
+    }
+
+    if (!springResponse.ok) {
+      const errorResponse = await springErrorResponse(springResponse)
+      return relaySpringCookies(
+        relaySpringCookies(errorResponse, responseCookies),
+        springResponse.headers
+      )
+    }
+
+    const applications = await springResponse.json() as SpringApplicationListResponse[]
 
     const exportFile = new ExportApplicationsUseCase().execute(
       applications.map((application) => ({
-        ...resolveApplicationCandidate(application),
-        vacancyTitle: 'Espontánea',
-        submittedAt: application.submittedAt
+        candidateName: application.candidateName,
+        email: application.email,
+        phone: application.phone,
+        vacancyTitle: application.vacancy?.title ?? 'Espontánea',
+        submittedAt: new Date(application.submittedAt)
       }))
     )
 
-    return new NextResponse(exportFile.content, {
-      status: 200,
-      headers: {
-        'Content-Type': exportFile.mimeType,
-        'Content-Disposition': `attachment; filename="${exportFile.fileName}"`
-      }
-    })
+    return relaySpringCookies(
+      relaySpringCookies(new NextResponse(exportFile.content, {
+        status: 200,
+        headers: {
+          'Content-Type': exportFile.mimeType,
+          'Content-Disposition': `attachment; filename="${exportFile.fileName}"`
+        }
+      }), responseCookies),
+      springResponse.headers
+    )
   } catch (error) {
     logger.error('Error al exportar postulaciones', error)
-    return NextResponse.json({ error: 'Error al exportar postulaciones' }, { status: 500 })
+    return relaySpringCookies(
+      NextResponse.json({ error: 'Error al exportar postulaciones' }, { status: 500 }),
+      responseCookies
+    )
   }
+}
+
+type SpringApplicationListResponse = {
+  candidateName: string
+  email: string
+  phone: string
+  submittedAt: string
+  vacancy: { title: string } | null
+}
+
+async function springErrorResponse(response: Response) {
+  const errorBody = await response.text()
+  try {
+    return NextResponse.json(JSON.parse(errorBody), { status: response.status })
+  } catch {
+    return NextResponse.json(
+      { error: errorBody || 'Error al exportar postulaciones' },
+      { status: response.status }
+    )
+  }
+}
+
+function json(body: unknown, status: 400 | 401 | 403 | 503, cookies?: SpringCookieSource) {
+  return relaySpringCookies(NextResponse.json(body, { status }), cookies)
 }

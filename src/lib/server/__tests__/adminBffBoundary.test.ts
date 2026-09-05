@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const { authMock, getSpringSessionMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  getSpringSessionMock: vi.fn()
+}))
+
+vi.mock('@/lib/auth', () => ({ auth: authMock }))
+vi.mock('@/lib/springSession', () => ({ getSpringSession: getSpringSessionMock }))
 
 import {
   getAllowedBffRequestHeaders,
   relaySpringCookies,
+  authorizeDashboardRead,
   type SpringCookieSource
 } from '../adminBffBoundary'
 
@@ -51,5 +60,51 @@ describe('adminBffBoundary', () => {
     const cookies = response.headers.get('set-cookie') ?? ''
     expect(cookies).toContain('existing=true')
     for (const expectedCookie of expectedCookies) expect(cookies).toContain(expectedCookie)
+  })
+
+  afterEach(() => {
+    delete process.env.SPRING_AUTH_ENABLED
+    vi.clearAllMocks()
+  })
+
+  it.each([
+    ['anonymous', 401],
+    ['forbidden', 403],
+    ['unavailable', 503]
+  ] as const)('does not fall back to NextAuth after Spring returns %s', async (state, status) => {
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({ state })
+
+    await expect(authorizeDashboardRead(new Request('http://localhost', {
+      headers: { Cookie: 'SESSIONID=S0; XSRF-TOKEN=csrf' }
+    }))).resolves.toMatchObject({ state, status })
+    expect(authMock).not.toHaveBeenCalled()
+  })
+
+  it('uses the rotated Spring session for the upstream request and relays it to the browser', async () => {
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      user: {},
+      setCookie: 'SESSIONID=S1; Path=/; HttpOnly'
+    })
+
+    await expect(authorizeDashboardRead(new Request('http://localhost', {
+      headers: { Cookie: 'SESSIONID=S0; XSRF-TOKEN=csrf' }
+    }))).resolves.toMatchObject({
+      state: 'authorized',
+      cookie: 'SESSIONID=S1; XSRF-TOKEN=csrf',
+      responseCookies: 'SESSIONID=S1; Path=/; HttpOnly'
+    })
+  })
+
+  it('uses legacy NextAuth only when Spring authorization is disabled', async () => {
+    authMock.mockResolvedValue({ user: { role: 'ADMIN' } })
+
+    await expect(authorizeDashboardRead(new Request('http://localhost'))).resolves.toMatchObject({
+      state: 'authorized',
+      cookie: ''
+    })
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
   })
 })

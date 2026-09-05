@@ -238,4 +238,60 @@ describe('/api/vacancies', () => {
     expect(response.status).toBe(500)
     expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated')
   })
+
+  it('uses and relays the rotated Spring session only for protected all=true reads', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', user: {}, setCookie: 'SESSIONID=S1; Path=/; HttpOnly' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { getSetCookie: () => ['XSRF-TOKEN=next; Path=/'] },
+      json: () => Promise.resolve([])
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { GET } = await import('@/app/api/vacancies/route')
+    const protectedResponse = await GET(new NextRequest('http://localhost/api/vacancies?all=true', {
+      headers: { Cookie: 'SESSIONID=S0; XSRF-TOKEN=csrf' }
+    }))
+    const publicResponse = await GET(new NextRequest('http://localhost/api/vacancies'))
+
+    expect(protectedResponse.status).toBe(200)
+    expect(protectedResponse.headers.get('set-cookie')).toContain('SESSIONID=S1')
+    expect(protectedResponse.headers.get('set-cookie')).toContain('XSRF-TOKEN=next')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://spring.example.com/api/v1/vacancies?all=true', expect.objectContaining({ headers: expect.objectContaining({ Cookie: 'SESSIONID=S1; XSRF-TOKEN=csrf' }) }))
+    expect(publicResponse.status).toBe(200)
+    expect(getSpringSessionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves the public vacancy failure envelope when Spring rejects a public read', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      text: () => Promise.resolve('Bad Gateway')
+    }))
+
+    const { GET } = await import('@/app/api/vacancies/route')
+    const response = await GET(new NextRequest('http://localhost/api/vacancies'))
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({ error: 'Error al obtener vacantes' })
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
+  })
+
+  it.each([['anonymous', 401], ['forbidden', 403], ['unavailable', 503]] as const)(
+    'preserves Spring %s without a legacy fallback for protected reads', async (state, status) => {
+      process.env.BACKEND_URL = 'https://spring.example.com/'
+      process.env.SPRING_AUTH_ENABLED = 'true'
+      getSpringSessionMock.mockResolvedValue({ state })
+      const { GET } = await import('@/app/api/vacancies/route')
+      const response = await GET(new NextRequest('http://localhost/api/vacancies?all=true'))
+      expect(response.status).toBe(status)
+      if (state === 'unavailable') {
+        await expect(response.json()).resolves.toEqual({ error: 'Spring backend unavailable' })
+      }
+      expect(authMock).not.toHaveBeenCalled()
+    }
+  )
 })

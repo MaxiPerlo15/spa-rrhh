@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import {
   contactsListQuerySchema,
@@ -9,23 +8,27 @@ import {
 import { toContactAdminDto } from '@/lib/dto/contact'
 import { guardPublicRequest, isPublicRequestGuardError } from '@/lib/publicRequestGuard'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { authorizeDashboardRead, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 
 // GET /api/contacts - Listar contactos (admin)
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
+    const authorization = await authorizeDashboardRead(request)
+    if (authorization.state !== 'authorized') {
+      return relaySpringCookies(
+        NextResponse.json(
+          { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+          { status: authorization.status }
+        ),
+        authorization.responseCookies
       )
     }
 
     const backendUrl = getBackendUrl()
     if (!backendUrl) {
-      return NextResponse.json(
-        { error: 'Spring backend not configured' },
-        { status: 503 }
+      return relaySpringCookies(
+        NextResponse.json({ error: 'Spring backend not configured' }, { status: 503 }),
+        authorization.responseCookies
       )
     }
 
@@ -34,39 +37,48 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status') ?? undefined
     })
     if (!queryValidation.success) {
-      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
+      return relaySpringCookies(
+        NextResponse.json(formatValidationError(queryValidation.error), { status: 400 }),
+        authorization.responseCookies
+      )
     }
 
     let springResponse: Response
     try {
-      springResponse = await fetch(`${backendUrl}/api/v1/contacts`, {
-        method: 'GET',
-        headers: getSpringBackendHeaders()
+        springResponse = await fetch(`${backendUrl}/api/v1/contacts`, {
+          method: 'GET',
+          headers: {
+            ...getSpringBackendHeaders(),
+            ...(authorization.cookie ? { Cookie: authorization.cookie } : {})
+          }
       })
     } catch (error) {
       logger.error('Spring backend unreachable for contact list', error)
-      return NextResponse.json(
-        { error: 'Spring backend unavailable' },
-        { status: 503 }
+      return relaySpringCookies(
+        NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 }),
+        authorization.responseCookies
       )
     }
 
     if (!springResponse.ok) {
       try {
         const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relaySpringCookies(
+          relaySpringCookies(NextResponse.json(errorJson, { status: springResponse.status }), authorization.responseCookies),
+          springResponse.headers
+        )
       } catch {
         const errorBody = await springResponse.text()
-        return NextResponse.json(
-          { error: errorBody || 'Error al obtener contactos' },
-          { status: springResponse.status }
+        return relaySpringCookies(
+          relaySpringCookies(NextResponse.json({ error: errorBody || 'Error al obtener contactos' }, { status: springResponse.status }), authorization.responseCookies),
+          springResponse.headers
         )
       }
     }
 
     const contacts = await springResponse.json()
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       contacts.map((c: Record<string, unknown>) =>
         toContactAdminDto({
           id: c.id as string,
@@ -80,6 +92,8 @@ export async function GET(request: NextRequest) {
         })
       )
     )
+    relaySpringCookies(response, authorization.responseCookies)
+    return relaySpringCookies(response, springResponse.headers)
   } catch (error) {
     logger.error('Error al obtener contactos', error)
     return NextResponse.json(

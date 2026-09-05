@@ -5,8 +5,8 @@ import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
 import { normalizeLocation } from '@/lib/utils'
 import { revalidatePublicVacanciesCache } from '@/lib/server/publicVacancies'
-import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
-import { getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
+import { getBackendUrl, getSpringBackendHeaders, isSpringAuthEnabled } from '@/lib/server/springBackend'
+import { authorizeDashboardRead, getAllowedBffRequestHeaders, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 import {
   type SpringVacancyResponse,
   mapSpringToDto,
@@ -43,6 +43,12 @@ class SpringVacancyMutationFailureError extends Error {
 class SpringVacancyDeniedError extends Error {
   constructor(readonly response: Response) {
     super('Spring backend denied vacancy mutation')
+  }
+}
+
+class SpringVacancyReadError extends Error {
+  constructor(readonly response: Response) {
+    super('Spring vacancy lookup failed')
   }
 }
 
@@ -131,7 +137,7 @@ async function closeVacancyInSpring(id: string, request: NextRequest) {
   }
 }
 
-async function getVacancyFromSpring(id: string) {
+async function getVacancyFromSpring(id: string, cookie?: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -139,19 +145,31 @@ async function getVacancyFromSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}`, {
     method: 'GET',
-    headers: getSpringBackendHeaders()
+    headers: {
+      ...getSpringBackendHeaders(),
+      ...(cookie ? { Cookie: cookie } : {})
+    }
   })
 
   if (response.status === 404) {
-    return null
+    return { vacancy: null, headers: response.headers }
   }
 
   if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(`Spring backend rejected vacancy lookup (${response.status}): ${errorBody}`)
+    throw new SpringVacancyReadError(response)
   }
 
-  return mapSpringToDto(await response.json() as SpringVacancyResponse)
+  return { vacancy: mapSpringToDto(await response.json() as SpringVacancyResponse), headers: response.headers }
+}
+
+async function relaySpringVacancyReadError(response: Response) {
+  return relaySpringCookies(
+    new NextResponse(await response.text(), {
+      status: response.status,
+      headers: { 'Content-Type': response.headers.get('content-type') ?? 'application/json' }
+    }),
+    response.headers
+  )
 }
 
 async function activateVacancyInSpring(id: string, request: NextRequest) {
@@ -289,18 +307,52 @@ export async function GET(
       )
     }
 
-    const session = await auth()
-    const isAdmin = session?.user?.role === 'ADMIN'
-
-    const springVacancy = await getVacancyFromSpring(id)
-    if (!springVacancy || (!isAdmin && springVacancy.status !== 'active')) {
-      return NextResponse.json(
-        { error: 'Vacante no encontrada' },
-        { status: 404 }
-      )
+    let isAdmin = false
+    let sessionCookie: string | undefined
+    let authorizationCookies: string | undefined
+    if (isSpringAuthEnabled()) {
+      if (request.cookies.get('SESSIONID')) {
+        const authorization = await authorizeDashboardRead(request)
+        const responseCookie = typeof authorization.responseCookies === 'string'
+          ? authorization.responseCookies
+          : undefined
+        if (authorization.state !== 'authorized') {
+          return relaySpringCookies(
+            NextResponse.json(
+              { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+              { status: authorization.status }
+            ),
+            responseCookie
+          )
+        }
+        isAdmin = true
+        sessionCookie = authorization.cookie
+        authorizationCookies = responseCookie
+      }
+    } else {
+      const session = await auth()
+      isAdmin = session?.user?.role === 'ADMIN'
     }
 
-    return NextResponse.json(springVacancy)
+    let springVacancy
+    try {
+      springVacancy = await getVacancyFromSpring(id, sessionCookie)
+    } catch (error) {
+      if (error instanceof SpringVacancyReadError && (error.response.status === 401 || error.response.status === 403)) {
+        return relaySpringVacancyReadError(error.response)
+      }
+      throw error
+    }
+    if (!springVacancy.vacancy || (!isAdmin && springVacancy.vacancy.status !== 'active')) {
+      return relaySpringCookies(NextResponse.json(
+        { error: 'Vacante no encontrada' },
+        { status: 404 }
+      ), authorizationCookies)
+    }
+
+    const response = NextResponse.json(springVacancy.vacancy)
+    relaySpringCookies(response, authorizationCookies)
+    return relaySpringCookies(response, springVacancy.headers)
   } catch (error) {
     logger.error('Error al obtener vacante', error)
     return NextResponse.json(

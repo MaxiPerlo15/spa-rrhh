@@ -4,12 +4,24 @@ const springAuthEnabled = process.env.SPRING_AUTH_ENABLED === 'true'
 const adminEmail = process.env.ADMIN_EMAIL
 const adminPassword = process.env.ADMIN_PASSWORD
 
-async function signIn(page: import('@playwright/test').Page) {
+async function signIn(
+  page: import('@playwright/test').Page,
+  context: import('@playwright/test').BrowserContext
+) {
   await page.addInitScript(() => localStorage.setItem('admin_onboarding_completed_v1', 'true'))
-  await page.goto('/admin/signin')
-  await page.fill('input[name="email"]', adminEmail!)
-  await page.fill('input[name="password"]', adminPassword!)
-  await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
+
+  const relayResponse = await context.request.post('/api/auth/spring/login', {
+    data: { email: adminEmail, password: adminPassword }
+  })
+  expect(relayResponse.status()).toBe(200)
+  expect(relayResponse.headers()['set-cookie']).toContain('SESSIONID=')
+
+  const sessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+  expect(sessionCookie, 'the login relay must persist SESSIONID before navigating to /admin').toBeDefined()
+  expect(sessionCookie?.path).toBe('/')
+  expect(sessionCookie?.httpOnly).toBe(true)
+
+  await page.goto('/admin')
   await expect(page).toHaveURL('/admin', { timeout: 15_000 })
 }
 
@@ -17,8 +29,8 @@ test.describe('Spring-backed admin notifications', () => {
   test.skip(!springAuthEnabled, 'SPRING_AUTH_ENABLED must be true for Spring notification tests')
   test.skip(!adminEmail || !adminPassword, 'ADMIN_EMAIL and ADMIN_PASSWORD required')
 
-  test('marks one notification read and deletes another through the Next item proxy', async ({ page }) => {
-    await signIn(page)
+  test('marks one notification read and deletes another through the Next item proxy', async ({ page, context }) => {
+    await signIn(page, context)
     await page.getByRole('button', { name: /Notificaciones del panel/i }).click()
 
     const dialog = page.getByRole('dialog', { name: /Notificaciones/i })

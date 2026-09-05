@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
@@ -16,6 +16,17 @@ const databasePassword = randomBytes(24).toString('hex')
 const adminEmail = `spring-e2e-${runId}@example.test`
 const adminPassword = randomBytes(24).toString('base64url')
 const internalApiToken = randomBytes(32).toString('hex')
+const legacyUserId = `spring-e2e-legacy-${runId}`
+const targetUserId = `spring-e2e-user-${runId}`
+const settingsId = `spring-e2e-settings-${runId}`
+const reconciliationRunId = `spring-e2e-run-${runId}`
+const reconciliationItemId = `spring-e2e-item-${runId}`
+const reconciliationApprovalId = `spring-e2e-approval-${runId}`
+const roleId = `spring-e2e-role-${runId}`
+const permissionId = `spring-e2e-permission-${runId}`
+const snapshotTimestamp = '2026-09-05T00:00:00.000Z'
+const databaseTimestamp = '2026-09-05 00:00:00.000+00'
+const reportChecksum = createHash('sha256').update('spring-settings-reconciliation-report-v1').digest('hex')
 const springAuthE2eSpec = process.env.SPRING_AUTH_E2E_SPEC
 
 let springProcess: ReturnType<typeof spawn> | undefined
@@ -62,10 +73,20 @@ async function seedAdmin(port: number) {
   })
   await client.connect()
   try {
-    const roleId = `spring-e2e-role-${runId}`
-    const permissionId = `spring-e2e-permission-${runId}`
-    const userId = `spring-e2e-user-${runId}`
     const passwordHash = await bcrypt.hash(adminPassword, 12)
+    const settingsSnapshot = canonicalSnapshot({
+      createdAt: snapshotTimestamp, id: settingsId, notificationsEnabled: true,
+      notifyNewApplications: true, notifyNewContacts: false, notifySecurityAlerts: true,
+      updatedAt: snapshotTimestamp, userId: legacyUserId
+    })
+    const userSnapshot = canonicalSnapshot({
+      createdAt: snapshotTimestamp, email: adminEmail, id: legacyUserId, name: 'Spring E2E Admin',
+      passwordHash, role: 'ADMIN', updatedAt: snapshotTimestamp
+    })
+    const usuarioSnapshot = canonicalSnapshot({
+      email: adminEmail, enabled: true, id: targetUserId, nombreUsuario: 'Spring E2E Admin',
+      password: passwordHash, passwordResetToken: null, passwordResetTokenExpiry: null, rolId: roleId
+    })
 
     await client.query('BEGIN')
     await client.query(
@@ -82,7 +103,33 @@ async function seedAdmin(port: number) {
     )
     await client.query(
       'INSERT INTO usuario (id, email, enabled, nombre_usuario, password, rol_id) VALUES ($1, $2, TRUE, $3, $4, $5)',
-      [userId, adminEmail, 'Spring E2E Admin', passwordHash, roleId],
+      [targetUserId, adminEmail, 'Spring E2E Admin', passwordHash, roleId],
+    )
+    await client.query(
+      'INSERT INTO "User" ("id", "email", "name", "passwordHash", "role", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, CAST($5 AS "Role"), $6, $6)',
+      [legacyUserId, adminEmail, 'Spring E2E Admin', passwordHash, 'ADMIN', databaseTimestamp],
+    )
+    await client.query(
+      'INSERT INTO "AdminSettings" ("id", "userId", "notificationsEnabled", "notifyNewApplications", "notifyNewContacts", "notifySecurityAlerts", "createdAt", "updatedAt") VALUES ($1, $2, TRUE, TRUE, FALSE, TRUE, $3, $3)',
+      [settingsId, legacyUserId, databaseTimestamp],
+    )
+    await client.query(
+      'INSERT INTO reconciliation_runs (id, catalog_fingerprint, report_checksum, created_at) VALUES ($1, $2, $3, $4)',
+      [reconciliationRunId, 'e'.repeat(64), reportChecksum, databaseTimestamp],
+    )
+    await client.query(
+      'INSERT INTO reconciliation_items (id, run_id, admin_settings_id, admin_settings_snapshot, admin_settings_hash, prisma_user_id, prisma_user_snapshot, prisma_user_hash, usuario_id, usuario_snapshot, usuario_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+      [
+        reconciliationItemId, reconciliationRunId, settingsId, settingsSnapshot.json, settingsSnapshot.hash,
+        legacyUserId, userSnapshot.json, userSnapshot.hash, targetUserId, usuarioSnapshot.json, usuarioSnapshot.hash,
+      ],
+    )
+    await client.query(
+      'INSERT INTO reconciliation_approvals (id, item_id, source_id, target_id, verifier_id, report_checksum, status, normalized_email, prisma_user_id, admin_settings_hash, prisma_user_hash, usuario_hash) VALUES ($1, $2, $3, $4, $5, $6, \'MATCHED\', $7, $8, $9, $10, $11)',
+      [
+        reconciliationApprovalId, reconciliationItemId, settingsId, targetUserId, 'spring-e2e-verifier', reportChecksum,
+        adminEmail.toLowerCase(), legacyUserId, settingsSnapshot.hash, userSnapshot.hash, usuarioSnapshot.hash,
+      ],
     )
     await client.query(
       'INSERT INTO "AdminNotification" ("id", "title", "message", "level", "isRead", "createdAt", "updatedAt") VALUES ($1, $2, $3, CAST($4 AS "NotificationLevel"), FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ($5, $6, $7, CAST($4 AS "NotificationLevel"), FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
@@ -98,6 +145,68 @@ async function seedAdmin(port: number) {
   } finally {
     await client.end()
   }
+}
+
+function sha256(value: string) {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function canonicalSnapshot(value: Record<string, unknown>) {
+  const json = JSON.stringify(Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
+  ))
+  return { json, hash: sha256(json) }
+}
+
+async function flywayContractReady(port: number, version: string, verifySettings = false) {
+  const client = new Client({ host: '127.0.0.1', port, database: databaseName, user: 'postgres', password: databasePassword })
+  await client.connect()
+  try {
+    const result = await client.query(
+      verifySettings
+        ? `SELECT s."usuarioId" = $3
+            AND a.status = 'MATCHED'
+            AND a.source_id = s."id"
+            AND a.target_id = $3
+            AND a.prisma_user_id = $6
+            AND a.normalized_email = $4
+            AND a.report_checksum = $5
+            AND r.report_checksum = $5
+            AND i.admin_settings_hash = encode(digest(i.admin_settings_snapshot, 'sha256'), 'hex')
+            AND i.prisma_user_hash = encode(digest(i.prisma_user_snapshot, 'sha256'), 'hex')
+            AND i.usuario_hash = encode(digest(i.usuario_snapshot, 'sha256'), 'hex')
+            AND a.admin_settings_hash = i.admin_settings_hash
+            AND a.prisma_user_hash = i.prisma_user_hash
+            AND a.usuario_hash = i.usuario_hash AS contract_ready
+           FROM flyway_schema_history h
+           JOIN "AdminSettings" s ON s."id" = $2
+           JOIN reconciliation_approvals a ON a.source_id = s."id"
+           JOIN reconciliation_items i ON i.id = a.item_id AND i.admin_settings_id = s."id"
+           JOIN reconciliation_runs r ON r.id = i.run_id
+           WHERE h.version = $1 AND h.success = TRUE`
+        : 'SELECT version FROM flyway_schema_history WHERE version = $1 AND success = TRUE',
+      verifySettings ? [version, settingsId, targetUserId, adminEmail.toLowerCase(), reportChecksum, legacyUserId] : [version],
+    )
+    return verifySettings ? result.rows[0]?.contract_ready === true : result.rowCount === 1
+  } finally {
+    await client.end()
+  }
+}
+
+async function startSpring(port: number, environment: NodeJS.ProcessEnv) {
+  springProcess = spawn('mvn', ['-q', 'spring-boot:run'], {
+    cwd: `${root}/backend`,
+    env: { ...environment, SERVER_PORT: String(port) },
+    stdio: 'inherit',
+  })
+}
+
+async function stopSpring() {
+  const child = springProcess
+  springProcess = undefined
+  if (!child || child.exitCode !== null || child.killed) return
+  child.kill('SIGTERM')
+  await once(child, 'exit').catch(() => undefined)
 }
 
 async function directLoginPreflight(springUrl: string) {
@@ -157,17 +266,20 @@ async function main() {
     SERVER_SERVLET_SESSION_COOKIE_SECURE: 'false',
     RRHH_SECURITY_INTERNAL_API_TOKEN: internalApiToken,
   }
-  springProcess = spawn('mvn', ['-q', 'spring-boot:run'], {
-    cwd: `${root}/backend`,
-    env: springEnvironment,
-    stdio: 'inherit',
-  })
-
-  await waitFor('Spring Boot', async () => {
+  await startSpring(springPort, { ...springEnvironment, SPRING_FLYWAY_TARGET: '4' })
+  await waitFor('Flyway V4 staging', () => flywayContractReady(databasePort, '4'))
+  await waitFor('Spring Boot staging', async () => {
     const response = await fetch(`${springUrl}/api/v1/health`)
     return response.ok
   })
   await seedAdmin(databasePort)
+  await stopSpring()
+  await startSpring(springPort, springEnvironment)
+  await waitFor('Spring Boot', async () => {
+    const response = await fetch(`${springUrl}/api/v1/health`)
+    return response.ok
+  })
+  await waitFor('Flyway V6 settings contract', () => flywayContractReady(databasePort, '6', true))
   await directLoginPreflight(springUrl)
 
   const nextPort = await availablePort()

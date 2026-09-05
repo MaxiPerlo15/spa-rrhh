@@ -61,8 +61,23 @@ public class ApplicationRestController {
   @GetMapping
   public List<ApplicationListResponse> list(
       @RequestParam(required = false) String vacancyId,
-      @RequestParam(required = false) String status) {
-    List<Postulacion> postulaciones = listBoundary.listApplications(vacancyId, status);
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) String sortBy,
+      @RequestParam(required = false) String sortDirection) {
+    List<Postulacion> postulaciones;
+    if (sortBy == null && sortDirection == null) {
+      postulaciones = search == null
+          ? listBoundary.listApplications(vacancyId, status)
+          : listBoundary.listApplications(vacancyId, status, search);
+    } else {
+      postulaciones = listBoundary.listApplications(
+          vacancyId,
+          status,
+          search,
+          sortBy != null ? sortBy : "submittedAt",
+          sortDirection != null ? sortDirection : "desc");
+    }
 
     return postulaciones.stream().map(this::toListResponse).toList();
   }

@@ -8,9 +8,8 @@ import {
   updateContactStatusSchema
 } from '@/lib/apiValidation'
 import { toContactAdminDto } from '@/lib/dto/contact'
-import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
-import { relaySpringCookies } from '@/lib/server/adminBffBoundary'
-import { getSpringSession } from '@/lib/springSession'
+import { getBackendUrl, getSpringBackendHeaders, isSpringAuthEnabled } from '@/lib/server/springBackend'
+import { authorizeDashboardRead, relaySpringCookies } from '@/lib/server/adminBffBoundary'
 interface RouteParams {
   params: Promise<{
     id: string
@@ -29,26 +28,38 @@ function relayMutationCookies(
   return response
 }
 
-async function authorizeSpringContactMutation(
+async function authorizeContactRequest(
   request: NextRequest
 ): Promise<AuthorizedSpringContactMutation | NextResponse> {
-  const sessionId = request.cookies.get('SESSIONID')?.value
-  if (!sessionId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (!isSpringAuthEnabled()) {
+    const session = await auth()
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+    return { cookie: '' }
+  }
 
-  const session = await getSpringSession(`SESSIONID=${sessionId}`)
-  if (session.state === 'anonymous') {
-    return relayMutationCookies(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), session.setCookie)
+  if (!request.cookies.get('SESSIONID')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
-  if (session.state === 'forbidden') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-  if (session.state === 'unavailable') {
-    return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
+
+  const authorization = await authorizeDashboardRead(request)
+  const responseCookie = typeof authorization.responseCookies === 'string'
+    ? authorization.responseCookies
+    : undefined
+  if (authorization.state !== 'authorized') {
+    return relayMutationCookies(
+      NextResponse.json(
+        { error: authorization.state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' },
+        { status: authorization.status }
+      ),
+      responseCookie
+    )
   }
 
   return {
-    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`,
-    setCookie: session.setCookie
+    cookie: authorization.cookie,
+    setCookie: responseCookie
   }
 }
 
@@ -63,51 +74,49 @@ export async function GET(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const authorization = await authorizeContactRequest(request)
+    if (authorization instanceof NextResponse) return authorization
 
     const backendUrl = getBackendUrl()
     if (!backendUrl) {
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorization.setCookie)
     }
 
     let springResponse: Response
     try {
       springResponse = await fetch(`${backendUrl}/api/v1/contacts/${id}`, {
         method: 'GET',
-        headers: getSpringBackendHeaders()
+        headers: {
+          ...getSpringBackendHeaders(),
+          ...(authorization.cookie ? { Cookie: authorization.cookie } : {})
+        }
       })
     } catch (error) {
       logger.error('Spring backend unreachable for contact detail', error)
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend unavailable' },
         { status: 503 }
-      )
+      ), authorization.setCookie)
     }
 
     if (!springResponse.ok) {
       try {
         const errorJson = await springResponse.json()
-        return NextResponse.json(errorJson, { status: springResponse.status })
+        return relayMutationCookies(NextResponse.json(errorJson, { status: springResponse.status }), authorization.setCookie, springResponse.headers)
       } catch {
         const errorBody = await springResponse.text()
-        return NextResponse.json(
+        return relayMutationCookies(NextResponse.json(
           { error: errorBody || 'Error al obtener contacto' },
           { status: springResponse.status }
-        )
+        ), authorization.setCookie, springResponse.headers)
       }
     }
 
     const contact = await springResponse.json()
-    return NextResponse.json(
+    return relayMutationCookies(NextResponse.json(
       toContactAdminDto({
         id: contact.id,
         name: contact.name,
@@ -118,7 +127,7 @@ export async function GET(
         status: contact.status,
         createdAt: contact.createdAt
       })
-    )
+    ), authorization.setCookie, springResponse.headers)
   } catch (error) {
     logger.error('Error al obtener contacto', error)
     return NextResponse.json(
@@ -142,37 +151,29 @@ export async function PATCH(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const authorization = await authorizeContactRequest(request)
+    if (authorization instanceof NextResponse) return authorization
+    authorizedSetCookie = authorization.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
+      return relayMutationCookies(originRejection, authorizedSetCookie)
     }
 
     const body = await request.json()
     const bodyValidation = updateContactStatusSchema.safeParse(body)
     if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+      return relayMutationCookies(NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 }), authorizedSetCookie)
     }
     const { status } = bodyValidation.data
 
     const backendUrl = getBackendUrl()
     if (!backendUrl) {
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
-
-    const springSession = await authorizeSpringContactMutation(request)
-    if (springSession instanceof NextResponse) return springSession
-    authorizedSetCookie = springSession.setCookie
 
     let springResponse: Response
     try {
@@ -181,7 +182,7 @@ export async function PATCH(
         headers: {
           'Content-Type': 'application/json',
           ...getSpringBackendHeaders(),
-          Cookie: springSession.cookie
+          ...(authorization.cookie ? { Cookie: authorization.cookie } : {})
         },
         body: JSON.stringify({ status })
       })
@@ -245,30 +246,22 @@ export async function DELETE(
       return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
     }
     const { id } = parsedParams.data
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const authorization = await authorizeContactRequest(request)
+    if (authorization instanceof NextResponse) return authorization
+    authorizedSetCookie = authorization.setCookie
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
+      return relayMutationCookies(originRejection, authorizedSetCookie)
     }
 
     const backendUrl = getBackendUrl()
     if (!backendUrl) {
-      return NextResponse.json(
+      return relayMutationCookies(NextResponse.json(
         { error: 'Spring backend not configured' },
         { status: 503 }
-      )
+      ), authorizedSetCookie)
     }
-
-    const springSession = await authorizeSpringContactMutation(request)
-    if (springSession instanceof NextResponse) return springSession
-    authorizedSetCookie = springSession.setCookie
 
     let springResponse: Response
     try {
@@ -276,7 +269,7 @@ export async function DELETE(
         method: 'DELETE',
         headers: {
           ...getSpringBackendHeaders(),
-          Cookie: springSession.cookie
+          ...(authorization.cookie ? { Cookie: authorization.cookie } : {})
         }
       })
     } catch (error) {

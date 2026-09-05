@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
+import { relaySpringCookies } from '@/lib/server/adminBffBoundary'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
-
-function forwardSetCookie(upstream: Response, response: NextResponse) {
-  const setCookie = upstream.headers.get('Set-Cookie')
-  if (setCookie) response.headers.set('Set-Cookie', setCookie)
-}
 
 export async function POST(request: Request) {
   const backendUrl = getBackendUrl()
@@ -20,7 +16,11 @@ export async function POST(request: Request) {
       cache: 'no-store'
     })
     const response = new NextResponse(null, { status: upstream.status })
-    forwardSetCookie(upstream, response)
+    relaySpringCookies(response, upstream.headers)
+    if (upstream.status === 204) {
+      const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+      response.headers.append('Set-Cookie', `SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`)
+    }
     return response
   } catch {
     return NextResponse.json({ error: 'Spring authentication is unavailable' }, { status: 503 })

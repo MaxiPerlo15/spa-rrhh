@@ -1,57 +1,48 @@
-## Exploration: Move Admin Ops and Remove Prisma
+## Exploration: Spring-session authorization for dashboard reads
 
 ### Current State
-JPA is the accepted canonical ORM, but Prisma still owns the final operational data path. Notifications, audit queries/writes, settings, audit retention, CV retention, application export, and health all access Prisma directly. `AdminAuditLog`, `AdminNotification`, and `AdminSettings` exist only in `prisma/schema.prisma`; Spring has no entities, controllers, jobs, or security rules for them.
+At `96058e6`, `SPRING_AUTH_ENABLED=true` disables the Credentials provider, but the dashboard-list BFFs still authorize with NextAuth only:
 
-Core business data has been cut over to Spring for vacancies, applications, contacts, and candidate writes. However, migrated Next adapters still call `auditAdminAction()`, which writes to Prisma, and public form rate-limit/captcha policy remains in Next. The final change must therefore remove both direct database access and these cross-cutting Prisma dependencies.
+- `GET /api/vacancies?all=true` checks `auth()` before listing all vacancies; `all=false` is public and must remain untouched.
+- `GET /api/applications` and `GET /api/contacts` always check `auth()` before their Spring list calls.
 
-The active Spring security model has a prerequisite gap: `/api/v1/auth/me` manually validates `SESSIONID`, but `SecurityConfig` has no filter that converts that session into a Spring Security `Authentication`. A new `/api/v1/admin/**` route protected by `hasRole("ADMIN")` would otherwise be denied. Existing Next API routes also use `auth()` even though Credentials providers are disabled in Spring-auth mode.
+The established session boundary (`getSpringSession()` plus `relaySpringCookies()`) validates `SESSIONID`, checks `admin:access`, carries a rotated validation cookie (`S1`) upstream, and appends it to browser responses. Notification BFFs use this successfully. The three reads do not forward `SESSIONID` or preserve `Set-Cookie`; their Spring calls currently rely only on the internal API key. In legacy mode, NextAuth admin authorization must remain the fallback.
+
+Route contracts to preserve in Spring mode are: missing/anonymous session -> `401` (`No autorizado`, including an expiry `Set-Cookie`); non-admin -> `403` (`No autorizado`); validation/backend unavailable -> `503` (`Spring backend unavailable`). After a successful preflight, local validation, missing-backend, network-`503`, and upstream responses must retain validation `S1`; upstream `Set-Cookie` values must be appended, not replace `S1`. Existing route-specific behavior otherwise stays intact: vacancy missing backend is `503` before protected `all=true` authorization, while application/contact authorize before their configured-backend check; application/contact propagate upstream `401`/`403`, while vacancy-list upstream failures currently fall through its existing `500` catch.
 
 ### Affected Areas
-- `src/app/api/admin/notifications/**`, `src/app/api/admin/audit/route.ts`, `src/app/api/admin/settings/route.ts` — Prisma-backed admin CRUD, query filters, schema-drift fallbacks, and settings upsert.
-- `src/lib/adminAudit.ts`, `src/lib/auditRetention.ts`, `src/lib/auditRetentionPolicy.ts` — Prisma raw audit insert, Prisma delete job, and ORM enum coupling used across migrated adapters.
-- `src/app/api/internal/**`, `src/lib/cvRetention.ts`, `scripts/purge-*.mjs` — Next-hosted, secret-triggered retention endpoints and scripts; CV cleanup queries/updates Prisma candidates.
-- `src/app/api/applications/export/route.ts`, `src/app/api/health/route.ts` — the two remaining non-admin production Prisma reads.
-- `src/lib/dto/adminNotification.ts`, `src/lib/dto/vacancy.ts`, `src/lib/prismaError.ts` — generated Prisma type/error dependencies that block package removal.
-- `src/lib/publicRequestGuard.ts`, `src/lib/rateLimit.ts`, `src/lib/botProtection.ts`, `src/app/api/uploadthing/core.ts` — public rate-limit/captcha policy remains in Next although the roadmap assigns it to Spring.
-- `src/lib/auth.ts`, `src/proxy.ts`, `backend/.../SecurityConfig.java`, `backend/.../application/SessionService.java` — admin adapter authorization must become Spring-session-aware before migrated admin routes are usable without NextAuth sessions.
-- `backend/.../domain/model/PrismaUser.java`, `backend/.../infrastructure/PrismaUserRepository.java` — unused JPA mapping to the legacy Prisma `"User"` table; remove only after one-time settings/user-reference migration is verified.
-- `prisma/`, `src/lib/prisma.ts`, `scripts/{create-admin,verify-admin,normalize-locations}.ts`, `package.json`, `package-lock.json`, `.github/workflows/ci.yml`, `src/lib/checkEnv.ts`, `.env.example` — Prisma runtime, CLI, direct PostgreSQL client usage, CI/bootstrap, and environment contract.
-- Prisma-mocking unit tests, Prisma-focused tests, README/AGENTS/CI/security/deployment docs, and historical migrations — tests must move to Spring gateway/contract tests; schema and migrations must be archived, not silently discarded.
+- `src/app/api/vacancies/route.ts` — migrate only the protected `GET ?all=true` branch; retain public listing and POST behavior.
+- `src/app/api/applications/route.ts` — migrate only admin list GET; retain public POST behavior.
+- `src/app/api/contacts/route.ts` — migrate only admin list GET; retain public POST behavior.
+- `src/lib/server/adminBffBoundary.ts` (or a focused sibling) — add a reusable dual-mode dashboard-read authorizer returning the upstream cookie plus response cookie, instead of triplicating mode and cookie logic.
+- `src/lib/__tests__/vacancyRoute.test.ts`, `src/lib/__tests__/applicationsListRoute.test.ts`, `src/lib/__tests__/contactsRoute.test.ts` — add route contracts for Spring authorization, rotation relay, and NextAuth fallback.
+- `tests/e2e/auth-spring-session.spec.ts` — prove each first dashboard read works immediately after Spring relay login.
+- `tests/e2e/api-smoke.spec.ts`, `tests/e2e/spring-application-flow.spec.ts` — existing public-vacancy and unauthenticated-list assertions remain valid; no change required.
 
 ### Approaches
-1. **Single cutover and package deletion** — implement all Spring admin APIs/jobs and delete Prisma in one PR.
-   - Pros: shortest hybrid period; one final cleanup.
-   - Cons: combines security, data migration, scheduling, external storage, CI, and frontend adapters; exceeds the 400-line review budget and makes rollback unsafe.
-   - Effort: High.
+1. **Shared dual-mode read authorizer in the BFF boundary** — when Spring auth is enabled, validate `SESSIONID`, derive the rotated cookie for the Spring request, and relay cookies; otherwise use current NextAuth admin validation.
+   - Pros: one authorization/status/rotation contract across all three reads; minimizes future drift; preserves legacy mode explicitly.
+   - Cons: adds a small shared server helper and requires route-level contract coverage.
+   - Effort: Medium.
 
-2. **Chained expand/contract migration** — establish Spring ownership first, cut Next to thin adapters, then delete Prisma only after explicit no-reference checks.
-   - Pros: preserves stable browser routes, isolates rollback, permits data reconciliation before destructive cleanup, and keeps review slices coherent.
-   - Cons: requires temporary dual schema awareness and several PRs.
-   - Effort: High.
+2. **Repeat conditional authorization in each route** — inline Spring-vs-NextAuth branching and cookie relay separately.
+   - Pros: no new helper abstraction.
+   - Cons: three copies of security-sensitive status and cookie behavior; likely to drift as notification routes did.
+   - Effort: Medium.
 
 ### Recommendation
-Use **Approach 2**. The final boundary is:
+Use approach 1. Preserve each route's current validation/configuration ordering and payload mapping, but replace only its dashboard-read authorization branch. In Spring mode, pass `Cookie: SESSIONID=S1` (or the original `S0` when unrotated) alongside `X-Backend-Api-Key`, append both preflight and upstream cookies, and use no session preflight in legacy mode.
 
-- **Spring owns** `AdminNotification`, `AdminAuditLog`, and `AdminSettings`; audit event creation and retention; CV-retention selection/metadata cleanup; scheduler execution; application-export data retrieval; DB health; and public form rate-limit/captcha policy.
-- **Next remains only a BFF/UI transport**: preserve current `/api/**` browser contracts, CSRF/CORS/CSP edge controls, CSV rendering, and UploadThing transport. For public forms/upload middleware, Next forwards the request context and captcha token to a Spring authorization/policy endpoint; it retains no rate-limit or captcha decision logic. For admin routes, it forwards the Spring `SESSIONID` and uses a single Spring-session-aware authorization helper rather than NextAuth `auth()`.
-- **Do not delete legacy data blindly.** Map `AdminNotification` and audit rows through JPA using string IDs. Migrate `AdminSettings` from the dormant Prisma `User` relationship to `Usuario` by verified email mapping (or explicitly reset preferences only with product approval). Remove `PrismaUser` and the old `"User"` table only after that reconciliation succeeds.
+The likely 320–380-line change exceeds the requested 300-line ceiling. Split it into two chained corrective work units:
 
-Recommended removal sequence:
-1. Add Spring session-to-SecurityContext authentication, admin entities/repositories/services/controllers, stable DTO/error contracts, and migration/reconciliation checks. Add Spring-side audit creation so domain mutations can record actor/context transactionally.
-2. Replace notifications, audit, settings, application export, and health with Spring-backed adapters. Remove schema-drift and Prisma-error fallbacks; keep response shapes stable. Migrate all audit call sites to Spring rather than retaining `auditAdminAction()`.
-3. Move audit/CV retention to Spring scheduled jobs (with protected manual trigger only if operations require it). Move public submission/upload authorization policy to Spring; remove the Next internal retention endpoints, cron scripts, and Next-owned policy implementations.
-4. Run production-like reconciliation and smoke checks: migrated settings counts, audit/notification reads, retention dry run, public-form rejection behavior, admin session authorization, export parity, and `/api/health` behavior against Spring.
-5. Delete `src/lib/prisma.ts`, Prisma routes/helpers/types/tests, direct `pg` scripts, Prisma CLI scripts/config/dependencies, CI Prisma steps, and Next `DATABASE_URL` validation. Regenerate the lockfile, archive `prisma/schema.prisma` and migrations under `docs/archive/`, and update bootstrap/CI/env documentation.
-
-Delivery forecast: **400-line budget risk: High. Chained PRs recommended: Yes. Decision needed before apply: Yes.** A practical chain is (1) Spring admin/session/audit foundation, (2) Next adapters and audit cutover, (3) retention plus public-policy cutover, and (4) Prisma/config/CI/archive deletion.
+1. **Foundation + vacancies/applications** — shared authorizer, the protected vacancy/application list branches, their focused tests, and first-read E2E coverage for both (about 220–270 lines).
+2. **Contacts** — contact-list adoption, its focused tests, and its first-read E2E coverage (about 90–130 lines).
 
 ### Risks
-- The existing Spring session is not installed in Spring Security, so role-protected admin endpoints will fail until a session authentication bridge is added and tested.
-- Prisma and JPA tables remain separate legacy schemas; `AdminSettings.userId` requires verified identity mapping before the old `User` table can disappear.
-- Audit is currently best-effort and outside domain transactions. Moving it must preserve failure semantics while preventing silent loss of security events.
-- CV retention couples database selection to UploadThing deletion. Make remote deletion idempotent and retain retry/error reporting before removing the current job.
-- Removing `DATABASE_URL` changes startup, CI, health, test fixtures, scripts, and documentation simultaneously; deletion must be gated by a repository-wide no-Prisma reference check.
+- Treating Spring unavailability as a legacy fallback would silently bypass the active Spring security authority; fallback is only when `SPRING_AUTH_ENABLED !== 'true'`.
+- Replacing rather than appending `Set-Cookie` loses either the rotated session or an independent upstream cookie.
+- Expanding vacancy authorization beyond `all=true` would break the public vacancy listing and API smoke contract.
+- The current contact status query is not forwarded upstream; that unrelated behavior must not be changed in this corrective slice.
 
 ### Ready for Proposal
-Yes — propose a chained, expand/contract change with an explicit settings reconciliation plan and Spring-session SecurityContext foundation as mandatory first scope.
+Yes — propose two chained, read-only BFF authorization slices. No Spring controller/security change, mutation change, Prisma work, or browser API shape change is needed.

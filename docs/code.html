@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Soluciones web directas para hacer crecer tu negocio | Portfolio.CBA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#0f4c81",
+                        "primary-fixed-dim": "#a0c9ff",
+                        "tertiary-fixed": "#ffdcc4",
+                        "on-background": "#191c1f",
+                        "inverse-primary": "#a0c9ff",
+                        "secondary": "#00677d",
+                        "tertiary-container": "#743b00",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#004e5f",
+                        "outline-variant": "#c2c7d1",
+                        "background": "#f9f9fe",
+                        "tertiary": "#532800",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#001f27",
+                        "surface-container-high": "#e7e8ed",
+                        "secondary-fixed-dim": "#4cd6fb",
+                        "on-tertiary-container": "#f9a767",
+                        "on-primary-fixed": "#001c37",
+                        "surface-bright": "#f9f9fe",
+                        "primary": "#00355f",
+                        "surface-container-highest": "#e2e2e7",
+                        "secondary-fixed": "#b3ebff",
+                        "on-tertiary-fixed": "#2f1400",
+                        "surface-dim": "#d9dadf",
+                        "surface-container-low": "#f3f3f8",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#e2e2e7",
+                        "outline": "#727780",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#f0f0f5",
+                        "primary-fixed": "#d2e4ff",
+                        "surface-container": "#ededf3",
+                        "on-surface-variant": "#42474f",
+                        "tertiary-fixed-dim": "#ffb780",
+                        "on-primary-fixed-variant": "#07497d",
+                        "inverse-surface": "#2e3034",
+                        "surface": "#f9f9fe",
+                        "on-primary-container": "#8ebdf9",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#005c70",
+                        "surface-tint": "#2d6197",
+                        "secondary-container": "#50d9fe",
+                        "on-surface": "#191c1f",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#6f3800"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "24px",
+                        "stack-lg": "48px",
+                        "base": "8px",
+                        "container-max": "1120px",
+                        "stack-sm": "12px",
+                        "gutter": "24px",
+                        "margin-desktop": "40px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "display": ["Plus Jakarta Sans"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "500"}]
+                    },
+                    "boxShadow": {
+                        'soft': '0px 4px 20px rgba(15, 76, 129, 0.04)',
+                        'hover': '0px 8px 30px rgba(15, 76, 129, 0.08)'
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: transparent;
+            color: theme('colors.on-background');
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Animations */
+        @media (prefers-reduced-motion: no-preference) {
+            .reveal {
+                opacity: 0;
+                transform: translateY(30px);
+                transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .reveal.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            
+            .stagger-item {
+                opacity: 0;
+                transform: translateY(20px);
+                transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .stagger-item.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            .service-reveal-left {
+                transform: translateX(-56px);
+                transition-duration: 0.95s;
+            }
+            .service-reveal-right {
+                transform: translateX(56px);
+                transition-duration: 0.95s;
+            }
+            .service-reveal-left.active,
+            .service-reveal-right.active {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            @media (max-width: 767px) {
+                .service-reveal-left,
+                .service-reveal-right {
+                    transform: translateY(20px);
+                }
+                .service-reveal-left.active,
+                .service-reveal-right.active {
+                    transform: translateY(0);
+                }
+            }
+
+            /* Hero Specific Sequence */
+            .hero-text { transition-delay: 0.1s; }
+            .hero-cta { transition-delay: 0.3s; }
+            .hero-visual { transition-delay: 0.5s; opacity: 0; transform: scale(0.95); transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1); }
+            .hero-visual.active { opacity: 1; transform: scale(1); }
+
+            /* Process Line */
+            .process-line-progress {
+                width: 0%;
+                transition: width 0.4s ease-out;
+            }
+
+            .process-line-progress-mobile {
+                height: 0%;
+                transition: height 0.4s ease-out;
+            }
+        }
+        
+        .faq-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .faq-content.open {
+            max-height: 320px;
+        }
+        .faq-icon {
+            transition: transform 0.3s ease;
+        }
+        .faq-item button[aria-expanded="true"] .faq-icon {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 767px) {
+            .mobile-faq-list {
+                display: grid;
+                grid-template-rows: 0fr;
+                transition: grid-template-rows 0.35s ease-out;
+            }
+            .mobile-faq-list > div {
+                overflow: hidden;
+            }
+            .mobile-faq-list.open {
+                grid-template-rows: 1fr;
+            }
+            .mobile-faq-section-icon {
+                transition: transform 0.3s ease;
+            }
+            .mobile-faq-section-toggle[aria-expanded="true"] .mobile-faq-section-icon {
+                transform: rotate(180deg);
+            }
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-primary-container selection:text-on-primary relative">
+<!-- Atmospheric Background -->
+<div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-surface">
+<!-- Soft blobs -->
+<div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-fixed-dim/20 blur-[100px]"></div>
+<div class="absolute top-[40%] right-[-10%] w-[60%] h-[60%] rounded-full bg-secondary-fixed/10 blur-[120px]"></div>
+<div class="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] rounded-full bg-primary-fixed/20 blur-[150px]"></div>
+<!-- Grid pattern -->
+<svg class="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="40" id="bg-grid" patternunits="userSpaceOnUse" width="40">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" stroke-width="1"></path>
+</pattern>
+</defs>
+<rect fill="url(#bg-grid)" height="100%" width="100%"></rect>
+</svg>
+</div>
+<!-- TopNavBar -->
+<nav class="bg-surface/60 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/20">
+<div class="max-w-[1120px] mx-auto flex justify-between items-center px-gutter py-4">
+<a class="text-headline-md font-headline-md font-bold text-primary hover:text-primary-container transition-all duration-200" href="#">
+                Portfolio.CBA
+            </a>
+<div class="hidden md:flex space-x-8 items-center text-label-md font-label-md">
+<a class="text-on-surface-variant hover:text-primary transition-colors hover:scale-95 duration-150" href="#servicios">Servicios</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors hover:scale-95 duration-150" href="#casos">Casos</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors hover:scale-95 duration-150" href="#proceso">Proceso</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors hover:scale-95 duration-150" href="#faq">FAQ</a>
+</div>
+<a class="hidden md:inline-flex items-center justify-center bg-primary-container text-on-primary px-6 py-2 rounded-lg font-label-md hover:bg-primary transition-colors hover:scale-95 duration-150 shadow-sm" href="#contacto">
+                Contacto
+            </a>
+<button class="md:hidden text-primary p-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+</div>
+</nav>
+<main class="pt-[80px]">
+<!-- Hero Section -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg md:py-24 grid md:grid-cols-2 gap-12 items-center" id="hero-section">
+<div class="flex flex-col items-start space-y-6">
+<div class="reveal hero-text">
+<h1 class="font-display text-display text-on-background leading-tight mb-6">
+                        Soluciones web directas para hacer crecer tu negocio
+                    </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg">
+                        Diseñamos y desarrollamos herramientas digitales enfocadas en resultados. Sin jerga técnica, solo soluciones que resuelven los problemas reales de tu PYME.
+                    </p>
+</div>
+<div class="pt-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full reveal hero-cta">
+<a class="inline-flex items-center justify-center space-x-2 bg-[#25D366] text-white px-8 py-4 rounded-xl font-label-md hover:bg-[#20bd5a] transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-1 w-full sm:w-auto" href="#contacto">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm.029 18.88c-1.161 0-2.305-.292-3.318-.844l-3.677.964 1.006-3.588c-.608-1.056-.929-2.274-.929-3.518 0-4.407 3.582-7.989 7.989-7.989 4.411 0 7.994 3.585 7.994 7.99 0 4.407-3.583 7.985-7.989 7.985z"></path></svg>
+<span>Charlemos sobre tu proyecto</span>
+</a>
+<a class="inline-flex items-center justify-center space-x-2 text-primary font-label-md px-6 py-4 hover:bg-primary-fixed/30 rounded-xl transition-colors duration-300 w-full sm:w-auto group" href="#casos">
+<span>Ver casos</span>
+<span class="material-symbols-outlined transition-transform duration-300 group-hover:translate-x-1" style="font-variation-settings: 'FILL' 0;">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="relative w-full aspect-square md:aspect-[4/3] rounded-3xl overflow-hidden shadow-soft border border-outline-variant/20 bg-surface-container-low/50 backdrop-blur-sm hero-visual reveal">
+<img alt="Abstract web development process" class="absolute inset-0 w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AP1WRLtcufBzxBg-VmKC62uT9EF5DyU7Up47OSDmPbb57bXhMjyhMhD5F9ef-zTcuGv7up9dmnGU4lDb6aFrIqCkMCo4JgcnK7IUs76Ea6HXPdmV2kBF7NrMcytJHfoBWMYYOOottj-B8I6QYyrHp61lp5zOL__YKxoiIIuURgZONVhS4z1wN1o2OFRdS4CZmjjbwfHkHAypHmbcmq5byEp4cvDaHRjVSRwP1m4lcRCdgCeaQodqdQE3Q1YmXoA"/>
+</div>
+</section>
+<!-- Services Section -->
+<section class="py-stack-lg" id="servicios">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop section-reveal">
+<div class="text-center mb-16 reveal">
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-4">Servicios clave</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl mx-auto">Especializado en dos áreas fundamentales para el crecimiento digital de las empresas cordobesas.</p>
+</div>
+<div class="grid md:grid-cols-2 gap-8 stagger-container">
+<!-- Service Card 1 -->
+<div class="bg-surface/80 backdrop-blur-md p-10 rounded-3xl border border-outline-variant/20 shadow-sm hover:shadow-hover hover:border-secondary-container transition-all duration-300 group relative overflow-hidden stagger-item service-reveal-left hover:-translate-y-2">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/20 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<div class="w-16 h-16 rounded-2xl bg-primary-fixed flex items-center justify-center text-on-primary-fixed mb-8 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 0;">rocket_launch</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-background mb-4">Landing Pages</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">
+                            Páginas de aterrizaje ultrarrápidas y optimizadas para la conversión. Ideales para campañas publicitarias, captación de leads y lanzamientos de productos específicos.
+                        </p>
+<ul class="space-y-3 font-body-md text-body-md text-on-surface-variant">
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Alta tasa de conversión</span></li>
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Diseño responsive perfecto</span></li>
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Integración con CRM</span></li>
+</ul>
+</div>
+<!-- Service Card 2 -->
+<div class="bg-surface/80 backdrop-blur-md p-10 rounded-3xl border border-outline-variant/20 shadow-sm hover:shadow-hover hover:border-secondary-container transition-all duration-300 group relative overflow-hidden stagger-item service-reveal-right hover:-translate-y-2" style="transition-delay: 0.1s">
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary-fixed/20 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<div class="w-16 h-16 rounded-2xl bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed mb-8 group-hover:scale-110 transition-transform duration-500 shadow-sm">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 0;">dashboard_customize</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-background mb-4">Sistemas Web a medida</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">
+                            Plataformas personalizadas para optimizar la eficiencia interna de tu empresa. Desde gestión de inventario hasta portales de clientes, construidos para escalar.
+                        </p>
+<ul class="space-y-3 font-body-md text-body-md text-on-surface-variant">
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Automatización de tareas</span></li>
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Paneles de control intuitivos</span></li>
+<li class="flex items-center space-x-3"><span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span>Seguridad y escalabilidad</span></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<!-- Case Studies Section -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg section-reveal" id="casos">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4 reveal">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-2">Casos de éxito</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Proyectos recientes que generaron impacto real.</p>
+</div>
+<a class="inline-flex items-center space-x-1 text-primary font-label-md hover:underline group" href="#">
+<span>Ver todos</span>
+<span class="material-symbols-outlined transition-transform duration-300 group-hover:translate-x-1">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 stagger-container">
+<!-- Case 1 -->
+<a class="group block bg-surface/80 backdrop-blur-sm rounded-2xl overflow-hidden border border-outline-variant/20 shadow-sm hover:shadow-hover transition-all duration-300 flex flex-col stagger-item hover:-translate-y-1" href="#">
+<div class="aspect-[4/3] bg-surface-dim relative overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A clean, modern dashboard interface displayed on a laptop screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwUfiaiR06SJKw83q4JgYLRkAGKGS-NseOKAn1F-Ebq5oFcIRFP9O6pJq-LzlsgBoMcLzxwa5OrBO7uCvwywACjv5TyGv10MP3S--1cYOdr7OPtVj69A6i3ZSd9JK7bTm6iS23Y8FJdvK9m2GzjQPQFl3i3u9-QxcJ_Xx4E0NgTfhEFRrpBlkWkW6vELZLOOkC0qCyg3Dal7LelPBdJfjyyFlA4Z1siimYxAIA6NPcKXB8eSEN4Eb7-G6v_IhgEjyE1JvjE0sVgew"/>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<h4 class="font-headline-md text-[20px] text-on-background mb-1 group-hover:text-primary transition-colors">Gestor Inmobiliario</h4>
+<p class="font-body-md text-[14px] text-on-surface-variant mb-4">Sistema Web</p>
+</div>
+<p class="font-body-md text-[14px] text-primary font-medium line-clamp-2 mt-auto pt-2 border-t border-outline-variant/10">Optimizó la gestión de propiedades y clientes para agencia local.</p>
+</div>
+</a>
+<!-- Case 2 -->
+<a class="group block bg-surface/80 backdrop-blur-sm rounded-2xl overflow-hidden border border-outline-variant/20 shadow-sm hover:shadow-hover transition-all duration-300 flex flex-col stagger-item hover:-translate-y-1" href="#" style="transition-delay: 0.1s">
+<div class="aspect-[4/3] bg-surface-dim relative overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A minimalist landing page design visible on a sleek monitor" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOTjHOKecsn2pDqZzktqusw317j7T54VNZ6t5gZMr_-G4hjlCJvhlKAPBpthAR_1d-KchNerL9AvJ4dqm8luIX0mBwNwzGlfdqxNouh3827cXdFonxhijvgO9g3PVzZHD-jtgGNxX1CVtmKLxPnC-9-qScsdAmoG2RucB9cgLFWefVh_NPAB2YXhkjJk9yaj3LOZnKWr9hiI2Rf675ZZxsl52sWMWIuY4VghDMQdPks6kudVvI7fkN88UcQUza_QarbzOJKcbD9cU"/>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<h4 class="font-headline-md text-[20px] text-on-background mb-1 group-hover:text-primary transition-colors">Campaña Seguros</h4>
+<p class="font-body-md text-[14px] text-on-surface-variant mb-4">Landing Page</p>
+</div>
+<p class="font-body-md text-[14px] text-primary font-medium line-clamp-2 mt-auto pt-2 border-t border-outline-variant/10">Incrementó la captación de leads en un 40%.</p>
+</div>
+</a>
+<!-- Case 3 -->
+<a class="group block bg-surface/80 backdrop-blur-sm rounded-2xl overflow-hidden border border-outline-variant/20 shadow-sm hover:shadow-hover transition-all duration-300 flex flex-col stagger-item hover:-translate-y-1" href="#" style="transition-delay: 0.2s">
+<div class="aspect-[4/3] bg-surface-dim relative overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A top-down view of a modern workspace with a tablet showing a mobile-responsive web application" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhWOL9f7pp__x5-cDL5DiA9YlUFKW2j0OcOLUGkFgzCStPSSGfLD1afJLpDRvx8eLPaFqyVhqtQ4OInZk6OmXDuX2tmxPLFC-Acou__A0YuYLsODaHxDU7p8MMDvbB_AmMsWbFeWElHYGfLrKqP1m_pvfTlxBxEvMt7MDpGhaNRjIhXtI9uJVe2N5DijMCWH4b_dU3JfjxEF24eck0-7sr2BrPo2JkQyPmJVFMmIp9q9Rc0fSFoBw1GzW7wtJNJ84-GI_xsAW4RhM"/>
+</div>
+<div class="p-6 flex-grow flex flex-col justify-between">
+<div>
+<h4 class="font-headline-md text-[20px] text-on-background mb-1 group-hover:text-primary transition-colors">Portal Mayorista</h4>
+<p class="font-body-md text-[14px] text-on-surface-variant mb-4">E-commerce B2B</p>
+</div>
+<p class="font-body-md text-[14px] text-primary font-medium line-clamp-2 mt-auto pt-2 border-t border-outline-variant/10">Agilizó el sistema de pedidos recurrentes en un 60%.</p>
+</div>
+</a>
+<!-- Blurred 'Próximamente' Card -->
+<div class="bg-surface/40 backdrop-blur-sm rounded-2xl overflow-hidden border border-outline-variant/20 shadow-sm relative flex flex-col stagger-item" style="transition-delay: 0.3s">
+<div class="absolute inset-0 bg-surface/30 backdrop-blur-md z-10 flex items-center justify-center">
+<span class="bg-surface border border-outline-variant/20 px-5 py-2 rounded-xl font-label-md text-on-surface-variant shadow-sm tracking-wide">Próximamente</span>
+</div>
+<div class="aspect-[4/3] bg-surface-container-high/50 blur-sm"></div>
+<div class="p-6 blur-[2px] opacity-40 flex-grow flex flex-col justify-between">
+<div>
+<div class="h-6 w-3/4 bg-surface-variant rounded mb-2"></div>
+<div class="h-4 w-1/3 bg-surface-variant rounded mb-4"></div>
+</div>
+<div class="h-4 w-full bg-surface-variant rounded mt-auto pt-2"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Process Section -->
+<section class="bg-primary py-24 relative overflow-hidden section-reveal" id="proceso">
+<div class="max-w-[1120px] mx-auto px-margin-mobile md:px-margin-desktop relative z-10">
+<!-- Decorative elements -->
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary-fixed/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2"></div>
+<div class="absolute bottom-0 left-0 w-64 h-64 bg-secondary-fixed/10 rounded-full blur-3xl -translate-x-1/2 translate-y-1/2"></div>
+<h2 class="font-headline-lg text-headline-lg mb-10 text-center text-on-primary relative z-10 reveal">Mi proceso de trabajo</h2>
+<div class="grid grid-cols-1 md:grid-cols-5 gap-6 relative z-10 stagger-container process-container">
+<!-- Connecting Line for Mobile -->
+<div class="md:hidden absolute top-8 bottom-8 left-[40px] w-0.5 bg-primary-fixed/20 z-0">
+<div class="w-full bg-primary-fixed process-line-progress-mobile"></div>
+</div>
+<!-- Connecting Line for Desktop -->
+<div class="hidden md:block absolute top-[40px] left-[10%] right-[10%] h-0.5 bg-primary-fixed/20 z-0">
+<div class="h-full bg-primary-fixed process-line-progress"></div>
+</div>
+<!-- Steps as Compact Cards -->
+<div class="bg-primary/50 backdrop-blur-md border border-primary-fixed/10 p-5 ml-6 md:ml-0 rounded-2xl relative z-10 flex flex-col items-start hover:-translate-y-2 transition-all duration-300 stagger-item process-step cursor-default" data-step="1" tabindex="0">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center font-headline-md text-[18px] mb-4 shadow-sm transition-colors duration-300 step-icon">1</div>
+<h4 class="font-label-md text-[16px] text-on-primary mb-2 transition-colors duration-300">Conversación inicial</h4>
+<p class="font-body-md text-[13px] text-primary-fixed-dim/90 leading-relaxed">Entendemos tus necesidades y objetivos reales.</p>
+</div>
+<div class="bg-primary/50 backdrop-blur-md border border-primary-fixed/10 p-5 ml-6 md:ml-0 rounded-2xl relative z-10 flex flex-col items-start hover:-translate-y-2 transition-all duration-300 stagger-item process-step cursor-default" data-step="2" tabindex="0" style="transition-delay: 0.1s">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed/40 text-primary-fixed-dim flex items-center justify-center font-headline-md text-[18px] mb-4 shadow-sm transition-colors duration-300 step-icon">2</div>
+<h4 class="font-label-md text-[16px] text-on-primary/80 mb-2 transition-colors duration-300">Definición alcance</h4>
+<p class="font-body-md text-[13px] text-primary-fixed-dim/90 leading-relaxed">Propuesta clara, tiempos y costos sin sorpresas.</p>
+</div>
+<div class="bg-primary/50 backdrop-blur-md border border-primary-fixed/10 p-5 ml-6 md:ml-0 rounded-2xl relative z-10 flex flex-col items-start hover:-translate-y-2 transition-all duration-300 stagger-item process-step cursor-default" data-step="3" tabindex="0" style="transition-delay: 0.2s">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed/40 text-primary-fixed-dim flex items-center justify-center font-headline-md text-[18px] mb-4 shadow-sm transition-colors duration-300 step-icon">3</div>
+<h4 class="font-label-md text-[16px] text-on-primary/80 mb-2 transition-colors duration-300">Construcción</h4>
+<p class="font-body-md text-[13px] text-primary-fixed-dim/90 leading-relaxed">Desarrollo ágil con entregas parciales para feedback.</p>
+</div>
+<div class="bg-primary/50 backdrop-blur-md border border-primary-fixed/10 p-5 ml-6 md:ml-0 rounded-2xl relative z-10 flex flex-col items-start hover:-translate-y-2 transition-all duration-300 stagger-item process-step cursor-default" data-step="4" tabindex="0" style="transition-delay: 0.3s">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed/40 text-primary-fixed-dim flex items-center justify-center font-headline-md text-[18px] mb-4 shadow-sm transition-colors duration-300 step-icon">4</div>
+<h4 class="font-label-md text-[16px] text-on-primary/80 mb-2 transition-colors duration-300">Entrega final</h4>
+<p class="font-body-md text-[13px] text-primary-fixed-dim/90 leading-relaxed">Lanzamiento, pruebas exhaustivas y capacitación.</p>
+</div>
+<div class="bg-primary/50 backdrop-blur-md border border-primary-fixed/10 p-5 ml-6 md:ml-0 rounded-2xl relative z-10 flex flex-col items-start hover:-translate-y-2 transition-all duration-300 stagger-item process-step cursor-default" data-step="5" tabindex="0" style="transition-delay: 0.4s">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed/40 text-primary-fixed-dim flex items-center justify-center font-headline-md text-[18px] mb-4 shadow-sm transition-colors duration-300 step-icon">5</div>
+<h4 class="font-label-md text-[16px] text-on-primary/80 mb-2 transition-colors duration-300">Soporte continuo</h4>
+<p class="font-body-md text-[13px] text-primary-fixed-dim/90 leading-relaxed">Mantenimiento y optimización post-lanzamiento.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust Section -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg section-reveal">
+<div class="flex flex-col md:flex-row gap-12 items-center reveal">
+<div class="w-full md:w-1/3 flex justify-center md:justify-start">
+<div class="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden bg-surface-dim border-4 border-surface shadow-sm relative transition-transform duration-500 hover:scale-105">
+<img class="w-full h-full object-cover" data-alt="A friendly, professional headshot of a developer sitting in a bright, modern office space in Córdoba." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOJog1tbcnqaGRqNVYka7ZhLoViHLMQ19gkTzQA8dq6eOot6PYSjzaJ5EvKlNStFfh8nekMWVCGCb4ElfR6ozYN8tLZB8VXEwFEpAS4HWETyRFCJypcHatnKnVUob9miuXtzFbI_xVKBSM9GmwqaMqz0lZZFh-JZIo95UTMBnbMw7X5XZK4a1j3y_WXljpClnltRvH6pyAcvuaETv_OZDHWnMt-YUXU1Bw27Tf2wWSiV_kP377xLmEeNZciNAtGVgSN68_2579erw"/>
+</div>
+</div>
+<div class="w-full md:w-2/3">
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-6">Trabajás directamente conmigo</h2>
+<div class="space-y-4 font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+<p>Hola, soy [Nombre]. Olvidate de hablar con gerentes de cuentas o tickets de soporte impersonales. Cuando trabajamos juntos, tenés línea directa con la persona que está construyendo tu proyecto.</p>
+<p>Entiendo el ecosistema local de Córdoba porque trabajo acá. Mi enfoque es simple: crear herramientas digitales robustas que te ahorren tiempo y te ayuden a vender más, sin burocracia técnica.</p>
+<div class="pt-6 flex items-center space-x-4">
+<span class="inline-flex items-center space-x-2 bg-surface-container-high/50 text-on-surface-variant px-4 py-2 rounded-lg font-label-md backdrop-blur-sm border border-outline-variant/10 transition-colors hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<span>Basado en Córdoba Capital</span>
+</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- FAQ Section -->
+<section class="max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg section-reveal" id="faq">
+<div class="text-center mb-8 md:mb-12 reveal">
+<button class="mobile-faq-section-toggle md:pointer-events-none w-full md:w-auto flex items-center justify-center gap-3 rounded-2xl border border-outline-variant/20 bg-surface/60 px-5 py-4 md:border-0 md:bg-transparent md:p-0 text-center" aria-expanded="false" aria-controls="faq-list" type="button">
+<h2 class="font-headline-lg text-headline-lg text-on-background">Preguntas frecuentes</h2>
+<span class="material-symbols-outlined text-primary mobile-faq-section-icon md:hidden">expand_more</span>
+</button>
+</div>
+<div class="mobile-faq-list md:block" id="faq-list">
+<div class="space-y-4 reveal stagger-container">
+<!-- FAQ Item 1 -->
+<div class="border border-outline-variant/20 rounded-2xl bg-surface/60 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-surface/80 hover:shadow-sm stagger-item faq-item">
+<button class="w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors" aria-expanded="false">
+<span class="font-headline-md text-[18px] text-on-background">¿Cuánto tarda un proyecto promedio?</span>
+<span class="material-symbols-outlined text-primary faq-icon">expand_more</span>
+</button>
+<div class="faq-content">
+<div class="px-6 pb-6 pt-0">
+<p class="font-body-md text-body-md text-on-surface-variant">Para una Landing Page, habitualmente demoramos entre 2 y 3 semanas. Los Sistemas Web a medida varían según la complejidad, pero solemos estructurar entregables funcionales cada 3-4 semanas para que veas progreso rápido.</p>
+</div>
+</div>
+</div>
+<!-- FAQ Item 2 -->
+<div class="border border-outline-variant/20 rounded-2xl bg-surface/60 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-surface/80 hover:shadow-sm stagger-item faq-item" style="transition-delay: 0.1s">
+<button class="w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors" aria-expanded="false">
+<span class="font-headline-md text-[18px] text-on-background">¿Cómo estructuramos los pagos?</span>
+<span class="material-symbols-outlined text-primary faq-icon">expand_more</span>
+</button>
+<div class="faq-content">
+<div class="px-6 pb-6 pt-0">
+<p class="font-body-md text-body-md text-on-surface-variant">Trabajamos con un esquema de 50% al iniciar el proyecto y 50% contra entrega y conformidad. Para proyectos más grandes, podemos establecer hitos de pago según entregables específicos.</p>
+</div>
+</div>
+</div>
+<!-- FAQ Item 3 -->
+<div class="border border-outline-variant/20 rounded-2xl bg-surface/60 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-surface/80 hover:shadow-sm stagger-item faq-item" style="transition-delay: 0.2s">
+<button class="w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors" aria-expanded="false">
+<span class="font-headline-md text-[18px] text-on-background">¿Incluye mantenimiento mensual?</span>
+<span class="material-symbols-outlined text-primary faq-icon">expand_more</span>
+</button>
+<div class="faq-content">
+<div class="px-6 pb-6 pt-0">
+<p class="font-body-md text-body-md text-on-surface-variant">Ofrecemos planes de mantenimiento opcionales post-lanzamiento que cubren hosting, seguridad, backups y actualizaciones menores. No es obligatorio, pero es recomendado para garantizar el rendimiento a largo plazo.</p>
+</div>
+</div>
+</div>
+<!-- FAQ Item 4 -->
+<div class="border border-outline-variant/20 rounded-2xl bg-surface/60 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-surface/80 hover:shadow-sm stagger-item faq-item" style="transition-delay: 0.3s">
+<button class="w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors" aria-expanded="false">
+<span class="font-headline-md text-[18px] text-on-background">¿Incluye soporte post-lanzamiento?</span>
+<span class="material-symbols-outlined text-primary faq-icon">expand_more</span>
+</button>
+<div class="faq-content">
+<div class="px-6 pb-6 pt-0">
+<p class="font-body-md text-body-md text-on-surface-variant">Sí, ofrecemos soporte continuo para asegurar que todo funcione perfecto y se mantenga actualizado frente a nuevas tecnologías.</p>
+</div>
+</div>
+</div>
+<!-- FAQ Item 5 -->
+<div class="border border-outline-variant/20 rounded-2xl bg-surface/60 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-surface/80 hover:shadow-sm stagger-item faq-item" style="transition-delay: 0.4s">
+<button class="w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors" aria-expanded="false">
+<span class="font-headline-md text-[18px] text-on-background">¿Trabajan con clientes fuera de Córdoba?</span>
+<span class="material-symbols-outlined text-primary faq-icon">expand_more</span>
+</button>
+<div class="faq-content">
+<div class="px-6 pb-6 pt-0">
+<p class="font-body-md text-body-md text-on-surface-variant">Sí, aunque estamos basados en Córdoba, trabajamos de forma remota con clientes de todo el país utilizando herramientas de comunicación ágiles.</p>
+</div>
+</div>
+</div></div>
+</div>
+<script>
+                // Mobile FAQ section toggle
+                const mobileFaqToggle = document.querySelector('.mobile-faq-section-toggle');
+                const mobileFaqList = document.querySelector('.mobile-faq-list');
+                if (mobileFaqToggle && mobileFaqList) {
+                    mobileFaqToggle.addEventListener('click', () => {
+                        if (window.matchMedia('(min-width: 768px)').matches) return;
+                        const isExpanded = mobileFaqList.classList.contains('open');
+                        mobileFaqList.classList.toggle('open', !isExpanded);
+                        mobileFaqToggle.setAttribute('aria-expanded', String(!isExpanded));
+                    });
+                }
+
+                // FAQ Accordion logic
+                document.querySelectorAll('.faq-item button').forEach(button => {
+                    const content = button.nextElementSibling;
+                    content.classList.remove('open');
+                    button.setAttribute('aria-expanded', 'false');
+
+                    button.addEventListener('click', () => {
+                        const isExpanded = content.classList.contains('open');
+                        
+                        // Close all others
+                        document.querySelectorAll('.faq-content.open').forEach(el => {
+                            if (el !== content) {
+                                el.classList.remove('open');
+                                el.previousElementSibling?.setAttribute('aria-expanded', 'false');
+                            }
+                        });
+                        
+                        // Toggle current
+                        if (isExpanded) {
+                            content.classList.remove('open');
+                            button.setAttribute('aria-expanded', 'false');
+                        } else {
+                            content.classList.add('open');
+                            button.setAttribute('aria-expanded', 'true');
+                        }
+                    });
+                });
+            </script>
+</section>
+<!-- Final CTA -->
+<section class="py-24 relative overflow-hidden section-reveal" id="contacto">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center relative z-10 py-16 reveal">
+<h2 class="font-display text-[36px] text-on-background mb-4">Sin formularios lentos. Solo una charla real.</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-xl mx-auto">Escribime directamente por WhatsApp. Contame brevemente qué necesitas y coordinamos una videollamada corta sin compromiso.</p>
+<a class="inline-flex items-center justify-center space-x-3 bg-[#25D366] text-white px-10 py-5 rounded-2xl font-label-md text-[18px] hover:bg-[#20bd5a] transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-1" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm.029 18.88c-1.161 0-2.305-.292-3.318-.844l-3.677.964 1.006-3.588c-.608-1.056-.929-2.274-.929-3.518 0-4.407 3.582-7.989 7.989-7.989 4.411 0 7.994 3.585 7.994 7.99 0 4.407-3.583 7.985-7.989 7.985z"></path></svg>
+<span>Contactar por WhatsApp</span>
+</a>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full bg-surface/50 backdrop-blur-sm border-t border-outline-variant/10">
+<div class="max-w-[1120px] mx-auto flex flex-col md:flex-row justify-between items-center py-8 px-gutter">
+<div class="text-[18px] font-headline-md font-bold text-primary mb-4 md:mb-0">
+                Portfolio.CBA
+            </div>
+<div class="text-[13px] font-body-md text-on-surface-variant mb-4 md:mb-0">
+                © 2024 Portfolio.CBA - Hecho en Córdoba
+            </div>
+<div class="flex space-x-6 text-[14px] font-label-md text-on-surface-variant">
+<a class="hover:text-primary transition-colors" href="#">WhatsApp</a>
+<a class="hover:text-primary transition-colors" href="#">LinkedIn</a>
+<a class="hover:text-primary transition-colors" href="#">Email</a>
+</div>
+</div>
+</footer>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                    
+                    // If it's a container for staggered items, trigger them
+                    const staggerItems = entry.target.querySelectorAll('.stagger-item');
+                    if (staggerItems.length > 0) {
+                        staggerItems.forEach(item => item.classList.add('active'));
+                    }
+                    
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        // Elements to observe
+        document.querySelectorAll('.reveal, .stagger-container').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Hero section animation trigger (immediate)
+        setTimeout(() => {
+            document.querySelectorAll('#hero-section .reveal').forEach(el => {
+                el.classList.add('active');
+            });
+        }, 100);
+
+        // Dynamic Process Line
+        const processSteps = document.querySelectorAll('.process-step');
+        const progressBar = document.querySelector('.process-line-progress');
+        const progressBarMobile = document.querySelector('.process-line-progress-mobile');
+        
+        const activateProcessStep = (index) => {
+            const progress = ((index) / (processSteps.length - 1)) * 100;
+            if (progressBar) progressBar.style.width = `${progress}%`;
+            if (progressBarMobile) progressBarMobile.style.height = `${progress}%`;
+
+            processSteps.forEach((s, i) => {
+                const icon = s.querySelector('.step-icon');
+                const text = s.querySelector('h4');
+                
+                if (i <= index) {
+                    icon.classList.remove('bg-primary-fixed/40', 'text-primary-fixed-dim');
+                    icon.classList.add('bg-primary-fixed', 'text-primary');
+                    text.classList.remove('text-on-primary/80');
+                    text.classList.add('text-on-primary');
+                } else {
+                    icon.classList.add('bg-primary-fixed/40', 'text-primary-fixed-dim');
+                    icon.classList.remove('bg-primary-fixed', 'text-primary');
+                    text.classList.add('text-on-primary/80');
+                    text.classList.remove('text-on-primary');
+                }
+            });
+        };
+
+        processSteps.forEach((step, index) => {
+            step.addEventListener('mouseenter', () => activateProcessStep(index));
+            step.addEventListener('focus', () => activateProcessStep(index));
+            step.addEventListener('click', () => activateProcessStep(index));
+            step.addEventListener('touchstart', () => activateProcessStep(index), { passive: true });
+        });
+        
+        // Reset process section on mouse leave container
+        const processContainer = document.querySelector('.process-container');
+        if(processContainer) {
+            processContainer.addEventListener('mouseleave', () => {
+                if(progressBar) progressBar.style.width = '0%';
+                if(progressBarMobile) progressBarMobile.style.height = '0%';
+                processSteps.forEach((s, i) => {
+                    const icon = s.querySelector('.step-icon');
+                    const text = s.querySelector('h4');
+                    if(i !== 0) { // Keep first active
+                        icon.classList.add('bg-primary-fixed/40', 'text-primary-fixed-dim');
+                        icon.classList.remove('bg-primary-fixed', 'text-primary');
+                        text.classList.add('text-on-primary/80');
+                        text.classList.remove('text-on-primary');
+                    }
+                });
+            });
+        }
+    });
+</script>
+</body></html>

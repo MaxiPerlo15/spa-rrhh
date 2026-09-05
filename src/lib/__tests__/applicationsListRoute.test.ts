@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const authMock = vi.fn()
+const { authMock, getSpringSessionMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  getSpringSessionMock: vi.fn()
+}))
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
 }))
+vi.mock('@/lib/springSession', () => ({ getSpringSession: getSpringSessionMock }))
 
 describe('/api/applications GET', () => {
   beforeEach(() => {
@@ -227,4 +231,65 @@ describe('/api/applications GET', () => {
     expect(response.status).toBe(502)
     expect(body.error).toBe('Bad Gateway HTML')
   })
+
+  it('forwards S1 to Spring and appends validation and upstream cookies', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', user: {}, setCookie: 'SESSIONID=S1; Path=/; HttpOnly' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { getSetCookie: () => ['XSRF-TOKEN=next; Path=/'] },
+      json: () => Promise.resolve([])
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { GET } = await import('@/app/api/applications/route')
+    const response = await GET(new NextRequest('http://localhost/api/applications', {
+      headers: { Cookie: 'SESSIONID=S0' }
+    }))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=S1')
+    expect(response.headers.get('set-cookie')).toContain('XSRF-TOKEN=next')
+    expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/applications', expect.objectContaining({ headers: expect.objectContaining({ Cookie: 'SESSIONID=S1' }) }))
+  })
+
+  it('retains S1 when local query validation rejects after Spring authorization', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', user: {}, setCookie: 'SESSIONID=S1; Path=/; HttpOnly' })
+
+    const { GET } = await import('@/app/api/applications/route')
+    const response = await GET(new NextRequest('http://localhost/api/applications?status=INVALID'))
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=S1')
+  })
+
+  it('retains S1 when the backend is missing after Spring authorization', async () => {
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', user: {}, setCookie: 'SESSIONID=S1; Path=/; HttpOnly' })
+
+    const { GET } = await import('@/app/api/applications/route')
+    const response = await GET(new NextRequest('http://localhost/api/applications'))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toEqual({ error: 'Spring backend not configured' })
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=S1')
+  })
+
+  it.each([['anonymous', 401], ['forbidden', 403], ['unavailable', 503]] as const)(
+    'returns Spring %s without calling legacy NextAuth', async (state, status) => {
+      process.env.BACKEND_URL = 'https://spring.example.com/'
+      process.env.SPRING_AUTH_ENABLED = 'true'
+      getSpringSessionMock.mockResolvedValue({ state })
+      const { GET } = await import('@/app/api/applications/route')
+      const response = await GET(new NextRequest('http://localhost/api/applications'))
+      expect(response.status).toBe(status)
+      if (state === 'unavailable') {
+        await expect(response.json()).resolves.toEqual({ error: 'Spring backend unavailable' })
+      }
+      expect(authMock).not.toHaveBeenCalled()
+    }
+  )
 })

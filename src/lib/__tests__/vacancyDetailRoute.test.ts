@@ -170,6 +170,94 @@ describe('/api/vacancies/[id]', () => {
     expect(findUniqueMock).not.toHaveBeenCalled()
   })
 
+  it('authorizes Spring detail reads with the rotated session and relays upstream cookies', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    authMock.mockRejectedValue(new Error('NextAuth must not gate Spring detail reads'))
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: rotatedSessionCookie,
+      user: { userId: 'spring-admin', email: 'admin@example.com' }
+    })
+    const upstreamCookie = 'XSRF-TOKEN=upstream-token; Path=/; SameSite=Lax'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (name: string) => name === 'set-cookie' ? upstreamCookie : null,
+        getSetCookie: () => [upstreamCookie]
+      },
+      json: () => Promise.resolve(springVacancyResponse('DRAFT'))
+    }))
+
+    const { GET } = await import('@/app/api/vacancies/[id]/route')
+    const response = await GET(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      headers: { Cookie: 'SESSIONID=original-session; XSRF-TOKEN=csrf' }
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain(rotatedSessionCookie)
+    expect(response.headers.get('set-cookie')).toContain(upstreamCookie)
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session; XSRF-TOKEN=csrf')
+    expect(fetch).toHaveBeenCalledWith(
+      `https://spring.example.com/api/v1/vacancies/${vacancyId}`,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-Backend-Api-Key': 'shared-secret',
+          Cookie: 'SESSIONID=rotated-session; XSRF-TOKEN=csrf'
+        })
+      })
+    )
+    expect(authMock).not.toHaveBeenCalled()
+    expect(findUniqueMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['anonymous', 401],
+    ['forbidden', 403],
+    ['unavailable', 503]
+  ] as const)('returns Spring %s for a protected detail read without NextAuth fallback', async (state, status) => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    authMock.mockRejectedValue(new Error('NextAuth must not gate Spring detail reads'))
+    getSpringSessionMock.mockResolvedValue({ state })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { GET } = await import('@/app/api/vacancies/[id]/route')
+    const response = await GET(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`, {
+      headers: { Cookie: 'SESSIONID=original-session' }
+    }), { params: Promise.resolve({ id: vacancyId }) })
+
+    expect(response.status).toBe(status)
+    expect(await response.json()).toEqual({ error: state === 'unavailable' ? 'Spring backend unavailable' : 'No autorizado' })
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(authMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps an active vacancy publicly visible in Spring-auth mode without a session', async () => {
+    process.env.BACKEND_URL = 'https://spring.example.com/'
+    process.env.SPRING_AUTH_ENABLED = 'true'
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { getSetCookie: () => [] },
+      json: () => Promise.resolve(springVacancyResponse('ACTIVE'))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { GET } = await import('@/app/api/vacancies/[id]/route')
+    const response = await GET(new NextRequest(`http://localhost:3000/api/vacancies/${vacancyId}`), {
+      params: Promise.resolve({ id: vacancyId })
+    })
+
+    expect(response.status).toBe(200)
+    expect((await response.json()).status).toBe('active')
+    expect(getSpringSessionMock).not.toHaveBeenCalled()
+    expect(authMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({})
+  })
+
   it('does not fall back to Prisma when Spring is configured and returns 404', async () => {
     process.env.BACKEND_URL = 'https://spring.example.com/'
     process.env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'

@@ -8,7 +8,9 @@ import com.meinardi.rrhh.presentation.ApplicationDetailResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import java.util.HexFormat;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -161,6 +163,50 @@ public class ApplicationManager
           .toList();
     }
     return postulacionRepository.findAll();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Postulacion> listApplications(String vacancyId, String status, String search) {
+    String normalizedSearch = search.toLowerCase(Locale.ROOT);
+    return listApplications(vacancyId, status).stream()
+        .filter(p -> normalizedSearch.isBlank() || matchesSearch(p, normalizedSearch))
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Postulacion> listApplications(
+      String vacancyId, String status, String search, String sortBy, String sortDirection) {
+    List<Postulacion> filtered = search == null
+        ? listApplications(vacancyId, status)
+        : listApplications(vacancyId, status, search);
+    Comparator<Postulacion> comparator = switch (sortBy) {
+      case "candidateName" -> Comparator.comparing(
+          p -> p.getCandidato().getNombre(), String.CASE_INSENSITIVE_ORDER);
+      case "status" -> Comparator.comparing(
+          p -> p.getEstadoActual() != null ? p.getEstadoActual().name() : "",
+          String.CASE_INSENSITIVE_ORDER);
+      default -> Comparator.comparing(this::applicationDate);
+    };
+    if ("desc".equalsIgnoreCase(sortDirection)) comparator = comparator.reversed();
+    if (!"submittedAt".equals(sortBy)) {
+      comparator = comparator.thenComparing(this::applicationDate, Comparator.reverseOrder());
+    }
+    return filtered.stream().sorted(comparator).toList();
+  }
+
+  private OffsetDateTime applicationDate(Postulacion application) {
+    return application.getSubmittedAt() != null
+        ? application.getSubmittedAt()
+        : application.getFechaPostulacion();
+  }
+
+  private boolean matchesSearch(Postulacion postulacion, String search) {
+    Candidato candidate = postulacion.getCandidato();
+    return candidate.getNombre().toLowerCase(Locale.ROOT).contains(search)
+        || candidate.getEmail().toLowerCase(Locale.ROOT).contains(search)
+        || candidate.getTelefono().toLowerCase(Locale.ROOT).contains(search);
   }
 
   @Override

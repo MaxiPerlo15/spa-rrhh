@@ -251,6 +251,23 @@ class ApplicationManagerTest {
     assertThat(results).hasSize(1);
   }
 
+  @Test
+  void listApplicationsFiltersCandidateSearchCaseInsensitively() {
+    Postulacion p = Postulacion.createSpontaneous(Candidato.create("Ana Pérez", "ana@empresa.com", "+54123", "cv"), "cover");
+    when(postulacionRepository.findAll()).thenReturn(List.of(p));
+    assertThat(applicationManager.listApplications(null, null, "ANA PÉREZ")).containsExactly(p);
+  }
+
+  @Test
+  void listApplicationsSortsCandidateNameAndSubmittedAt() {
+    Postulacion zeta = Postulacion.createSpontaneous(Candidato.create("Zeta", "z@test.com", "+123", "cv"), "cover");
+    Postulacion ana = Postulacion.createSpontaneous(Candidato.create("Ana", "a@test.com", "+124", "cv"), "cover");
+    when(postulacionRepository.findAll()).thenReturn(List.of(zeta, ana));
+
+    assertThat(applicationManager.listApplications(null, null, null, "candidateName", "asc"))
+        .containsExactly(ana, zeta);
+  }
+
   // --- admin lifecycle: getById ---
 
   @Test

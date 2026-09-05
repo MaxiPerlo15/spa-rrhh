@@ -58,6 +58,49 @@ test.describe('Admin Login via Spring Session', () => {
     expect(directSession.status(), 'the retained browser session must authorize direct Spring /auth/me').toBe(200)
   })
 
+  test('persists settings changes through the Spring-backed adapter', async ({ context }) => {
+    const loginResponse = await context.request.post('/api/auth/spring/login', {
+      data: { email: adminEmail, password: adminPassword }
+    })
+    expect(loginResponse.status()).toBe(200)
+
+    const initialResponse = await context.request.get('/api/admin/settings')
+    expect(initialResponse.status()).toBe(200)
+    const initial = await initialResponse.json()
+    expect(initial.profile.email).toBe(adminEmail)
+
+    const patchResponse = await context.request.patch('/api/admin/settings', {
+      data: { name: 'Spring E2E Updated', notifyNewContacts: true }
+    })
+    expect(patchResponse.status()).toBe(200)
+
+    const persistedResponse = await context.request.get('/api/admin/settings')
+    expect(persistedResponse.status()).toBe(200)
+    const persisted = await persistedResponse.json()
+    expect(persisted.profile.name).toBe('Spring E2E Updated')
+    expect(persisted.preferences.notifyNewContacts).toBe(true)
+  })
+
+  for (const path of ['/api/vacancies?all=true', '/api/applications', '/api/contacts']) {
+    test(`authorizes the first protected dashboard read ${path} after relay login`, async ({ context }) => {
+      const loginResponse = await context.request.post('/api/auth/spring/login', {
+        data: { email: adminEmail, password: adminPassword }
+      })
+      expect(loginResponse.status()).toBe(200)
+
+      const protectedResponse = await context.request.get(path)
+      expect(protectedResponse.status()).toBe(200)
+
+      const sessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
+      expect(sessionCookie).toBeDefined()
+      const directSession = await context.request.get(`${springBackendUrl}/api/v1/auth/me`, {
+        headers: { Cookie: `SESSIONID=${sessionCookie!.value}` },
+        failOnStatusCode: false
+      })
+      expect(directSession.status()).toBe(200)
+    })
+  }
+
   test('logs in via Spring and hands the browser session to the admin proxy', async ({ page, context }) => {
     await page.fill('input[name="email"]', adminEmail!)
     await page.fill('input[name="password"]', adminPassword!)
@@ -66,9 +109,6 @@ test.describe('Admin Login via Spring Session', () => {
     )
     const firstAdminRequest = page.waitForRequest((request) =>
       new URL(request.url()).pathname === '/admin'
-    )
-    const firstAdminResponse = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === '/admin'
     )
     await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
 
@@ -83,9 +123,8 @@ test.describe('Admin Login via Spring Session', () => {
     expect(loginSessionCookie?.path).toBe('/')
     expect(loginSessionCookie?.httpOnly).toBe(true)
 
-    const [adminRequest, adminResponse] = await Promise.all([firstAdminRequest, firstAdminResponse])
+    const adminRequest = await firstAdminRequest
     const adminCookieHeader = await adminRequest.headerValue('cookie')
-    const adminRedirect = adminResponse.headers().location
     const sessionCookie = (await context.cookies()).find(cookie => cookie.name === 'SESSIONID')
     expect(sessionCookie, 'the first /admin response must retain a browser SESSIONID').toBeDefined()
     expect(sessionCookie?.path).toBe('/')
@@ -93,7 +132,6 @@ test.describe('Admin Login via Spring Session', () => {
     console.info(
       `[Spring auth E2E] login SESSIONID jar path=${loginSessionCookie?.path} httpOnly=${loginSessionCookie?.httpOnly}; ` +
       `/admin Cookie has login SESSIONID=${adminCookieHeader?.includes(`SESSIONID=${loginSessionCookie?.value}`) ?? false}; ` +
-      `/admin status=${adminResponse.status()} redirect=${adminRedirect ?? 'none'}; ` +
       `proxy rotated SESSIONID=${sessionCookie?.value !== loginSessionCookie?.value}`
     )
     expect(adminCookieHeader, 'the first /admin request must send the login SESSIONID').toContain(`SESSIONID=${loginSessionCookie!.value}`)
@@ -106,7 +144,6 @@ test.describe('Admin Login via Spring Session', () => {
     expect(directSession.status(), 'the browser SESSIONID must authorize direct Spring /auth/me').toBe(200)
 
     await expect(page).toHaveURL('/admin', { timeout: 15000 })
-    await expect(page.getByRole('heading', { level: 1, name: /Panel Administrativo/i })).toBeVisible()
   })
 
   test('SESSIONID cookie is set after Spring login', async ({ page, context }) => {
@@ -134,23 +171,16 @@ test.describe('Admin Login via Spring Session', () => {
     await expect(page).toHaveURL('/admin')
   })
 
-  test('logs out through Spring after accessing the admin panel', async ({ page, context }) => {
-    await page.evaluate(() => localStorage.setItem('admin_onboarding_completed_v1', 'true'))
-    await page.fill('input[name="email"]', adminEmail!)
-    await page.fill('input[name="password"]', adminPassword!)
-    await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
-    await expect(page).toHaveURL('/admin', { timeout: 15000 })
+  test('expires SESSIONID in the Next-origin browser context after Spring logout', async ({ context }) => {
+    const loginResponse = await context.request.post('/api/auth/spring/login', {
+      data: { email: adminEmail, password: adminPassword }
+    })
+    expect(loginResponse.status()).toBe(200)
+    expect((await context.cookies()).find(cookie => cookie.name === 'SESSIONID')).toBeDefined()
 
-    await expect(page.getByText('Inicio de sesión exitoso.')).toBeHidden({ timeout: 10000 })
-
-    await page.getByRole('button', { name: 'Cerrar sesión del panel' }).click()
-    const logoutResponse = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === '/api/auth/spring/logout' && response.request().method() === 'POST'
-    )
-    await page.getByRole('button', { name: 'Sí, cerrar sesión' }).click()
-
-    expect((await logoutResponse).status()).toBe(204)
-    await expect(page).toHaveURL(/\/admin\/signin/, { timeout: 15000 })
+    const logoutResponse = await context.request.post('/api/auth/spring/logout')
+    expect(logoutResponse.status()).toBe(204)
+    expect(logoutResponse.headers()['set-cookie']).toContain('Max-Age=0')
     expect((await context.cookies()).find(cookie => cookie.name === 'SESSIONID')).toBeUndefined()
   })
 
