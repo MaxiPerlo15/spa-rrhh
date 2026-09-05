@@ -1,6 +1,7 @@
 package com.meinardi.rrhh.presentation;
 
 import com.meinardi.rrhh.application.ContactoService;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.domain.model.Contacto;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ContactoRestController {
 
   private final ContactoService contactoService;
+  private final AuditedAdminMutation auditedMutation;
 
-  public ContactoRestController(ContactoService contactoService) {
+  public ContactoRestController(ContactoService contactoService, AuditedAdminMutation auditedMutation) {
     this.contactoService = contactoService;
+    this.auditedMutation = auditedMutation;
   }
 
   @PostMapping
@@ -46,14 +49,14 @@ public class ContactoRestController {
 
   @PatchMapping("/{id}")
   public ContactResponse updateStatus(
-      @PathVariable String id, @RequestBody java.util.Map<String, String> body) {
+      @PathVariable String id, @RequestBody java.util.Map<String, String> body, jakarta.servlet.http.HttpServletRequest request) {
     String status = body.get("status");
-    return toResponse(contactoService.updateStatus(id, status));
+    return toResponse(auditedMutation.execute("contact.update_status", "contact", id, request.getRemoteAddr(), request.getHeader("User-Agent"), java.util.Map.of("newStatus", status), () -> contactoService.updateStatus(id, status)));
   }
 
   @DeleteMapping("/{id}")
-  public java.util.Map<String, Boolean> delete(@PathVariable String id) {
-    contactoService.delete(id);
+  public java.util.Map<String, Boolean> delete(@PathVariable String id, jakarta.servlet.http.HttpServletRequest request) {
+    auditedMutation.execute("contact.delete", "contact", id, request.getRemoteAddr(), request.getHeader("User-Agent"), java.util.Map.of(), () -> { contactoService.delete(id); return null; });
     return java.util.Map.of("success", true);
   }
 

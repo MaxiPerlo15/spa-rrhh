@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
@@ -35,6 +36,7 @@ class VacancyExceptionHandlerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private AuditedVacancyCreator auditedVacancyCreator;
+  @MockitoBean private AuditedAdminMutation auditedMutation;
   @MockitoBean private GetVacancyInputBoundary getVacancyInputBoundary;
   @MockitoBean private UpdateVacancyInputBoundary updateVacancyInputBoundary;
   @MockitoBean private ActivateVacancyInputBoundary activateVacancyInputBoundary;
@@ -55,7 +57,7 @@ class VacancyExceptionHandlerTest {
 
   @Test
   void activateVacancyReturnsConflictWhenBusinessRuleFails() throws Exception {
-    when(activateVacancyInputBoundary.activateVacancy("vacancy-id"))
+    when(auditedMutation.execute(eq("vacancy.activate"), eq("vacancy"), eq("vacancy-id"), any(), any(), any(), any()))
         .thenThrow(new IllegalStateException("La vacante ya se encuentra activa"));
 
     mockMvc
@@ -88,7 +90,7 @@ class VacancyExceptionHandlerTest {
 
   @Test
   void updateVacancyReturnsBadRequestWhenCommandIsInvalid() throws Exception {
-    when(updateVacancyInputBoundary.updateVacancy(eq("vacancy-id"), any(UpdateVacancyCommand.class)))
+    when(auditedMutation.execute(eq("vacancy.update"), eq("vacancy"), eq("vacancy-id"), any(), any(), any(), any()))
         .thenThrow(new IllegalArgumentException("descripcion is required"));
 
     mockMvc
