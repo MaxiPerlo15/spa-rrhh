@@ -44,8 +44,9 @@ describe('/api/admin/candidates POST', () => {
     rejectIfUntrustedOriginMock.mockReturnValue(null)
   })
 
-  it('rechaza acceso sin autenticación de admin', async () => {
-    authMock.mockResolvedValue(null)
+  it('returns 503 without a configured Spring backend without local audit or upstream mutation', async () => {
+    const { getBackendUrl } = await import('@/lib/server/springBackend')
+    vi.mocked(getBackendUrl).mockReturnValueOnce(null)
     const { POST } = await import('@/app/api/admin/candidates/route')
     const request = new NextRequest('http://localhost:3000/api/admin/candidates', {
       method: 'POST',
@@ -56,8 +57,10 @@ describe('/api/admin/candidates POST', () => {
     const response = await POST(request)
     const body = await response.json()
 
-    expect(response.status).toBe(401)
-    expect(body).toMatchObject({ error: 'No autorizado' })
+    expect(response.status).toBe(503)
+    expect(body).toEqual({ error: 'Spring backend not configured' })
+    expect(auditAdminActionMock).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('rechaza candidatos manuales duplicados por identidad', async () => {
