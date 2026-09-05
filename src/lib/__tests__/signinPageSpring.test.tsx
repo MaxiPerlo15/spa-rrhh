@@ -8,7 +8,6 @@ vi.stubGlobal('fetch', fetchMock)
 
 // Set env vars BEFORE importing the component
 vi.stubEnv('NEXT_PUBLIC_SPRING_AUTH_ENABLED', 'true')
-vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://spring.example.com')
 
 const {
   pushMock,
@@ -43,7 +42,7 @@ describe('SignInPage — Spring relay mode', () => {
     vi.clearAllMocks()
   })
 
-  it('POSTs to Spring /api/v1/auth/login instead of NextAuth', async () => {
+  it('POSTs to the same-origin Spring login relay instead of NextAuth', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ userId: 'u1', email: 'admin@test.com' })
@@ -61,7 +60,7 @@ describe('SignInPage — Spring relay mode', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://spring.example.com/api/v1/auth/login',
+        '/api/auth/spring/login',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -90,7 +89,7 @@ describe('SignInPage — Spring relay mode', () => {
     await waitFor(() => {
       expect(showSuccessMock).toHaveBeenCalledWith('Inicio de sesión exitoso. Redirigiendo al panel.')
       expect(pushMock).toHaveBeenCalledWith('/admin')
-      expect(refreshMock).toHaveBeenCalled()
+      expect(refreshMock).not.toHaveBeenCalled()
     })
   })
 
@@ -135,7 +134,7 @@ describe('SignInPage — Spring relay mode', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://spring.example.com/api/v1/auth/login',
+        '/api/auth/spring/login',
         expect.objectContaining({
           body: JSON.stringify({ email: 'admin@test.com', password: 'Password123!' })
         })

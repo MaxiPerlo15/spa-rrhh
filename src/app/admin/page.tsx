@@ -271,6 +271,8 @@ export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { showSuccess, showError, showInfo } = useToast()
+  const springAuthEnabled = process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED === 'true'
+  const isAuthenticated = springAuthEnabled || status === 'authenticated'
   useMobileKeyboardAssist()
   
   // Usar el hook customizado para manejar datos y operaciones
@@ -292,7 +294,7 @@ export default function AdminDashboard() {
     deleteApplication: deleteApplicationApi,
     updateContactStatus,
     deleteContact: deleteContactApi
-  } = useAdminDashboard({ enabled: status === 'authenticated' })
+  } = useAdminDashboard({ enabled: isAuthenticated })
   
   const [activeTab, setActiveTab] = useState<AdminTab>('vacancies')
   const [lastNonSettingsTab, setLastNonSettingsTab] = useState<AdminTab>('vacancies')
@@ -645,7 +647,7 @@ export default function AdminDashboard() {
   }
 
   const loadAuditTimeline = useCallback(async () => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
 
     setAuditTimelineLoading(true)
     setAuditTimelineError(null)
@@ -682,7 +684,7 @@ export default function AdminDashboard() {
     } finally {
       setAuditTimelineLoading(false)
     }
-  }, [auditFilters.action, auditFilters.actorEmail, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.resourceType, auditTimelinePage, status])
+  }, [auditFilters.action, auditFilters.actorEmail, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.resourceType, auditTimelinePage, isAuthenticated])
 
   const filteredVacancies = useMemo(() => {
     return buildFilteredVacancies({
@@ -835,10 +837,10 @@ export default function AdminDashboard() {
   }, [firstApplicationId, firstApplicationWithCvId, firstContactId, firstVacancyId])
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (!springAuthEnabled && status === 'unauthenticated') {
       router.push('/admin/signin')
     }
-  }, [status, router])
+  }, [status, router, springAuthEnabled])
 
   useEffect(() => {
     if (activeTab !== 'settings') {
@@ -847,7 +849,7 @@ export default function AdminDashboard() {
   }, [activeTab])
 
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
 
     let shouldShow = false
     try {
@@ -861,15 +863,15 @@ export default function AdminDashboard() {
       setShowOnboarding(true)
       showInfo('Bienvenido al panel. Te mostramos un tutorial rápido.')
     }
-  }, [status, showInfo])
+  }, [isAuthenticated, showInfo])
 
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
     void reloadNotifications()
-  }, [status, reloadNotifications])
+  }, [isAuthenticated, reloadNotifications])
 
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
 
     void (async () => {
       try {
@@ -892,15 +894,15 @@ export default function AdminDashboard() {
         showError('No se pudo cargar la configuración del panel.')
       }
     })()
-  }, [showError, status])
+  }, [showError, isAuthenticated])
 
   useEffect(() => {
-    if (status !== 'authenticated' || activeTab !== 'settings') return
+    if (!isAuthenticated || activeTab !== 'settings') return
     void loadAuditTimeline()
-  }, [activeTab, loadAuditTimeline, status])
+  }, [activeTab, loadAuditTimeline, isAuthenticated])
 
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
     try {
       const raw = window.localStorage.getItem(ADMIN_TABLE_STATE_STORAGE_KEY)
       if (!raw) return
@@ -955,10 +957,10 @@ export default function AdminDashboard() {
     } catch {
       // ignore invalid persisted state
     }
-  }, [status])
+  }, [isAuthenticated])
 
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!isAuthenticated) return
     try {
       window.localStorage.setItem(
         ADMIN_TABLE_STATE_STORAGE_KEY,
@@ -1005,7 +1007,7 @@ export default function AdminDashboard() {
     sortContactsDirection,
     sortVacanciesBy,
     sortVacanciesDirection,
-    status
+    isAuthenticated
   ])
 
   useEffect(() => {
@@ -1764,11 +1766,13 @@ export default function AdminDashboard() {
       closeOnBackdropClick: true,
       onConfirm: async () => {
         try {
-          const callbackUrl = `${window.location.origin}/admin/signin`
-          await signOut({
-            callbackUrl,
-            redirect: false
-          })
+          if (springAuthEnabled) {
+            const response = await fetch('/api/auth/spring/logout', { method: 'POST' })
+            if (!response.ok) throw new Error('Spring logout failed')
+          } else {
+            const callbackUrl = `${window.location.origin}/admin/signin`
+            await signOut({ callbackUrl, redirect: false })
+          }
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
           router.replace('/admin/signin')
           router.refresh()
@@ -2046,7 +2050,7 @@ const handleTestSentry = () => {
     'REJECTED': 'bg-red-100 text-red-800'
   }
 
-  if (status === 'loading' || isLoading) {
+  if ((!springAuthEnabled && status === 'loading') || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
@@ -2054,13 +2058,13 @@ const handleTestSentry = () => {
     )
   }
 
-  if (!session) return null
+  if (!session && !springAuthEnabled) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminHeader 
         activeTab={activeTab}
-        userEmail={session.user?.email ?? undefined}
+        userEmail={session?.user?.email ?? undefined}
         onSignOut={handleSignOut}
         onBackFromSettings={handleBackFromSettings}
         onOpenFullTutorial={handleOpenHelp}
@@ -2251,7 +2255,7 @@ const handleTestSentry = () => {
 
         {activeTab === 'settings' && (
           <AdminSettingsSection
-            email={session.user?.email}
+            email={session?.user?.email}
             settingsForm={settingsForm}
             setSettingsForm={(updater) => setSettingsForm(updater)}
             settingsSaving={settingsSaving}

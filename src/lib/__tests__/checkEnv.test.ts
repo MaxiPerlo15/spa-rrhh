@@ -22,6 +22,8 @@ describe('validateRuntimeEnv', () => {
     delete env.FROM_EMAIL
     delete env.BACKEND_URL
     delete env.BACKEND_INTERNAL_API_TOKEN
+    delete env.SPRING_AUTH_ENABLED
+    delete env.NEXT_PUBLIC_SPRING_AUTH_ENABLED
   })
 
   afterEach(() => {
@@ -119,5 +121,17 @@ describe('validateRuntimeEnv', () => {
     env.BACKEND_INTERNAL_API_TOKEN = 'shared-secret'
 
     expect(() => validateRuntimeEnv()).toThrow('BACKEND_URL must use http/https protocol')
+  })
+
+  it('fails when Spring auth server and browser flags differ', () => {
+    const env = process.env as Record<string, string | undefined>
+
+    env.BACKEND_URL = 'https://spring.example.com'
+    env.SPRING_AUTH_ENABLED = 'true'
+    env.NEXT_PUBLIC_SPRING_AUTH_ENABLED = 'false'
+
+    expect(() => validateRuntimeEnv()).toThrow(
+      'SPRING_AUTH_ENABLED and NEXT_PUBLIC_SPRING_AUTH_ENABLED must match'
+    )
   })
 })

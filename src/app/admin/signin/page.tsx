@@ -10,10 +10,6 @@ function isSpringAuthEnabled() {
   return process.env.NEXT_PUBLIC_SPRING_AUTH_ENABLED === 'true'
 }
 
-function getSpringBackendUrl() {
-  return process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, '') || null
-}
-
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -40,9 +36,9 @@ export default function SignInPage() {
 
       setIsLoading(true)
 
-      // Spring relay mode: POST directly to Spring backend
-      if (isSpringAuthEnabled() && getSpringBackendUrl()) {
-        const response = await fetch(`${getSpringBackendUrl()}/api/v1/auth/login`, {
+      // Spring relay mode keeps the browser session on the Next origin.
+      if (isSpringAuthEnabled()) {
+        const response = await fetch('/api/auth/spring/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: normalizedEmail, password: trimmedPassword })
@@ -56,7 +52,6 @@ export default function SignInPage() {
 
         showSuccess('Inicio de sesión exitoso. Redirigiendo al panel.')
         router.push('/admin')
-        router.refresh()
         return
       }
 

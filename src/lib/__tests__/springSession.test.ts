@@ -16,6 +16,7 @@ describe('getSpringSession', () => {
 
     fetchMock.mockResolvedValue({
       ok: true,
+      headers: new Headers({ 'Set-Cookie': 'SESSIONID=rotated; Path=/; HttpOnly; SameSite=Lax' }),
       json: async () => ({
         userId: 'user-1',
         email: 'admin@test.com',
@@ -37,6 +38,7 @@ describe('getSpringSession', () => {
     )
     expect(result).toEqual({
       state: 'authorized',
+      sessionCookie: 'SESSIONID=rotated; Path=/; HttpOnly; SameSite=Lax',
       user: {
         userId: 'user-1',
         email: 'admin@test.com',
@@ -51,12 +53,18 @@ describe('getSpringSession', () => {
 
     fetchMock.mockResolvedValue({
       ok: false,
-      status: 401
+      status: 401,
+      headers: new Headers({
+        'Set-Cookie': 'SESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax'
+      })
     })
 
     const result = await getSpringSession('SESSIONID=expired')
 
-    expect(result).toEqual({ state: 'anonymous' })
+    expect(result).toEqual({
+      state: 'anonymous',
+      sessionCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax'
+    })
   })
 
   it('returns a forbidden state when Spring returns 403', async () => {

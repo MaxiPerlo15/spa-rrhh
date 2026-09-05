@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,23 +52,29 @@ public class AuthController {
   }
 
   @GetMapping("/me")
-  public ResponseEntity<LoginResponse> me(HttpServletRequest request) {
-    return sessionService
-        .validateSession(request)
+  public ResponseEntity<LoginResponse> me(Authentication authentication) {
+    return authenticatedUser(authentication)
         .map(usuario -> ResponseEntity.ok(toLoginResponse(usuario)))
         .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-    return sessionService
-        .validateSession(request, response)
+  public ResponseEntity<Void> logout(
+      Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    return authenticatedUser(authentication)
         .map(
             usuario -> {
               sessionService.invalidateSession(request, response);
               return ResponseEntity.noContent().<Void>build();
             })
         .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+  }
+
+  private java.util.Optional<Usuario> authenticatedUser(Authentication authentication) {
+    if (authentication == null || !(authentication.getPrincipal() instanceof Usuario usuario)) {
+      return java.util.Optional.empty();
+    }
+    return java.util.Optional.of(usuario);
   }
 
   private LoginResponse toLoginResponse(Usuario usuario) {

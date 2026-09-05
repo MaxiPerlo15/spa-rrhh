@@ -44,10 +44,11 @@ vi.mock('@/lib/springSession', () => ({
 
 import { proxy } from '@/proxy'
 
-function makeRequest(pathname: string, opts: { cookie?: string; origin?: string; method?: string } = {}) {
+function makeRequest(pathname: string, opts: { cookie?: string; origin?: string; host?: string; method?: string } = {}) {
   const headers = new Headers()
   if (opts.cookie) headers.set('cookie', opts.cookie)
   if (opts.origin) headers.set('origin', opts.origin)
+  if (opts.host) headers.set('host', opts.host)
 
   return {
     nextUrl: { pathname, origin: 'http://localhost:3001' },
@@ -93,6 +94,19 @@ describe('proxy — CORS and cross-origin branches', () => {
     const request = makeRequest('/api/vacancies')
     proxy(request, {} as never)
     expect(mocks.applyCorsHeadersMock).not.toHaveBeenCalled()
+  })
+
+  it('treats a request origin matching the Host header as same-origin', () => {
+    const request = makeRequest('/api/auth/spring/login', {
+      origin: 'http://127.0.0.1:3100',
+      host: '127.0.0.1:3100',
+      method: 'POST'
+    })
+
+    const result = proxy(request, {} as never) as unknown as { type: string }
+
+    expect(result.type).toBe('next')
+    expect(mocks.isAllowedOriginMock).not.toHaveBeenCalled()
   })
 })
 

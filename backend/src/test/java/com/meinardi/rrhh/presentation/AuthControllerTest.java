@@ -20,6 +20,7 @@ import com.meinardi.rrhh.infrastructure.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -128,11 +131,8 @@ class AuthControllerTest {
 
   @Test
   void meReturnsCurrentUserWhenSessionValid() throws Exception {
-    when(sessionService.validateSession(any(HttpServletRequest.class)))
-        .thenReturn(Optional.of(testUsuario));
-
     mockMvc
-        .perform(get("/api/v1/auth/me"))
+        .perform(get("/api/v1/auth/me").principal(authenticatedPrincipal()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.userId").value("u1"))
         .andExpect(jsonPath("$.email").value("admin@test.com"))
@@ -153,8 +153,6 @@ class AuthControllerTest {
 
   @Test
   void logoutReturns204AndClearsTheBrowserSessionCookie() throws Exception {
-    when(sessionService.validateSession(any(HttpServletRequest.class), any(HttpServletResponse.class)))
-        .thenReturn(Optional.of(testUsuario));
     doAnswer(invocation -> {
           invocation.getArgument(1, HttpServletResponse.class).addHeader("Set-Cookie", "SESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
           return null;
@@ -163,7 +161,7 @@ class AuthControllerTest {
         .invalidateSession(any(HttpServletRequest.class), any(HttpServletResponse.class));
 
     mockMvc
-        .perform(post("/api/v1/auth/logout"))
+        .perform(post("/api/v1/auth/logout").principal(authenticatedPrincipal()))
         .andExpect(status().isNoContent())
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
@@ -180,5 +178,9 @@ class AuthControllerTest {
     mockMvc.perform(post("/api/v1/auth/logout")).andExpect(status().isUnauthorized());
 
     verify(sessionService, never()).invalidateSession(any(), any());
+  }
+
+  private Authentication authenticatedPrincipal() {
+    return new UsernamePasswordAuthenticationToken(testUsuario, null, List.of());
   }
 }

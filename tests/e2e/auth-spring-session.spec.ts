@@ -30,12 +30,18 @@ test.describe('Admin Login via Spring Session', () => {
   })
 
   test('logs in via Spring and redirects to admin panel', async ({ page }) => {
+    const relayRequest = page.waitForRequest('/api/auth/spring/login')
     await page.fill('input[name="email"]', adminEmail!)
     await page.fill('input[name="password"]', adminPassword!)
     await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
 
-    await expect(page).toHaveURL('/admin', { timeout: 15000 })
+    await expect(page).toHaveURL(/\/admin(?:\?.*)?$/, { timeout: 15000 })
     await expect(page.getByRole('heading', { level: 1, name: /Panel Administrativo/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Cerrar sesión del panel' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Vacantes', exact: true })).toBeVisible()
+    await expect(page.locator('input[name="password"]')).toHaveCount(0)
+    expect(new URL(page.url()).pathname).toBe('/admin')
+    await relayRequest
   })
 
   test('SESSIONID cookie is set after Spring login', async ({ page, context }) => {
@@ -51,16 +57,17 @@ test.describe('Admin Login via Spring Session', () => {
     expect(sessionCookie?.httpOnly).toBe(true)
   })
 
-  test('admin page access with valid Spring session', async ({ page }) => {
-    // Login first
+  test('logs out through the same-origin relay and clears the browser session', async ({ page }) => {
     await page.fill('input[name="email"]', adminEmail!)
     await page.fill('input[name="password"]', adminPassword!)
     await page.getByRole('button', { name: /Iniciar Sesión/i }).click()
     await expect(page).toHaveURL('/admin', { timeout: 15000 })
 
-    // Navigate to admin dashboard — should work with existing session
-    await page.goto('/admin/dashboard')
-    await expect(page).toHaveURL(/\/admin/)
+    const relayResponse = page.waitForResponse('/api/auth/spring/logout')
+    await page.evaluate(() => fetch('/api/auth/spring/logout', { method: 'POST' }))
+    expect((await relayResponse).status()).toBe(204)
+    await expect(page).toHaveURL(/\/admin\/signin/)
+    expect((await page.context().cookies()).find((cookie) => cookie.name === 'SESSIONID')).toBeUndefined()
   })
 
   test('redirects to signin when no SESSIONID cookie', async ({ page }) => {

@@ -13,18 +13,18 @@ vi.mock('next/server', () => ({
     next: (opts?: unknown) => ({
       type: 'next',
       opts,
-      headers: { set: vi.fn() }
+      headers: { append: vi.fn(), set: vi.fn() }
     }),
     json: (body: unknown, init?: unknown) => ({
       type: 'json',
       body,
       init,
-      headers: { set: vi.fn() }
+      headers: { append: vi.fn(), set: vi.fn() }
     }),
     redirect: (url: string) => ({
       type: 'redirect',
       url,
-      headers: { set: vi.fn() }
+      headers: { append: vi.fn(), set: vi.fn() }
     })
   }
 }))
@@ -70,16 +70,55 @@ describe('proxy — Spring session relay', () => {
 
   it('forwards SESSIONID cookie to Spring for /admin paths', () => {
     getSpringSessionMock.mockResolvedValue({
-      userId: 'user-1',
-      email: 'admin@test.com',
-      nombreUsuario: 'admin',
-      rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      state: 'authorized',
+      user: {
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
     })
 
     const request = makeRequest('/admin/dashboard', 'SESSIONID=abc123')
     proxy(request, {} as never)
 
     expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=abc123')
+  })
+
+  it('expires a stale SESSIONID when Spring rejects it during the proxy check', async () => {
+    getSpringSessionMock.mockResolvedValue({
+      state: 'anonymous',
+      sessionCookie: 'SESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax'
+    })
+
+    const response = await proxy(makeRequest('/admin', 'SESSIONID=expired') as never, {} as never)
+
+    expect(response).toBeDefined()
+    expect(response!.headers.append).toHaveBeenCalledWith(
+      'Set-Cookie',
+      'SESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax'
+    )
+  })
+
+  it('forwards a rotated SESSIONID after Spring validates the admin session', async () => {
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      sessionCookie: 'SESSIONID=rotated; Path=/; HttpOnly; SameSite=Lax',
+      user: {
+        userId: 'user-1',
+        email: 'admin@test.com',
+        nombreUsuario: 'admin',
+        rol: { id: 'rol-1', nombre: 'ADMIN', permisos: ['admin:access'] }
+      }
+    })
+
+    const response = await proxy(makeRequest('/admin', 'SESSIONID=stale-id') as never, {} as never)
+
+    expect(response).toBeDefined()
+    expect(response!.headers.append).toHaveBeenCalledWith(
+      'Set-Cookie',
+      'SESSIONID=rotated; Path=/; HttpOnly; SameSite=Lax'
+    )
   })
 
   it('does not check session for non-admin paths', () => {
