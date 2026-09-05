@@ -36,15 +36,15 @@ Chain strategy: feature-branch-chain
 ## Phase 3: Admin Ownership
 
 - [x] 3.1 **PR2a RED→GREEN→REFACTOR** Spring health and thin `src/app/api/health/route.ts`; preserve 200/503 `{status,database}` and `Cache-Control: no-store`.
-- [ ] 3.2 **PR2a-fix-a RED** Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts`: relay, logout cookies, redaction, and auth mode.
-- [ ] 3.3 **PR2a-fix-a GREEN→REFACTOR** Use `src/lib/server/springBackend.ts`; align `src/lib/checkEnv.ts` and admin props; forward relay cookies only; **≤400**.
+- [x] 3.2 **PR2a-fix-a RED** Vitest contracts for `src/app/api/auth/spring/{login,logout}/route.ts`: relay, logout cookies, redaction, and auth mode.
+- [x] 3.3 **PR2a-fix-a GREEN→REFACTOR** Use `src/lib/server/springBackend.ts`; align `src/lib/checkEnv.ts` and admin props; forward relay cookies only; **≤400**.
 - [x] 3.4 **PR2a-fix-a2 RED** Add `src/app/__tests__/layout.test.tsx` and `tests/e2e/auth-spring-session.spec.ts` contracts: Spring mode omits global `SessionProvider`/`SentryUserContext`, uses `/admin`, and submits only to the same-origin relay.
 - [x] 3.5 **PR2a-fix-a2 GREEN→REFACTOR** Gate providers in `src/app/layout.tsx`; set Spring-matching server flags in `playwright.config.ts`; correct the Playwright `/admin` route and relay assertion. Preserve legacy mode; rollback layout/config/E2E only; **≤400**.
 - [x] 3.6 **PR2a-fix-a2 verify** Run layout/Vitest and Chromium Spring relay proof, lint/typecheck; rebase PR2a-fix-b before its RED task.
 - [x] 3.7 **PR2a-fix-b RED** Spring/JUnit and Vitest `src/proxy.ts`/`src/lib/springSession.ts` contracts: rotated/expired `SESSIONID` reaches Next. Depends PR2a-fix-a2.
 - [x] 3.8 **PR2a-fix-b GREEN→REFACTOR** Forward rotation/stale expiry; harden `tests/e2e/auth-spring-session.spec.ts` cookie handoff and `/admin`. **≤400**.
 - [x] 3.9 **PR2a-fix-b verify** Run focused JUnit, Vitest, Playwright, lint/typecheck; then rebase PR2b.
-- [ ] 3.10 **PR2b RED→GREEN→REFACTOR** Spring and `src/app/api/admin/notifications/{route.ts,[id]/route.ts}`: pagination/DTOs, 201, 400/404, 401/403/503. Depends PR2a-fix-b; **≤400**.
+- [x] 3.10 **PR2b RED→GREEN→REFACTOR** Spring and `src/app/api/admin/notifications/{route.ts,[id]/route.ts}`: pagination/DTOs, 201, 400/404, 401/403/503. Depends PR2a-fix-b; approved `size:exception` (1,072 changed lines, notification-only boundary).
 - [ ] 3.11 **PR2c RED→GREEN→REFACTOR** Spring audit and `src/app/api/admin/audit/route.ts`: filters, UTC bounds, order, pagination, errors. Depends PR2b; **≤400**.
 - [ ] 3.12 **PR2d RED→GREEN→REFACTOR** Spring settings and `src/app/api/admin/settings/route.ts`: shape and error envelopes. Depends PR2c; **≤400**.
 

@@ -1,175 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
-import {
-  adminNotificationsListQuerySchema,
-  createAdminNotificationSchema,
-  formatValidationError
-} from '@/lib/apiValidation'
-import { toAdminNotificationDto, type AdminNotificationDtoSource } from '@/lib/dto/adminNotification'
-import { canUseSchemaDriftFallback } from '@/lib/prismaError'
+import { adminNotificationsListQuerySchema, createAdminNotificationSchema, formatValidationError } from '@/lib/apiValidation'
+import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
+import { getSpringSession } from '@/lib/springSession'
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' }
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const queryValidation = adminNotificationsListQuerySchema.safeParse({
-      view: request.nextUrl.searchParams.get('view') ?? undefined,
-      page: request.nextUrl.searchParams.get('page') ?? undefined,
-      limit: request.nextUrl.searchParams.get('limit') ?? undefined
-    })
-
-    if (!queryValidation.success) {
-      return NextResponse.json(formatValidationError(queryValidation.error), { status: 400 })
-    }
-
-    const { view, page, limit } = queryValidation.data
-    const where =
-      view === 'all'
-        ? {}
-        : {
-            isRead: view === 'read'
-          }
-
-    let items: AdminNotificationDtoSource[]
-    const totalPromise = prisma.adminNotification.count({ where })
-    try {
-      items = await prisma.adminNotification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit
-      })
-    } catch (error) {
-      if (!canUseSchemaDriftFallback(error)) throw error
-      logger.warn('Fallback temporal de lectura de notificaciones por schema drift', {
-        route: 'GET /api/admin/notifications'
-      })
-      items = await prisma.adminNotification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          message: true,
-          level: true,
-          isRead: true,
-          createdAt: true
-        }
-      })
-    }
-    const total = await totalPromise
-
-    return NextResponse.json({
-      items: items.map(toAdminNotificationDto),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / limit))
-      }
-    })
-  } catch (error) {
-    logger.error('Error al listar notificaciones admin', error)
-    return NextResponse.json({ error: 'Error al obtener notificaciones' }, { status: 500 })
-  }
+  const authorization = await authorize(request)
+  if (authorization) return authorization
+  const validation = adminNotificationsListQuerySchema.safeParse({ view: request.nextUrl.searchParams.get('view') ?? undefined, page: request.nextUrl.searchParams.get('page') ?? undefined, limit: request.nextUrl.searchParams.get('limit') ?? undefined })
+  if (!validation.success) return json(formatValidationError(validation.error), 400)
+  const { view, page, limit } = validation.data
+  return proxy(request, `/api/v1/admin/notifications?view=${view}&page=${page}&limit=${limit}`)
 }
 
 export async function POST(request: NextRequest) {
+  const authorization = await authorize(request)
+  if (authorization) return authorization
+  const originRejection = rejectIfUntrustedOrigin(request)
+  if (originRejection) return withNoStore(originRejection)
+  let body: unknown
   try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const originRejection = rejectIfUntrustedOrigin(request)
-    if (originRejection) {
-      return originRejection
-    }
-
-    const body = await request.json()
-    const bodyValidation = createAdminNotificationSchema.safeParse(body)
-    if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
-    }
-
-    let created: AdminNotificationDtoSource
-    try {
-      created = await prisma.adminNotification.create({
-        data: {
-          title: bodyValidation.data.title,
-          message: bodyValidation.data.message,
-          level: bodyValidation.data.level,
-          actionLabel: bodyValidation.data.action?.label,
-          actionType: bodyValidation.data.action?.type,
-          actionResourceId: bodyValidation.data.action?.resourceId
-        }
-      })
-    } catch (error) {
-      if (!canUseSchemaDriftFallback(error)) throw error
-      logger.warn('Fallback temporal de creación de notificaciones por schema drift', {
-        route: 'POST /api/admin/notifications'
-      })
-      created = await prisma.adminNotification.create({
-        data: {
-          title: bodyValidation.data.title,
-          message: bodyValidation.data.message,
-          level: bodyValidation.data.level
-        },
-        select: {
-          id: true,
-          title: true,
-          message: true,
-          level: true,
-          isRead: true,
-          createdAt: true
-        }
-      })
-    }
-
-    return NextResponse.json(toAdminNotificationDto(created), { status: 201 })
+    body = await request.json()
   } catch (error) {
     logger.error('Error al crear notificación admin', error)
-    return NextResponse.json({ error: 'Error al crear notificación' }, { status: 500 })
+    return json({ error: 'Error al crear notificación' }, 500)
   }
+  const validation = createAdminNotificationSchema.safeParse(body)
+  if (!validation.success) return json(formatValidationError(validation.error), 400)
+  return proxy(request, '/api/v1/admin/notifications', { method: 'POST', body: JSON.stringify(validation.data) })
 }
 
 export async function DELETE(request: NextRequest) {
+  const authorization = await authorize(request)
+  if (authorization) return authorization
+  const originRejection = rejectIfUntrustedOrigin(request)
+  if (originRejection) return withNoStore(originRejection)
+  const view = request.nextUrl.searchParams.get('view')
+  if (view !== 'all' && view !== 'read') return json({ error: 'Parámetro view inválido' }, 400)
+  return proxy(request, `/api/v1/admin/notifications?view=${view}`, { method: 'DELETE' })
+}
+
+async function proxy(request: NextRequest, path: string, init?: RequestInit) {
+  const backendUrl = getBackendUrl()
+  if (!backendUrl) return json({ error: 'Spring backend not configured' }, 503)
   try {
-    const session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const originRejection = rejectIfUntrustedOrigin(request)
-    if (originRejection) {
-      return originRejection
-    }
-
-    const view = request.nextUrl.searchParams.get('view')
-    const where =
-      view === 'read'
-        ? { isRead: true }
-        : view === 'all'
-          ? {}
-          : null
-
-    if (!where) {
-      return NextResponse.json({ error: 'Parámetro view inválido' }, { status: 400 })
-    }
-
-    const deleted = await prisma.adminNotification.deleteMany({ where })
-
-    return NextResponse.json({ deletedCount: deleted.count })
+    const response = await fetch(`${backendUrl}${path}`, {
+      ...init,
+      cache: 'no-store',
+      headers: { ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...getSpringBackendHeaders(), ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {}) }
+    })
+    return new NextResponse(await response.text(), { status: response.status, headers: { ...NO_STORE_HEADERS, 'Content-Type': response.headers.get('Content-Type') ?? 'application/json' } })
   } catch (error) {
-    logger.error('Error al eliminar notificaciones admin', error)
-    return NextResponse.json({ error: 'Error al eliminar notificaciones' }, { status: 500 })
+    logger.error('Spring backend unavailable for admin notifications', error)
+    return json({ error: 'Spring backend unavailable' }, 503)
   }
+}
+
+function json(body: unknown, status: number) { return NextResponse.json(body, { status, headers: NO_STORE_HEADERS }) }
+
+async function authorize(request: NextRequest) {
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) return json({ error: 'No autorizado' }, 401)
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') return json({ error: 'No autorizado' }, 401)
+  if (session.state === 'forbidden') return json({ error: 'No autorizado' }, 403)
+  if (session.state === 'unavailable') return json({ error: 'Spring backend unavailable' }, 503)
+  return null
+}
+
+function withNoStore(response: Response) {
+  response.headers.set('Cache-Control', 'no-store')
+  return response
 }
