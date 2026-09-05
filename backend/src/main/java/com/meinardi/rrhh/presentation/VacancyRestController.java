@@ -3,6 +3,7 @@ package com.meinardi.rrhh.presentation;
 import com.meinardi.rrhh.application.ActivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.CreateVacancyCommand;
 import com.meinardi.rrhh.application.AuditedVacancyCreator;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
 import com.meinardi.rrhh.application.CloseVacancyInputBoundary;
 import com.meinardi.rrhh.application.DeactivateVacancyInputBoundary;
 import com.meinardi.rrhh.application.GetVacancyInputBoundary;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/vacancies")
 public class VacancyRestController {
   private final AuditedVacancyCreator auditedVacancyCreator;
+  private final AuditedAdminMutation auditedMutation;
   private final GetVacancyInputBoundary getVacancyInputBoundary;
   private final UpdateVacancyInputBoundary updateVacancyInputBoundary;
   private final ActivateVacancyInputBoundary activateVacancyInputBoundary;
@@ -38,6 +40,7 @@ public class VacancyRestController {
 
   public VacancyRestController(
       AuditedVacancyCreator auditedVacancyCreator,
+      AuditedAdminMutation auditedMutation,
       GetVacancyInputBoundary getVacancyInputBoundary,
       UpdateVacancyInputBoundary updateVacancyInputBoundary,
       ActivateVacancyInputBoundary activateVacancyInputBoundary,
@@ -45,6 +48,7 @@ public class VacancyRestController {
       CloseVacancyInputBoundary closeVacancyInputBoundary,
       ListVacanciesInputBoundary listVacanciesInputBoundary) {
     this.auditedVacancyCreator = auditedVacancyCreator;
+    this.auditedMutation = auditedMutation;
     this.getVacancyInputBoundary = getVacancyInputBoundary;
     this.updateVacancyInputBoundary = updateVacancyInputBoundary;
     this.activateVacancyInputBoundary = activateVacancyInputBoundary;
@@ -76,26 +80,32 @@ public class VacancyRestController {
   }
 
   @PatchMapping("/{id}")
-  public VacancyResponse update(@PathVariable String id, @Valid @RequestBody UpdateVacancyCommand command) {
-    Vacante updated = updateVacancyInputBoundary.updateVacancy(id, command);
+  public VacancyResponse update(@PathVariable String id, @Valid @RequestBody UpdateVacancyCommand command, HttpServletRequest request) {
+    Vacante updated = mutation("vacancy.update", id, request, () -> updateVacancyInputBoundary.updateVacancy(id, command));
     return VacancyResponse.from(updated);
   }
 
   @PatchMapping("/{id}/close")
-  public VacancyResponse close(@PathVariable String id) {
-    Vacante closed = closeVacancyInputBoundary.closeVacancy(id);
+  public VacancyResponse close(@PathVariable String id, HttpServletRequest request) {
+    Vacante closed = mutation("vacancy.close", id, request, () -> closeVacancyInputBoundary.closeVacancy(id));
     return VacancyResponse.from(closed);
   }
 
   @PatchMapping("/{id}/activate")
-  public VacancyResponse activate(@PathVariable String id) {
-    Vacante activated = activateVacancyInputBoundary.activateVacancy(id);
+  public VacancyResponse activate(@PathVariable String id, HttpServletRequest request) {
+    Vacante activated = mutation("vacancy.activate", id, request, () -> activateVacancyInputBoundary.activateVacancy(id));
     return VacancyResponse.from(activated);
   }
 
   @PatchMapping("/{id}/deactivate")
-  public VacancyResponse deactivate(@PathVariable String id) {
-    Vacante deactivated = deactivateVacancyInputBoundary.deactivateVacancy(id);
+  public VacancyResponse deactivate(@PathVariable String id, HttpServletRequest request) {
+    Vacante deactivated = mutation("vacancy.deactivate", id, request, () -> deactivateVacancyInputBoundary.deactivateVacancy(id));
     return VacancyResponse.from(deactivated);
+  }
+
+  private Vacante mutation(String action, String id, HttpServletRequest request, java.util.function.Supplier<Vacante> operation) {
+    String forwardedFor = request.getHeader("X-Forwarded-For");
+    String clientIp = forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim();
+    return auditedMutation.execute(action, "vacancy", id, clientIp, request.getHeader("User-Agent"), java.util.Map.of(), operation);
   }
 }

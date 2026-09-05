@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { auditAdminAction } from '@/lib/adminAudit'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
 import { formatValidationError, routeIdSchema, updateVacancySchema } from '@/lib/apiValidation'
 import { normalizeLocation } from '@/lib/utils'
@@ -16,6 +15,13 @@ import {
   rejectUnsupportedSpringVacancyFields,
   SpringVacancyWriteError
 } from '@/lib/server/springVacancyGateway'
+import { getSpringSession } from '@/lib/springSession'
+import {
+  getAllowedBffRequestHeaders,
+  recordDeniedBffAudit,
+  recordErrorBffAudit,
+  relaySpringCookies
+} from '@/lib/server/adminBffBoundary'
 
 class SpringVacancyNotFoundError extends Error {
   constructor(id: string) {
@@ -44,7 +50,7 @@ async function rejectFailedSpringVacancyStatusMutation(
   }
 }
 
-async function closeVacancyInSpring(id: string) {
+async function closeVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -52,7 +58,7 @@ async function closeVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/close`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...getAllowedBffRequestHeaders(request), Cookie: cookie }
   })
 
   await rejectFailedSpringVacancyStatusMutation(
@@ -88,7 +94,7 @@ async function getVacancyFromSpring(id: string) {
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
 }
 
-async function activateVacancyInSpring(id: string) {
+async function activateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -96,7 +102,7 @@ async function activateVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/activate`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...getAllowedBffRequestHeaders(request), Cookie: cookie }
   })
 
   await rejectFailedSpringVacancyStatusMutation(
@@ -109,7 +115,7 @@ async function activateVacancyInSpring(id: string) {
   return mapSpringToDto(await response.json() as SpringVacancyResponse)
 }
 
-async function deactivateVacancyInSpring(id: string) {
+async function deactivateVacancyInSpring(id: string, request: NextRequest, cookie: string) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
     throw new Error('BACKEND_URL is required for vacancy operations')
@@ -117,7 +123,7 @@ async function deactivateVacancyInSpring(id: string) {
 
   const response = await fetch(`${backendUrl}/api/v1/vacancies/${id}/deactivate`, {
     method: 'PATCH',
-    headers: getSpringBackendHeaders()
+    headers: { ...getSpringBackendHeaders(), ...getAllowedBffRequestHeaders(request), Cookie: cookie }
   })
 
   await rejectFailedSpringVacancyStatusMutation(
@@ -132,7 +138,9 @@ async function deactivateVacancyInSpring(id: string) {
 
 async function updateVacancyInSpring(
   id: string,
-  data: ReturnType<typeof buildUpdatePayload>
+  data: ReturnType<typeof buildUpdatePayload>,
+  request: NextRequest,
+  cookie: string
 ) {
   const backendUrl = getBackendUrl()
   if (!backendUrl) {
@@ -143,7 +151,9 @@ async function updateVacancyInSpring(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      ...getSpringBackendHeaders()
+      ...getSpringBackendHeaders(),
+      ...getAllowedBffRequestHeaders(request),
+      Cookie: cookie
     },
     body: JSON.stringify(data)
   })
@@ -164,6 +174,48 @@ interface RouteParams {
   params: Promise<{
     id: string
   }>
+}
+
+type AuthorizedSession = {
+  cookie: string
+  setCookie?: string
+  actor: { id: string; email: string }
+}
+
+function relayCookie(response: NextResponse, setCookie?: string) {
+  relaySpringCookies(response, setCookie)
+  return response
+}
+
+async function getAuthorizedSessionCookie(
+  request: NextRequest,
+  action: string
+): Promise<AuthorizedSession | NextResponse> {
+  const auditEvent = { action, resourceType: 'vacancy' }
+  const sessionId = request.cookies.get('SESSIONID')?.value
+  if (!sessionId) {
+    await recordDeniedBffAudit(request, auditEvent)
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const session = await getSpringSession(`SESSIONID=${sessionId}`)
+  if (session.state === 'anonymous') {
+    await recordDeniedBffAudit(request, auditEvent)
+    return relayCookie(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), session.setCookie)
+  }
+  if (session.state === 'forbidden') {
+    await recordDeniedBffAudit(request, auditEvent)
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+  if (session.state === 'unavailable') {
+    await recordErrorBffAudit(request, auditEvent, new Error('Spring backend unavailable'))
+    return NextResponse.json({ error: 'Spring backend unavailable' }, { status: 503 })
+  }
+  return {
+    cookie: session.setCookie?.split(';', 1)[0] ?? `SESSIONID=${sessionId}`,
+    setCookie: session.setCookie,
+    actor: { id: session.user.userId, email: session.user.email }
+  }
 }
 
 // GET /api/vacancies/[id] - Obtener una vacante específica
@@ -208,43 +260,28 @@ export async function GET(
 
 // Función compartida para actualizar vacante
 async function updateVacancy(request: NextRequest, params: Promise<{ id: string }>) {
-  let session = null as Awaited<ReturnType<typeof auth>>
+  let authorizedSetCookie: string | undefined
+  let actor: AuthorizedSession['actor'] | undefined
   let resourceId: string | undefined
   try {
-    // Verificar autenticación
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.update',
-        resourceType: 'vacancy',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+    if (!getBackendUrl()) {
+      await recordErrorBffAudit(request, { action: 'vacancy.update', resourceType: 'vacancy' }, new Error('Vacancy backend not configured'))
+      return NextResponse.json({ error: 'Vacancy backend not configured' }, { status: 503 })
     }
+    const sessionCookie = await getAuthorizedSessionCookie(request, 'vacancy.update')
+    if (sessionCookie instanceof NextResponse) return sessionCookie
+    authorizedSetCookie = sessionCookie.setCookie
+    actor = sessionCookie.actor
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
-    }
-
-    if (!getBackendUrl()) {
-      return NextResponse.json(
-        { error: 'Vacancy backend not configured' },
-        { status: 503 }
-      )
+      await recordDeniedBffAudit(request, { action: 'vacancy.update', resourceType: 'vacancy', actor })
+      return relayCookie(originRejection, authorizedSetCookie)
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
-      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(parsedParams.error), { status: 400 }), authorizedSetCookie)
     }
     const { id } = parsedParams.data
     resourceId = id
@@ -252,12 +289,12 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     const body = await request.json()
     const bodyValidation = updateVacancySchema.safeParse(body)
     if (!bodyValidation.success) {
-      return NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(bodyValidation.error), { status: 400 }), authorizedSetCookie)
     }
 
     const unsupportedFields = getUnsupportedSpringVacancyFields(bodyValidation.data)
     if (unsupportedFields.length > 0) {
-      return rejectUnsupportedSpringVacancyFields(unsupportedFields)
+      return relayCookie(rejectUnsupportedSpringVacancyFields(unsupportedFields), authorizedSetCookie)
     }
 
     const normalizedBody = { ...bodyValidation.data }
@@ -271,68 +308,48 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
     const hasBusinessFieldChange = Object.keys(normalizedBody).some((key) => key !== 'status')
 
     if (requestedStatus !== undefined && hasBusinessFieldChange) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'La modificación de datos y el cambio de estado deben realizarse por operaciones separadas' },
         { status: 400 }
-      )
+      ), authorizedSetCookie)
     }
 
     if (isOnlyStatusChange && (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE' || requestedStatus === 'CLOSED')) {
       let vacancy = null
       try {
         vacancy = requestedStatus === 'ACTIVE'
-          ? await activateVacancyInSpring(id)
+          ? await activateVacancyInSpring(id, request, sessionCookie.cookie)
           : requestedStatus === 'INACTIVE'
-            ? await deactivateVacancyInSpring(id)
-            : await closeVacancyInSpring(id)
+            ? await deactivateVacancyInSpring(id, request, sessionCookie.cookie)
+            : await closeVacancyInSpring(id, request, sessionCookie.cookie)
       } catch (error) {
         if (error instanceof SpringVacancyNotFoundError) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: 'Vacante no encontrada' },
             { status: 404 }
-          )
+          ), authorizedSetCookie)
         }
         if (error instanceof SpringVacancyWriteError) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: error.message },
             { status: error.status }
-          )
+          ), authorizedSetCookie)
         }
         throw error
       }
 
       if (vacancy) {
-        await auditAdminAction({
-          request,
-          actor: {
-            id: session.user?.id,
-            email: session.user?.email
-          },
-          action: requestedStatus === 'ACTIVE'
-            ? 'vacancy.activate'
-            : requestedStatus === 'INACTIVE'
-              ? 'vacancy.deactivate'
-              : 'vacancy.close',
-          resourceType: 'vacancy',
-          resourceId: vacancy.id,
-          outcome: 'SUCCESS',
-          metadata: {
-            title: vacancy.title,
-            newStatus: vacancy.status,
-            backend: 'spring'
-          }
-        })
         revalidatePublicVacanciesCache()
 
-        return NextResponse.json(vacancy)
+        return relayCookie(NextResponse.json(vacancy), authorizedSetCookie)
       }
     }
 
     if (isOnlyStatusChange) {
-      return NextResponse.json(
+      return relayCookie(NextResponse.json(
         { error: 'Cambio de estado no soportado por el backend configurado' },
         { status: 400 }
-      )
+      ), authorizedSetCookie)
     }
 
     if (hasBusinessFieldChange) {
@@ -345,67 +362,38 @@ async function updateVacancy(request: NextRequest, params: Promise<{ id: string 
           workday: bodyValidation.data.workday,
           modality: bodyValidation.data.modality,
           requirements: bodyValidation.data.requirements
-        }))
+        }), request, sessionCookie.cookie)
       } catch (error) {
         if (error instanceof SpringVacancyNotFoundError) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: 'Vacante no encontrada' },
             { status: 404 }
-          )
+          ), authorizedSetCookie)
         }
         if (error instanceof SpringVacancyWriteError) {
-          return NextResponse.json(
+          return relayCookie(NextResponse.json(
             { error: error.message },
             { status: error.status }
-          )
+          ), authorizedSetCookie)
         }
         throw error
       }
 
       if (springVacancy) {
-        await auditAdminAction({
-          request,
-          actor: {
-            id: session.user?.id,
-            email: session.user?.email
-          },
-          action: 'vacancy.update',
-          resourceType: 'vacancy',
-          resourceId: springVacancy.id,
-          outcome: 'SUCCESS',
-          metadata: {
-            changedFields: Object.keys(normalizedBody).filter((field) => field !== 'status'),
-            title: springVacancy.title,
-            backend: 'spring'
-          }
-        })
         revalidatePublicVacanciesCache()
 
-        return NextResponse.json(springVacancy)
+        return relayCookie(NextResponse.json(springVacancy), authorizedSetCookie)
       }
     }
 
     throw new Error('Spring backend did not complete the vacancy update')
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'vacancy.update',
-      resourceType: 'vacancy',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
+    await recordErrorBffAudit(request, { action: 'vacancy.update', resourceType: 'vacancy', resourceId, actor }, error)
     logger.error('Error al actualizar vacante', error)
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       { error: 'Error al actualizar vacante' },
       { status: 500 }
-    )
+    ), authorizedSetCookie)
   }
 }
 
@@ -430,106 +418,62 @@ export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
 ) {
-  let session = null as Awaited<ReturnType<typeof auth>>
+  let authorizedSetCookie: string | undefined
+  let actor: AuthorizedSession['actor'] | undefined
   let resourceId: string | undefined
   try {
-    // Verificar autenticación
-    session = await auth()
-    if (!session || session.user?.role !== 'ADMIN') {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session?.user?.id,
-          email: session?.user?.email
-        },
-        action: 'vacancy.close',
-        resourceType: 'vacancy',
-        outcome: 'DENIED'
-      })
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+    if (!getBackendUrl()) {
+      await recordErrorBffAudit(request, { action: 'vacancy.close', resourceType: 'vacancy' }, new Error('Vacancy backend not configured'))
+      return NextResponse.json({ error: 'Vacancy backend not configured' }, { status: 503 })
     }
+    const sessionCookie = await getAuthorizedSessionCookie(request, 'vacancy.close')
+    if (sessionCookie instanceof NextResponse) return sessionCookie
+    authorizedSetCookie = sessionCookie.setCookie
+    actor = sessionCookie.actor
 
     const originRejection = rejectIfUntrustedOrigin(request)
     if (originRejection) {
-      return originRejection
-    }
-
-    if (!getBackendUrl()) {
-      return NextResponse.json(
-        { error: 'Vacancy backend not configured' },
-        { status: 503 }
-      )
+      await recordDeniedBffAudit(request, { action: 'vacancy.close', resourceType: 'vacancy', actor })
+      return relayCookie(originRejection, authorizedSetCookie)
     }
 
     const parsedParams = routeIdSchema.safeParse(await params)
     if (!parsedParams.success) {
-      return NextResponse.json(formatValidationError(parsedParams.error), { status: 400 })
+      return relayCookie(NextResponse.json(formatValidationError(parsedParams.error), { status: 400 }), authorizedSetCookie)
     }
     const { id } = parsedParams.data
     resourceId = id
 
     let closedVacancy = null
     try {
-      closedVacancy = await closeVacancyInSpring(id)
+      closedVacancy = await closeVacancyInSpring(id, request, sessionCookie.cookie)
     } catch (error) {
       if (error instanceof SpringVacancyNotFoundError) {
-        return NextResponse.json(
+        return relayCookie(NextResponse.json(
           { error: 'Vacante no encontrada' },
           { status: 404 }
-        )
+        ), authorizedSetCookie)
       }
       if (error instanceof SpringVacancyWriteError) {
-        return NextResponse.json(
+        return relayCookie(NextResponse.json(
           { error: error.message },
           { status: error.status }
-        )
+        ), authorizedSetCookie)
       }
       throw error
     }
 
     if (closedVacancy) {
-      await auditAdminAction({
-        request,
-        actor: {
-          id: session.user?.id,
-          email: session.user?.email
-        },
-        action: 'vacancy.close',
-        resourceType: 'vacancy',
-        resourceId: id,
-        outcome: 'SUCCESS',
-        metadata: {
-          title: closedVacancy.title,
-          newStatus: closedVacancy.status,
-          backend: 'spring'
-        }
-      })
       revalidatePublicVacanciesCache()
 
-      return NextResponse.json(closedVacancy)
+      return relayCookie(NextResponse.json(closedVacancy), authorizedSetCookie)
     }
   } catch (error) {
-    await auditAdminAction({
-      request,
-      actor: {
-        id: session?.user?.id,
-        email: session?.user?.email
-      },
-      action: 'vacancy.close',
-      resourceType: 'vacancy',
-      resourceId,
-      outcome: 'ERROR',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
-    })
+    await recordErrorBffAudit(request, { action: 'vacancy.close', resourceType: 'vacancy', resourceId, actor }, error)
     logger.error('Error al cerrar vacante', error)
-    return NextResponse.json(
+    return relayCookie(NextResponse.json(
       { error: 'Error al cerrar vacante' },
       { status: 500 }
-    )
+    ), authorizedSetCookie)
   }
 }
