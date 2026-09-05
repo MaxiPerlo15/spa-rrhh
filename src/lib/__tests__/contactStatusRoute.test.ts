@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const authMock = vi.fn()
-const auditAdminActionMock = vi.fn()
+const getSpringSessionMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({
   auth: authMock
 }))
 
-vi.mock('@/lib/adminAudit', () => ({
-  auditAdminAction: auditAdminActionMock
+vi.mock('@/lib/springSession', () => ({
+  getSpringSession: getSpringSessionMock
 }))
 
 vi.mock('@/lib/csrf', () => ({
@@ -89,6 +89,7 @@ describe('/api/contacts/[id] PATCH', () => {
         email: 'admin@test.com'
       }
     })
+    getSpringSessionMock.mockResolvedValue({ state: 'authorized', user: {} })
 
     fetchSpy.mockResolvedValueOnce(
       new Response(
@@ -102,7 +103,8 @@ describe('/api/contacts/[id] PATCH', () => {
       method: 'PATCH',
       body: JSON.stringify({ status: 'RESPONDED' }),
       headers: {
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        Cookie: 'SESSIONID=original-session'
       }
     })
 
@@ -135,5 +137,80 @@ describe('/api/contacts/[id] PATCH', () => {
 
     expect(response.status).toBe(401)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('delegates the status mutation with the rotated Spring session and safe request context', async () => {
+    authMock.mockResolvedValue({
+      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
+    })
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: {}
+    })
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      id: 'cmdbcontactstatus0000000001',
+      name: 'Carlos Lopez',
+      email: 'carlos@example.com',
+      phone: '+54 11 9876-5432',
+      subject: 'Reclutamiento',
+      message: 'Quiero postularme',
+      status: 'RESPONDED',
+      createdAt: '2026-03-01T08:00:00.000Z'
+    }), { status: 200 }))
+
+    const { PATCH } = await import('@/app/api/contacts/[id]/route')
+    const response = await PATCH(new NextRequest(
+      'http://localhost:3000/api/contacts/cmdbcontactstatus0000000001',
+      {
+        method: 'PATCH',
+        headers: {
+          Cookie: 'SESSIONID=original-session',
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.10, 10.0.0.1',
+          'User-Agent': 'contact-admin-test'
+        },
+        body: JSON.stringify({ status: 'RESPONDED' })
+      }
+    ), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(getSpringSessionMock).toHaveBeenCalledWith('SESSIONID=original-session')
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/contacts/cmdbcontactstatus0000000001',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Cookie: 'SESSIONID=rotated-session',
+          'X-Forwarded-For': '203.0.113.10',
+          'User-Agent': 'contact-admin-test'
+        })
+      })
+    )
+  })
+
+  it('delegates contact deletion with the Spring session and relays its rotation', async () => {
+    authMock.mockResolvedValue({
+      user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
+    })
+    getSpringSessionMock.mockResolvedValue({
+      state: 'authorized',
+      setCookie: 'SESSIONID=rotated-session; Path=/; HttpOnly',
+      user: {}
+    })
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const { DELETE } = await import('@/app/api/contacts/[id]/route')
+    const response = await DELETE(new NextRequest(
+      'http://localhost:3000/api/contacts/cmdbcontactstatus0000000001',
+      { method: 'DELETE', headers: { Cookie: 'SESSIONID=original-session' } }
+    ), { params: Promise.resolve({ id: 'cmdbcontactstatus0000000001' }) })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('SESSIONID=rotated-session')
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/contacts/cmdbcontactstatus0000000001',
+      expect.objectContaining({ method: 'DELETE', headers: expect.objectContaining({ Cookie: 'SESSIONID=rotated-session' }) })
+    )
   })
 })

@@ -58,17 +58,17 @@ public class SecurityConfig {
             exceptions ->
                 exceptions
                     .authenticationEntryPoint(
-                        (request, response, exception) -> {
-                          recordCandidateDenied(request, auditService);
-                          if (request.getRequestURI().startsWith("/api/v1/admin/")) {
+                         (request, response, exception) -> {
+                          recordDenied(request, auditService);
+                          if (request.getRequestURI().startsWith("/api/v1/admin/") || isContactMutation(request)) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
                           }
                         })
                      .accessDeniedHandler(
-                         (request, response, exception) -> {
-                           recordCandidateDenied(request, auditService);
+                          (request, response, exception) -> {
+                            recordDenied(request, auditService);
                            writeJsonError(response, 403, "forbidden");
                          }))
         .sessionManagement(
@@ -136,20 +136,10 @@ public class SecurityConfig {
                               hasValidInternalApiToken(
                                   context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
                                   internalApiToken)));
-              auth.requestMatchers(HttpMethod.PATCH, "/api/v1/contacts/{id}")
-                  .access(
-                      (authentication, context) ->
-                          new AuthorizationDecision(
-                              hasValidInternalApiToken(
-                                  context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                  internalApiToken)));
-              auth.requestMatchers(HttpMethod.DELETE, "/api/v1/contacts/{id}")
-                  .access(
-                      (authentication, context) ->
-                          new AuthorizationDecision(
-                              hasValidInternalApiToken(
-                                  context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                  internalApiToken)));
+               auth.requestMatchers(HttpMethod.PATCH, "/api/v1/contacts/{id}")
+                   .hasAuthority("admin:access");
+               auth.requestMatchers(HttpMethod.DELETE, "/api/v1/contacts/{id}")
+                   .hasAuthority("admin:access");
 
               // Admin candidate create and update — requires internal API token
               auth.requestMatchers(HttpMethod.POST, "/api/v1/candidates")
@@ -222,17 +212,24 @@ public class SecurityConfig {
         && configuredToken.equals(providedToken);
   }
 
-  private void recordCandidateDenied(
+  static void recordDenied(
       jakarta.servlet.http.HttpServletRequest request, AuditService auditService) {
     String path = request.getRequestURI();
     String action;
     String resourceId;
+    String resourceType;
     if ("POST".equals(request.getMethod()) && "/api/v1/candidates".equals(path)) {
       action = "candidate.create";
       resourceId = null;
+      resourceType = "candidate";
     } else if ("PATCH".equals(request.getMethod()) && path.startsWith("/api/v1/candidates/")) {
       action = "candidate.update";
       resourceId = path.substring("/api/v1/candidates/".length());
+      resourceType = "candidate";
+    } else if (isContactMutation(request)) {
+      action = "PATCH".equals(request.getMethod()) ? "contact.update_status" : "contact.delete";
+      resourceId = path.substring("/api/v1/contacts/".length());
+      resourceType = "contact";
     } else {
       return;
     }
@@ -240,7 +237,7 @@ public class SecurityConfig {
       String forwardedFor = request.getHeader("X-Forwarded-For");
       auditService.recordDenied(
           action,
-          "candidate",
+           resourceType,
           resourceId,
           forwardedFor == null ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim(),
           request.getHeader("User-Agent"),
@@ -248,6 +245,11 @@ public class SecurityConfig {
     } catch (RuntimeException auditFailure) {
       log.error("Unable to persist {} DENIED audit event", action, auditFailure);
     }
+  }
+
+  private static boolean isContactMutation(jakarta.servlet.http.HttpServletRequest request) {
+    return ("PATCH".equals(request.getMethod()) || "DELETE".equals(request.getMethod()))
+        && request.getRequestURI().startsWith("/api/v1/contacts/");
   }
 
   private boolean requiresInternalApiToken(

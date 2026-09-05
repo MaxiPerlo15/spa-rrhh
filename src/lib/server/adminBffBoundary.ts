@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server'
 import { isIP } from 'node:net'
-import { auditAdminAction } from '@/lib/adminAudit'
 
 export type BffAuditEvent = {
   actor?: { id?: string | null; email?: string | null }
@@ -11,6 +10,7 @@ export type BffAuditEvent = {
 }
 
 export async function recordDeniedBffAudit(request: NextRequest, event: BffAuditEvent) {
+  const { auditAdminAction } = await import('@/lib/adminAudit')
   await auditAdminAction({ ...event, request, outcome: 'DENIED' })
 }
 
@@ -19,6 +19,7 @@ export async function recordErrorBffAudit(
   event: BffAuditEvent,
   error: unknown
 ) {
+  const { auditAdminAction } = await import('@/lib/adminAudit')
   await auditAdminAction({
     ...event,
     request,

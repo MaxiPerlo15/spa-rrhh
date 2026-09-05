@@ -20,6 +20,8 @@ import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
+import com.meinardi.rrhh.application.AuditedAdminMutation;
+import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.PasswordResetService;
 import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
@@ -29,6 +31,7 @@ import com.meinardi.rrhh.presentation.ApplicationRestController;
 import com.meinardi.rrhh.presentation.NotificationController;
 import com.meinardi.rrhh.presentation.AuditController;
 import com.meinardi.rrhh.presentation.CandidateRestController;
+import com.meinardi.rrhh.presentation.ContactoRestController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -46,7 +49,7 @@ import org.springframework.mock.web.MockHttpSession;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, NotificationController.class, AuditController.class})
+@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -79,6 +82,8 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private AuditService auditService;
   @MockitoBean private AuditedCandidateAdmin auditedCandidateAdmin;
+  @MockitoBean private AuditedAdminMutation auditedAdminMutation;
+  @MockitoBean private ContactoService contactoService;
   @Autowired private SessionService sessionService;
 
   // --- GET /api/v1/applications/{id} ---
@@ -131,6 +136,22 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.eq("candidate.update"),
             org.mockito.ArgumentMatchers.eq("candidate"),
             org.mockito.ArgumentMatchers.eq("candidate-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void anonymousContactDeleteReturns401AndRecordsDeniedInSpring() throws Exception {
+    mockMvc
+        .perform(delete("/api/v1/contacts/contact-123"))
+        .andExpect(status().isUnauthorized());
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("contact.delete"),
+            org.mockito.ArgumentMatchers.eq("contact"),
+            org.mockito.ArgumentMatchers.eq("contact-123"),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
