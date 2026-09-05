@@ -21,6 +21,7 @@ import com.meinardi.rrhh.application.ListVacanciesInputBoundary;
 import com.meinardi.rrhh.application.NotificationService;
 import com.meinardi.rrhh.application.AuditService;
 import com.meinardi.rrhh.application.AuditedAdminMutation;
+import com.meinardi.rrhh.application.AuditedVacancyCreator;
 import com.meinardi.rrhh.application.AuditedCandidateAdmin;
 import com.meinardi.rrhh.application.ContactoService;
 import com.meinardi.rrhh.application.PasswordResetService;
@@ -28,11 +29,16 @@ import com.meinardi.rrhh.application.SessionService;
 import com.meinardi.rrhh.application.UpdateVacancyInputBoundary;
 import com.meinardi.rrhh.domain.model.Rol;
 import com.meinardi.rrhh.domain.model.Usuario;
+import com.meinardi.rrhh.domain.model.Jornada;
+import com.meinardi.rrhh.domain.model.Modalidad;
+import com.meinardi.rrhh.domain.model.Ubicacion;
+import com.meinardi.rrhh.domain.model.Vacante;
 import com.meinardi.rrhh.presentation.ApplicationRestController;
 import com.meinardi.rrhh.presentation.NotificationController;
 import com.meinardi.rrhh.presentation.AuditController;
 import com.meinardi.rrhh.presentation.CandidateRestController;
 import com.meinardi.rrhh.presentation.ContactoRestController;
+import com.meinardi.rrhh.presentation.VacancyRestController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -47,10 +53,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.Optional;
 import java.util.Set;
 
-@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class})
+@WebMvcTest({ApplicationRestController.class, CandidateRestController.class, ContactoRestController.class, NotificationController.class, AuditController.class, VacancyRestController.class})
 @AutoConfigureMockMvc(addFilters = true)
 @Import({SecurityConfig.class, SessionService.class})
 @TestPropertySource(
@@ -83,6 +90,7 @@ class SecurityConfigApplicationRoutesTest {
   @MockitoBean private NotificationService notificationService;
   @MockitoBean private AuditService auditService;
   @MockitoBean private AuditedAdminMutation auditedAdminMutation;
+  @MockitoBean private AuditedVacancyCreator auditedVacancyCreator;
   @MockitoBean private AuditedCandidateAdmin auditedCandidateAdmin;
   @MockitoBean private ContactoService contactoService;
   @Autowired private SessionService sessionService;
@@ -194,6 +202,124 @@ class SecurityConfigApplicationRoutesTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
     org.mockito.Mockito.verifyNoInteractions(auditedCandidateAdmin);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"create", "update", "activate", "deactivate", "close"})
+  void anonymousVacancyMutationReturnsJson401RecordsDeniedAndDoesNotMutate(String operation)
+      throws Exception {
+    mockMvc
+        .perform(vacancyMutation(operation))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(content().string("{\"error\":\"unauthorized\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("vacancy." + operation),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            "create".equals(operation)
+                ? org.mockito.ArgumentMatchers.isNull()
+                : org.mockito.ArgumentMatchers.eq("vacancy-123"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(
+        auditedVacancyCreator,
+        updateVacancyInputBoundary,
+        activateVacancyInputBoundary,
+        deactivateVacancyInputBoundary,
+        closeVacancyInputBoundary,
+        auditedAdminMutation);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"create", "update", "activate", "deactivate", "close"})
+  void forbiddenVacancyMutationReturnsJson403WithSanitizedAuditContextAndDoesNotMutate(
+      String operation) throws Exception {
+    Usuario user = administratorWithoutPermission();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+
+    mockMvc
+        .perform(
+            vacancyMutation(operation)
+                .session(sessionFor(user))
+                .with(request -> {
+                  request.setRemoteAddr("10.0.0.4");
+                  return request;
+                })
+                .header("X-Forwarded-For", "203.0.113.+10")
+                .header("User-Agent", "a".repeat(513)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(content().string("{\"error\":\"forbidden\"}"));
+
+    org.mockito.Mockito.verify(auditService)
+        .recordDenied(
+            org.mockito.ArgumentMatchers.eq("vacancy." + operation),
+            org.mockito.ArgumentMatchers.eq("vacancy"),
+            "create".equals(operation)
+                ? org.mockito.ArgumentMatchers.isNull()
+                : org.mockito.ArgumentMatchers.eq("vacancy-123"),
+            org.mockito.ArgumentMatchers.eq("10.0.0.4"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.of("reason", "forbidden")));
+    org.mockito.Mockito.verifyNoInteractions(
+        auditedVacancyCreator,
+        updateVacancyInputBoundary,
+        activateVacancyInputBoundary,
+        deactivateVacancyInputBoundary,
+        closeVacancyInputBoundary,
+        auditedAdminMutation);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"create", "update", "activate", "deactivate", "close"})
+  void vacancyMutationWithAdminAccessReachesTheMutation(String operation) throws Exception {
+    Usuario user = administrator();
+    Vacante vacancy = vacancy();
+    org.mockito.Mockito.when(usuarioRepository.findById("u1")).thenReturn(Optional.of(user));
+    if ("create".equals(operation)) {
+      org.mockito.Mockito.when(
+              auditedVacancyCreator.create(
+                  org.mockito.ArgumentMatchers.any(),
+                  org.mockito.ArgumentMatchers.any(),
+                  org.mockito.ArgumentMatchers.any()))
+          .thenReturn(vacancy);
+    } else {
+      org.mockito.Mockito.doAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(6)).get())
+          .when(auditedAdminMutation)
+          .execute(
+              org.mockito.ArgumentMatchers.anyString(),
+              org.mockito.ArgumentMatchers.anyString(),
+              org.mockito.ArgumentMatchers.anyString(),
+              org.mockito.ArgumentMatchers.anyString(),
+              org.mockito.ArgumentMatchers.nullable(String.class),
+              org.mockito.ArgumentMatchers.anyMap(),
+              org.mockito.ArgumentMatchers.any());
+      switch (operation) {
+        case "update" ->
+            org.mockito.Mockito.when(
+                    updateVacancyInputBoundary.updateVacancy(
+                        org.mockito.ArgumentMatchers.eq("vacancy-123"),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenReturn(vacancy);
+        case "activate" ->
+            org.mockito.Mockito.when(activateVacancyInputBoundary.activateVacancy("vacancy-123"))
+                .thenReturn(vacancy);
+        case "deactivate" ->
+            org.mockito.Mockito.when(deactivateVacancyInputBoundary.deactivateVacancy("vacancy-123"))
+                .thenReturn(vacancy);
+        case "close" ->
+            org.mockito.Mockito.when(closeVacancyInputBoundary.closeVacancy("vacancy-123"))
+                .thenReturn(vacancy);
+        default -> throw new IllegalArgumentException("unsupported vacancy mutation");
+      }
+    }
+
+    mockMvc
+        .perform(vacancyMutation(operation).session(sessionFor(user)))
+        .andExpect("create".equals(operation) ? status().isCreated() : status().isOk());
   }
 
   @ParameterizedTest
@@ -462,6 +588,31 @@ class SecurityConfigApplicationRoutesTest {
     return "PATCH".equals(method)
         ? patch("/api/v1/contacts/contact-123").contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"RESPONDED\"}")
         : delete("/api/v1/contacts/contact-123");
+  }
+
+  private MockHttpServletRequestBuilder vacancyMutation(String operation) {
+    if ("create".equals(operation)) {
+      return post("/api/v1/vacancies")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+              "{\"titulo\":\"Platform Engineer\",\"descripcion\":\"Build reliable systems\",\"ubicacionNombre\":\"Remote\",\"jornada\":\"FULL_TIME\",\"modalidad\":\"REMOTE\"}");
+    }
+    return patch("/api/v1/vacancies/vacancy-123" + ("update".equals(operation) ? "" : "/" + operation))
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("update".equals(operation) ? "{\"titulo\":\"Updated vacancy\"}" : "");
+  }
+
+  private Vacante vacancy() {
+    Vacante vacancy =
+        Vacante.create(
+            "Platform Engineer",
+            "Build reliable systems",
+            null,
+            new Ubicacion("Remote", "Remote"),
+            Jornada.FULL_TIME,
+            Modalidad.REMOTE);
+    vacancy.setId("vacancy-123");
+    return vacancy;
   }
 
   private void assertInvalidSession(MockHttpSession session) throws Exception {

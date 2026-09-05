@@ -60,10 +60,11 @@ public class SecurityConfig {
                     .authenticationEntryPoint(
                         (request, response, exception) -> {
                           recordDenied(request, auditService);
-                           if (request.getRequestURI().startsWith("/api/v1/admin/")
-                               || isContactMutation(request)
-                               || isCandidateCreate(request)
-                               || isCandidatePatch(request)) {
+                            if (request.getRequestURI().startsWith("/api/v1/admin/")
+                                || isContactMutation(request)
+                                || isCandidateCreate(request)
+                                || isCandidatePatch(request)
+                                || isVacancyMutation(request)) {
                             writeJsonError(response, 401, "unauthorized");
                           } else {
                             response.sendError(403);
@@ -98,27 +99,10 @@ public class SecurityConfig {
                                     internalApiToken)));
               }
 
-              if (allowUnauthenticatedMutations) {
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
-                    .permitAll();
-                auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
-                    .permitAll();
-              } else {
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
-                    .access(
-                        (authentication, context) ->
-                            new AuthorizationDecision(
-                                hasValidInternalApiToken(
-                                    context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                    internalApiToken)));
-                auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
-                    .access(
-                        (authentication, context) ->
-                            new AuthorizationDecision(
-                                hasValidInternalApiToken(
-                                    context.getRequest().getHeader(INTERNAL_API_TOKEN_HEADER),
-                                    internalApiToken)));
-              }
+              auth.requestMatchers(HttpMethod.POST, "/api/v1/vacancies")
+                  .hasAuthority("admin:access");
+              auth.requestMatchers(HttpMethod.PATCH, "/api/v1/vacancies/**")
+                  .hasAuthority("admin:access");
 
               // Public contact submit — no auth required (rate limit + captcha enforced by Next BFF)
               auth.requestMatchers(HttpMethod.POST, "/api/v1/contacts")
@@ -211,6 +195,7 @@ public class SecurityConfig {
     String action;
     String resourceId;
     String resourceType;
+    VacancyDeniedAction vacancyDeniedAction = vacancyDeniedAction(request);
     if ("POST".equals(request.getMethod()) && "/api/v1/candidates".equals(path)) {
       action = "candidate.create";
       resourceId = null;
@@ -223,6 +208,10 @@ public class SecurityConfig {
       action = "PATCH".equals(request.getMethod()) ? "contact.update_status" : "contact.delete";
       resourceId = path.substring("/api/v1/contacts/".length());
       resourceType = "contact";
+    } else if (vacancyDeniedAction != null) {
+      action = vacancyDeniedAction.action();
+      resourceId = vacancyDeniedAction.resourceId();
+      resourceType = "vacancy";
     } else {
       return;
     }
@@ -254,6 +243,33 @@ public class SecurityConfig {
     return "PATCH".equals(request.getMethod())
         && request.getRequestURI().startsWith("/api/v1/candidates/");
   }
+
+  private static boolean isVacancyMutation(jakarta.servlet.http.HttpServletRequest request) {
+    return vacancyDeniedAction(request) != null;
+  }
+
+  private static VacancyDeniedAction vacancyDeniedAction(
+      jakarta.servlet.http.HttpServletRequest request) {
+    String path = request.getRequestURI();
+    if ("POST".equals(request.getMethod()) && "/api/v1/vacancies".equals(path)) {
+      return new VacancyDeniedAction("vacancy.create", null);
+    }
+    String prefix = "/api/v1/vacancies/";
+    if (!"PATCH".equals(request.getMethod()) || !path.startsWith(prefix)) return null;
+    String[] segments = path.substring(prefix.length()).split("/", -1);
+    if (segments.length == 1 && !segments[0].isBlank()) {
+      return new VacancyDeniedAction("vacancy.update", segments[0]);
+    }
+    if (segments.length != 2 || segments[0].isBlank()) return null;
+    return switch (segments[1]) {
+      case "activate" -> new VacancyDeniedAction("vacancy.activate", segments[0]);
+      case "deactivate" -> new VacancyDeniedAction("vacancy.deactivate", segments[0]);
+      case "close" -> new VacancyDeniedAction("vacancy.close", segments[0]);
+      default -> null;
+    };
+  }
+
+  private record VacancyDeniedAction(String action, String resourceId) {}
 
   private boolean requiresInternalApiToken(
       boolean allowUnauthenticatedVacancyAccess, boolean allowUnauthenticatedMutations) {
