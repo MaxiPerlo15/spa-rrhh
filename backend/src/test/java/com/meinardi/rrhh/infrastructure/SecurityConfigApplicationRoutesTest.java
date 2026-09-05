@@ -204,6 +204,7 @@ class SecurityConfigApplicationRoutesTest {
     mockMvc
         .perform(vacancyCreate())
         .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(content().string("{\"error\":\"unauthorized\"}"));
 
     org.mockito.Mockito.verify(auditService)
@@ -230,6 +231,7 @@ class SecurityConfigApplicationRoutesTest {
                 .header("X-Forwarded-For", "203.0.113.10")
                 .header("User-Agent", "vacancy-post-test"))
         .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(content().string("{\"error\":\"forbidden\"}"));
 
     org.mockito.Mockito.verify(auditService)
@@ -250,6 +252,7 @@ class SecurityConfigApplicationRoutesTest {
     mockMvc
         .perform(vacancyDetailMutation(suffix))
         .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(content().string("{\"error\":\"unauthorized\"}"));
 
     org.mockito.Mockito.verify(auditService)
@@ -277,6 +280,7 @@ class SecurityConfigApplicationRoutesTest {
                 .header("X-Forwarded-For", "203.0.113.10")
                 .header("User-Agent", "vacancy-detail-test"))
         .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(content().string("{\"error\":\"forbidden\"}"));
 
     org.mockito.Mockito.verify(auditService)
