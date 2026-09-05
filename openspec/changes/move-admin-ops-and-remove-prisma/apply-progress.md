@@ -1,12 +1,12 @@
-# Apply Progress: Move Admin Operations and Remove Prisma — PR1b Typed Next BFF Session States
+# Apply Progress: Move Admin Operations and Remove Prisma — PR1c Flyway/Reconciliation Split Gate
 
 ## Delivery
 
 - Strategy: feature-branch-chain.
-- Work unit: PR1b — typed Spring-session-aware Next BFF/proxy states.
-- Boundary: `PR1a-fix → PR1b`; Spring security bridge, Flyway/reconciliation, admin operations, retention, policy, and Prisma are excluded.
-- Review budget: 120–180 changed lines. The tracked candidate is 231 additions + deletions including this local progress artifact, remaining below the 400-line limit.
-- Rollback: revert this typed BFF/proxy child only.
+- Work unit: PR1c — Flyway baseline adoption and AdminSettings reconciliation evidence.
+- Boundary: `PR1b → PR1c`; admin adapters, retention/policy, Next BFF changes, and Prisma removal remain excluded.
+- Review budget: the requested combined work is projected above the enforced 350-line planning budget and 400-line hard limit; no partial implementation was started.
+- Rollback: no source changes to revert.
 
 ## Completed Tasks
 
@@ -14,18 +14,21 @@
 - [x] PR1a 1.2a GREEN→REFACTOR: permission-authoritative session bridge (previous batch)
 - [x] PR1a-fix 1.2b RED→GREEN: configured cookie clearing and logout response propagation (previous batch)
 - [x] PR1b 1.3 RED→GREEN→REFACTOR: typed `authorized|anonymous|forbidden|unavailable` Spring BFF/proxy states.
+- [ ] PR1c 1.4 RED / 1.5 GREEN→REFACTOR: blocked before RED because Flyway adoption and immutable reconciliation evidence cannot be delivered coherently within the approved PR1c line budget.
 
-## Corrective Coverage
+## PR1c Split Gate
 
-- The browser-gate test now awaits `proxy()` with an `authorized` session and proves `NextResponse.next`, forwarded `SESSIONID`, generated nonce, and CSP header behavior.
-- A generic Spring 502 response now proves the existing non-401/403 failure mapping to `unavailable`.
-- No production behavior changed and no later slice was started.
+- Existing `application.yml` still has `spring.jpa.hibernate.ddl-auto: update`; PR1c must switch this to validation while introducing Flyway.
+- There are no Flyway dependencies, migration files, `AdminSettings` JPA model, reconciliation evidence models, or legacy-settings mappings in the backend.
+- A coherent implementation needs at minimum: the Flyway dependency/configuration, a captured V1 schema baseline, V2 evidence tables, immutable evidence persistence, normalization/checksum/approval logic, and focused unit/integration tests. This materially exceeds the 350-line plan.
+- Smallest safe split: **PR1c-a Flyway adoption** (dependency/configuration, captured V1 baseline, catalog-fingerprint preflight, adoption integration tests); then **PR1c-b reconciliation evidence** (V2 evidence tables, immutable models/service, normalization/verification/reset approval tests). PR1c-b must target PR1c-a.
 
 ## TDD Cycle Evidence
 
 | Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
 |---|---|---|---|---|---|---|---|
 | 1.3 | `src/lib/__tests__/{springSession,proxyBranches,proxySpringSession}.test.ts` | Unit | ✅ 23/23 focused tests before corrective coverage | ✅ Original task RED was recorded in prior apply-progress; corrective tests cover already-green production behavior, so they passed immediately without production edits | ✅ 25/25 focused tests; 433/433 full suite | ✅ Authorized browser pass-through and 502 unavailable add distinct paths to the existing anonymous/403/unavailable coverage | ➖ None needed — test-only corrective retry |
+| 1.4–1.5 | N/A | Unit + integration | ✅ `mvn test` baseline passed before planning | ➖ Blocked before RED — combined scope exceeds hard budget | ➖ Not started | ➖ Not started | ➖ Not started |
 
 ## Verification
 
@@ -36,4 +39,4 @@
 
 ## Status
 
-PR1b remains complete: 1/1 assigned task complete. The next child is PR1c and must target PR1b.
+PR1b remains complete. PR1c is blocked pending approval of the two-child split; no implementation, task checkbox, commit, or push was performed.
