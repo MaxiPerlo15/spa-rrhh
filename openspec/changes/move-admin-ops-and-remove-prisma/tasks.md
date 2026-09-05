@@ -35,6 +35,10 @@ Chain strategy: feature-branch-chain
 - [x] 2.3 **RED** add contracts for the bounded remaining detail/read slice (`vacancies/[id]` GET and `contacts/[id]` GET/PATCH/DELETE); **GREEN** migrate Spring-session forwarding, CSRF/origin, DTO/status/error and cookie parity without Prisma; verify focused Vitest. Candidate collection/detail handlers do not exist and application reads were already migrated.
 - [x] 2.4 **RED** add settings route parity and 404 regression contracts; **GREEN** reconcile GET/PATCH wiring to Spring `Usuario`/`AdminSettings`, approval evidence, and response shape; verify adapter plus PostgreSQL reconciliation integration tests.
 
+## Historical Completed Migration Evidence
+
+- [x] PR2b notification ownership/adapters were completed on the incoming migration chain; the detailed Spring CRUD, Next adapter, fixture, focused-test, and browser evidence is retained in `apply-progress.md`.
+
 ## Phase 3: Retention and Public Policy
 
 - [x] 3.1 **RED** add CV lease/concurrency, exact-key, supersede, retry/five-attempt, expired-lease, absent-object, and dry-run tests; **GREEN** implement Spring work items/worker/Flyway transactionally; verify targeted JUnit/Testcontainers.

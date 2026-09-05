@@ -14,7 +14,7 @@ vi.mock('@/lib/server/springBackend', () => ({
 vi.mock('@/lib/csrf', () => ({ rejectIfUntrustedOrigin: rejectIfUntrustedOriginMock }))
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }))
 
-const notificationId = 'notification-1'
+const notificationId = 'cmc7q8v1r0000v5r4f9k0m2n3'
 const cookie = { Cookie: 'SESSIONID=admin-session' }
 
 function request(method: 'PATCH' | 'DELETE', body?: string) {
@@ -40,7 +40,9 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
   it('forwards an authorized PATCH unchanged and preserves the Spring DTO', async () => {
     const payload = { isRead: true }
     const updated = { id: notificationId, title: 'New application', level: 'success', isRead: true }
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } }))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } })
+    )
     vi.stubGlobal('fetch', fetchMock)
     const { PATCH } = await import('@/app/api/admin/notifications/[id]/route')
 
@@ -49,10 +51,15 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toEqual(updated)
-    expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/admin/notifications/notification-1', {
-      method: 'PATCH', body: JSON.stringify(payload), cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', 'X-Backend-Api-Key': 'test-token', Cookie: 'SESSIONID=admin-session' }
-    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://spring.example.com/api/v1/admin/notifications/${notificationId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'X-Backend-Api-Key': 'test-token', Cookie: 'SESSIONID=admin-session' }
+      }
+    )
   })
 
   it.each([
@@ -61,9 +68,11 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
   ])('forwards the rotated validation session and appends cookies for %s', async (_method, upstreamCookie) => {
     const validationCookie = 'SESSIONID=S1; Path=/; HttpOnly; SameSite=Lax'
     getSpringSessionMock.mockResolvedValue({ state: 'authorized', setCookie: validationCookie })
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'ok' }), {
-      headers: { 'Content-Type': 'application/json', 'Set-Cookie': upstreamCookie }
-    }))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: 'ok' }), {
+        headers: { 'Content-Type': 'application/json', 'Set-Cookie': upstreamCookie }
+      })
+    )
     vi.stubGlobal('fetch', fetchMock)
     const { PATCH, DELETE } = await import('@/app/api/admin/notifications/[id]/route')
 
@@ -102,7 +111,9 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
 
   it('forwards a successful DELETE message unchanged', async () => {
     const deleted = { message: 'Notificación eliminada' }
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(deleted), { headers: { 'Content-Type': 'application/json' } }))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(deleted), { headers: { 'Content-Type': 'application/json' } })
+    )
     vi.stubGlobal('fetch', fetchMock)
     const { DELETE } = await import('@/app/api/admin/notifications/[id]/route')
 
@@ -111,13 +122,35 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toEqual(deleted)
-    expect(fetchMock).toHaveBeenCalledWith('https://spring.example.com/api/v1/admin/notifications/notification-1', {
-      method: 'DELETE', cache: 'no-store',
-      headers: { 'X-Backend-Api-Key': 'test-token', Cookie: 'SESSIONID=admin-session' }
-    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://spring.example.com/api/v1/admin/notifications/${notificationId}`,
+      {
+        method: 'DELETE',
+        cache: 'no-store',
+        headers: { 'X-Backend-Api-Key': 'test-token', Cookie: 'SESSIONID=admin-session' }
+      }
+    )
   })
 
-  it('returns a local no-store 400 for malformed PATCH JSON without proxying', async () => {
+  it('returns a local no-store 400 for an invalid notification id without proxying', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { DELETE } = await import('@/app/api/admin/notifications/[id]/route')
+    const response = await DELETE(
+      new NextRequest('https://spa-rrhh.test/api/admin/notifications/not-an-id', {
+        method: 'DELETE',
+        headers: { cookie: 'SESSIONID=admin-session' }
+      }),
+      { params: Promise.resolve({ id: 'not-an-id' }) }
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toMatchObject({ error: 'Datos inválidos' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns a no-store 400 for malformed PATCH JSON without proxying', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const { PATCH } = await import('@/app/api/admin/notifications/[id]/route')
@@ -160,5 +193,70 @@ describe('/api/admin/notifications/[id] Spring adapter', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toEqual({ error })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves Spring not-found envelopes when deleting a notification', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Notificación no encontrada' }), { status: 404 })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { DELETE } = await import('@/app/api/admin/notifications/[id]/route')
+    const response = await DELETE(request('DELETE'), params)
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toEqual({ error: 'Notificación no encontrada' })
+  })
+
+  it('maps an unreachable Spring backend to the browser 503 envelope', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')))
+    const { DELETE } = await import('@/app/api/admin/notifications/[id]/route')
+    const response = await DELETE(request('DELETE'), params)
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toEqual({ error: 'Spring backend unavailable' })
+  })
+
+  it('authorizes before CSRF, route validation, or JSON parsing for anonymous PATCH requests', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    getSpringSessionMock.mockResolvedValue({ state: 'anonymous' })
+    rejectIfUntrustedOriginMock.mockReturnValue(
+      new Response(JSON.stringify({ error: 'Origen no permitido' }), { status: 403 })
+    )
+
+    const { PATCH } = await import('@/app/api/admin/notifications/[id]/route')
+    const response = await PATCH(
+      new NextRequest('https://spa-rrhh.test/api/admin/notifications/not-an-id', {
+        method: 'PATCH',
+        headers: { origin: 'https://untrusted.example', 'Content-Type': 'application/json', cookie: 'SESSIONID=limited-session' },
+        body: '{'
+      }),
+      { params: Promise.resolve({ id: 'not-an-id' }) }
+    )
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toEqual({ error: 'No autorizado' })
+    expect(rejectIfUntrustedOriginMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 before route validation for authenticated non-admin DELETE requests', async () => {
+    getSpringSessionMock.mockResolvedValue({ state: 'forbidden' })
+    const { DELETE } = await import('@/app/api/admin/notifications/[id]/route')
+    const response = await DELETE(
+      new NextRequest('https://spa-rrhh.test/api/admin/notifications/not-an-id', {
+        method: 'DELETE',
+        headers: { cookie: 'SESSIONID=limited-session' }
+      }),
+      { params: Promise.resolve({ id: 'not-an-id' }) }
+    )
+
+    expect(response.status).toBe(403)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toEqual({ error: 'No autorizado' })
+    expect(rejectIfUntrustedOriginMock).not.toHaveBeenCalled()
   })
 })

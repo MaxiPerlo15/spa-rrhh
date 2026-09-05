@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
 import { rejectIfUntrustedOrigin } from '@/lib/csrf'
-import { formatValidationError, updateAdminNotificationSchema } from '@/lib/apiValidation'
+import { formatValidationError, routeIdSchema, updateAdminNotificationSchema } from '@/lib/apiValidation'
 import { getBackendUrl, getSpringBackendHeaders } from '@/lib/server/springBackend'
 import { getSpringSession } from '@/lib/springSession'
 import { relaySpringCookies } from '@/lib/server/adminBffBoundary'
@@ -19,6 +19,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const originRejection = rejectIfUntrustedOrigin(request)
   if (originRejection) return withNoStore(originRejection, authorization.setCookie)
 
+  const id = routeIdSchema.safeParse(await params)
+  if (!id.success) return json(formatValidationError(id.error), 400, authorization.setCookie)
+
   let body: unknown
   try {
     body = await request.json()
@@ -29,10 +32,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const validation = updateAdminNotificationSchema.safeParse(body)
   if (!validation.success) return json(formatValidationError(validation.error), 400, authorization.setCookie)
 
-  return proxy(request, await notificationPath(params), {
-    method: 'PATCH',
-    body: JSON.stringify(validation.data)
-  }, authorization.setCookie)
+  return proxy(
+    request,
+    notificationPath(id.data.id),
+    { method: 'PATCH', body: JSON.stringify(validation.data) },
+    authorization.setCookie
+  )
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
@@ -42,11 +47,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const originRejection = rejectIfUntrustedOrigin(request)
   if (originRejection) return withNoStore(originRejection, authorization.setCookie)
 
-  return proxy(request, await notificationPath(params), { method: 'DELETE' }, authorization.setCookie)
+  const id = routeIdSchema.safeParse(await params)
+  if (!id.success) return json(formatValidationError(id.error), 400, authorization.setCookie)
+
+  return proxy(request, notificationPath(id.data.id), { method: 'DELETE' }, authorization.setCookie)
 }
 
-async function notificationPath(params: RouteParams['params']) {
-  const { id } = await params
+function notificationPath(id: string) {
   return `/api/v1/admin/notifications/${encodeURIComponent(id)}`
 }
 
@@ -65,13 +72,19 @@ async function proxy(request: NextRequest, path: string, init: RequestInit, setC
         ...(cookie ? { Cookie: cookie } : {})
       }
     })
-    return relaySpringCookies(relaySpringCookies(new NextResponse(await response.text(), {
-      status: response.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        'Content-Type': response.headers.get('Content-Type') ?? 'application/json'
-      }
-    }), setCookie), response.headers)
+    return relaySpringCookies(
+      relaySpringCookies(
+        new NextResponse(await response.text(), {
+          status: response.status,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Content-Type': response.headers.get('Content-Type') ?? 'application/json'
+          }
+        }),
+        setCookie
+      ),
+      response.headers
+    )
   } catch (error) {
     logger.error('Spring backend unavailable for admin notification item', error)
     return json({ error: 'Spring backend unavailable' }, 503, setCookie)
@@ -90,10 +103,13 @@ async function authorize(request: NextRequest) {
 }
 
 function json(body: unknown, status: number, setCookie?: string) {
-  return relaySpringCookies(NextResponse.json(body, {
-    status,
-    headers: NO_STORE_HEADERS
-  }), setCookie)
+  return relaySpringCookies(
+    NextResponse.json(body, {
+      status,
+      headers: NO_STORE_HEADERS
+    }),
+    setCookie
+  )
 }
 
 function withNoStore(response: Response, setCookie?: string) {

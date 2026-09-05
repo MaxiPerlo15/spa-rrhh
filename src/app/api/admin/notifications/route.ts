@@ -24,7 +24,12 @@ export async function GET(request: NextRequest) {
   if (!validation.success) return json(formatValidationError(validation.error), 400, authorization.setCookie)
 
   const { view, page, limit } = validation.data
-  return proxy(request, `/api/v1/admin/notifications?view=${view}&page=${page}&limit=${limit}`, undefined, authorization.setCookie)
+  return proxy(
+    request,
+    `/api/v1/admin/notifications?view=${view}&page=${page}&limit=${limit}`,
+    undefined,
+    authorization.setCookie
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -44,10 +49,12 @@ export async function POST(request: NextRequest) {
   const validation = createAdminNotificationSchema.safeParse(body)
   if (!validation.success) return json(formatValidationError(validation.error), 400, authorization.setCookie)
 
-  return proxy(request, '/api/v1/admin/notifications', {
-    method: 'POST',
-    body: JSON.stringify(validation.data)
-  }, authorization.setCookie)
+  return proxy(
+    request,
+    '/api/v1/admin/notifications',
+    { method: 'POST', body: JSON.stringify(validation.data) },
+    authorization.setCookie
+  )
 }
 
 export async function DELETE(request: NextRequest) {
@@ -62,7 +69,12 @@ export async function DELETE(request: NextRequest) {
     return json({ error: 'Parámetro view inválido' }, 400, authorization.setCookie)
   }
 
-  return proxy(request, `/api/v1/admin/notifications?view=${view}`, { method: 'DELETE' }, authorization.setCookie)
+  return proxy(
+    request,
+    `/api/v1/admin/notifications?view=${view}`,
+    { method: 'DELETE' },
+    authorization.setCookie
+  )
 }
 
 async function proxy(request: NextRequest, path: string, init?: RequestInit, setCookie?: string) {
@@ -81,13 +93,19 @@ async function proxy(request: NextRequest, path: string, init?: RequestInit, set
       }
     })
 
-    return relaySpringCookies(relaySpringCookies(new NextResponse(await response.text(), {
-      status: response.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        'Content-Type': response.headers.get('Content-Type') ?? 'application/json'
-      }
-    }), setCookie), response.headers)
+    return relaySpringCookies(
+      relaySpringCookies(
+        new NextResponse(await response.text(), {
+          status: response.status,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Content-Type': response.headers.get('Content-Type') ?? 'application/json'
+          }
+        }),
+        setCookie
+      ),
+      response.headers
+    )
   } catch (error) {
     logger.error('Spring backend unavailable for admin notifications', error)
     return json({ error: 'Spring backend unavailable' }, 503, setCookie)
@@ -95,10 +113,13 @@ async function proxy(request: NextRequest, path: string, init?: RequestInit, set
 }
 
 function json(body: unknown, status: number, setCookie?: string) {
-  return relaySpringCookies(NextResponse.json(body, {
-    status,
-    headers: NO_STORE_HEADERS
-  }), setCookie)
+  return relaySpringCookies(
+    NextResponse.json(body, {
+      status,
+      headers: NO_STORE_HEADERS
+    }),
+    setCookie
+  )
 }
 
 async function authorize(request: NextRequest) {

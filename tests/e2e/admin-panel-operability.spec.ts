@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { encode } from 'next-auth/jwt'
 
 type AdminSettingsState = {
   notificationsEnabled: boolean
@@ -59,15 +57,57 @@ const adminSession = {
   expires: '2099-12-31T23:59:59.999Z'
 }
 
-const baseUrl = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000'
+const baseUrl = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3100'
+
+async function establishSpringAdminSession(page: Page) {
+  const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:8080').replace(/\/+$/, '')
+  const loginResponse = await page.request.post(`${backendUrl}/api/v1/auth/login`, {
+    data: {
+      email: readEnvValue('ADMIN_EMAIL'),
+      password: readEnvValue('ADMIN_PASSWORD')
+    }
+  })
+
+  if (!loginResponse.ok()) {
+    throw new Error(`Spring admin login failed with ${loginResponse.status()}`)
+  }
+
+  const sessionId = loginResponse.headers()['set-cookie']?.match(/SESSIONID=([^;]+)/)?.[1]
+  if (!sessionId) {
+    throw new Error('Spring admin login did not set SESSIONID')
+  }
+
+  const sessionResponse = await page.request.get(`${backendUrl}/api/v1/auth/me`, {
+    headers: { Cookie: `SESSIONID=${sessionId}` }
+  })
+  if (!sessionResponse.ok()) {
+    throw new Error(`Spring admin session validation failed with ${sessionResponse.status()}`)
+  }
+
+  const session = await sessionResponse.json() as { rol?: { permisos?: string[] } }
+  if (!session.rol?.permisos?.includes('admin:access')) {
+    throw new Error('Spring admin session is missing admin:access')
+  }
+
+  const rotatedSessionId = sessionResponse.headers()['set-cookie']?.match(/SESSIONID=([^;]+)/)?.[1]
+
+  await page.context().addCookies([
+    {
+      name: 'SESSIONID',
+      value: rotatedSessionId ?? sessionId,
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure: baseUrl.startsWith('https://')
+    }
+  ])
+}
 
 function readEnvValue(name: string): string {
-  const envText = readFileSync('.env', 'utf8')
-  const match = envText.match(new RegExp(`^${name}=(.*)$`, 'm'))
-  if (!match?.[1]) {
-    throw new Error(`Missing ${name} in .env`)
-  }
-  return match[1].trim().replace(/^['"]|['"]$/g, '')
+  const configuredValue = process.env[name]
+  if (configuredValue) return configuredValue
+
+  throw new Error(`Missing ${name} for the Spring admin fixture`)
 }
 
 async function mockAdminShell(page: Page, options?: {
@@ -76,28 +116,7 @@ async function mockAdminShell(page: Page, options?: {
   applications?: MockApplication[]
   contacts?: MockContact[]
 }) {
-  const sessionToken = await encode({
-    secret: readEnvValue('NEXTAUTH_SECRET'),
-    token: {
-      name: adminSession.user.name,
-      email: adminSession.user.email,
-      role: adminSession.user.role,
-      id: adminSession.user.id,
-      sub: adminSession.user.id
-    },
-    maxAge: 60 * 60 * 8
-  })
-
-  await page.context().addCookies([
-    {
-      name: 'next-auth.session-token',
-      value: sessionToken,
-      url: baseUrl,
-      httpOnly: true,
-      sameSite: 'Lax',
-      secure: false
-    }
-  ])
+  await establishSpringAdminSession(page)
 
   const settingsState: AdminSettingsState = options?.settings ?? {
     notificationsEnabled: true,
@@ -467,12 +486,14 @@ test.describe('Admin panel operability', () => {
     })
 
     await page.goto('/admin')
+    await expect(page).toHaveURL(/\/admin$/)
     await page.getByRole('button', { name: /Notificaciones del panel/i }).click()
 
     const notificationsDialog = page.getByRole('dialog', { name: /Notificaciones/i })
     await expect(notificationsDialog).toBeVisible()
     await expect(page.getByRole('button', { name: /Nuevas \(2\)/i })).toBeVisible()
     await expect(page.getByRole('button', { name: /Leidas \(1\)/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ver postulación' })).toBeVisible()
 
     await page.getByRole('button', { name: /^Marcar leida$/i }).first().click()
     await expect(page.getByRole('button', { name: /Nuevas \(1\)/i })).toBeVisible()

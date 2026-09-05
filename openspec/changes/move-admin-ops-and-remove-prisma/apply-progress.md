@@ -311,3 +311,9 @@ Tasks 3.1–3.4 are implemented. Phase 4 task 4.1 is complete: the captured isol
 ### Completion
 
 - [x] Task 3.1 CV retention lease/concurrency, exact-key deletion, supersession, retry/five-attempt, expired-lease, absent-object, dry-run, and transactional cleanup behavior is implemented and targeted-verified without commit, push, fetch, remote operation, or persistent database changes.
+
+## Historical PR2b Notification Evidence
+
+- The incoming notification migration recorded `npm run test:unit` — 459/459 passed; `cd backend && mvn test` — 229/229 passed; and isolated Spring + Next Chromium login → `/admin` → same-origin logout proof.
+- The reconstructed notification migration did not retain its original RED command history. The retained repair evidence is bounded to invalid bulk-delete views returning 400 without invoking deletion, with existing adapter, persistence, and browser coverage re-executed as the safety net.
+- This historical evidence does not alter the current Phase 3 retention plan or the newer cumulative Phase 3.1 completion above.
